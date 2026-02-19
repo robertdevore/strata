@@ -1,0 +1,208 @@
+import { create } from 'zustand'
+import type { Note, Settings } from '@shared/types'
+import { applyFiltersAndSort, type ActiveFilter } from '@renderer/src/domain/filtering'
+import { normalizeTag } from '@renderer/src/domain/noteUtils'
+import { notesService } from '@renderer/src/services/notesService'
+import { settingsService } from '@renderer/src/services/settingsService'
+
+type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
+
+interface AppState {
+	notes: Note[]
+	selectedNoteId: string | null
+	drafts: Record<string, string>
+	tags: Array<{ name: string; count: number }>
+	activeFilter: ActiveFilter
+	selectedTag: string | null
+	searchQuery: string
+	settings: Settings
+	showSettings: boolean
+	showFiltersPanel: boolean
+	saveState: SaveState
+	lastSavedAt: string | null
+	load: () => Promise<void>
+	refreshTags: () => Promise<void>
+	setSearchQuery: (value: string) => void
+	setActiveFilter: (value: ActiveFilter) => void
+	setSelectedTag: (value: string | null) => void
+	selectNote: (id: string | null) => void
+	createNote: () => Promise<void>
+	setDraft: (id: string, content: string) => void
+	flushDraft: (id: string) => Promise<void>
+	toggleStar: (id: string) => Promise<void>
+	toggleArchive: (id: string) => Promise<void>
+	deleteSelected: () => Promise<void>
+	setTagsForSelected: (tags: string[]) => Promise<void>
+	setShowSettings: (show: boolean) => void
+	setShowFiltersPanel: (show: boolean) => void
+	updateSettings: (patch: Partial<Settings>) => Promise<void>
+	filteredNotes: () => Note[]
+	selectedNote: () => Note | null
+	effectiveContent: () => string
+}
+
+const defaultSettings: Settings = {
+	theme: 'dark',
+	defaultView: 'all',
+	confirmDelete: true,
+	sortMode: 'updated_desc',
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+	notes: [],
+	selectedNoteId: null,
+	drafts: {},
+	tags: [],
+	activeFilter: 'all',
+	selectedTag: null,
+	searchQuery: '',
+	settings: defaultSettings,
+	showSettings: false,
+	showFiltersPanel: false,
+	saveState: 'idle',
+	lastSavedAt: null,
+
+	async load() {
+		const [notes, tags, settings] = await Promise.all([notesService.list(), notesService.listTags(), settingsService.get()])
+		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
+		const sorted = applyFiltersAndSort(notes, {
+			activeFilter,
+			selectedTag: null,
+			searchQuery: '',
+			sortMode: settings.sortMode,
+		})
+		set({ notes, tags, settings, activeFilter, selectedNoteId: sorted[0]?.id ?? null })
+	},
+
+	async refreshTags() {
+		set({ tags: await notesService.listTags() })
+	},
+
+	setSearchQuery(searchQuery) {
+		set({ searchQuery })
+	},
+
+	setActiveFilter(activeFilter) {
+		set({ activeFilter, selectedTag: null })
+	},
+
+	setSelectedTag(selectedTag) {
+		set({ selectedTag, activeFilter: 'all' })
+	},
+
+	selectNote(selectedNoteId) {
+		set({ selectedNoteId })
+	},
+
+	async createNote() {
+		const note = await notesService.create()
+		set((state) => ({
+			notes: [note, ...state.notes],
+			selectedNoteId: note.id,
+			drafts: { ...state.drafts, [note.id]: note.content },
+			saveState: 'saved',
+			lastSavedAt: note.updatedAt,
+		}))
+		await get().refreshTags()
+	},
+
+	setDraft(id, content) {
+		set((state) => ({
+			drafts: { ...state.drafts, [id]: content },
+			saveState: 'saving',
+		}))
+	},
+
+	async flushDraft(id) {
+		const draft = get().drafts[id]
+		if ('string' !== typeof draft) return
+		try {
+			const updated = await notesService.update(id, { content: draft })
+			if (!updated) return
+			set((state) => ({
+				notes: state.notes.map((note) => (note.id === id ? updated : note)),
+				saveState: 'saved',
+				lastSavedAt: updated.updatedAt,
+			}))
+		} catch {
+			set({ saveState: 'failed' })
+		}
+	},
+
+	async toggleStar(id) {
+		const current = get().notes.find((note) => note.id === id)
+		if (!current) return
+		const updated = await notesService.star(id, !current.starred)
+		if (!updated) return
+		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+	},
+
+	async toggleArchive(id) {
+		const current = get().notes.find((note) => note.id === id)
+		if (!current) return
+		const updated = await notesService.archive(id, !current.archived)
+		if (!updated) return
+		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+		await get().refreshTags()
+	},
+
+	async deleteSelected() {
+		const id = get().selectedNoteId
+		if (!id) return
+		if (!(await notesService.delete(id))) return
+		set((state) => {
+			const notes = state.notes.filter((note) => note.id !== id)
+			const drafts = { ...state.drafts }
+			delete drafts[id]
+			return {
+				notes,
+				drafts,
+				selectedNoteId: notes[0]?.id ?? null,
+			}
+		})
+		await get().refreshTags()
+	},
+
+	async setTagsForSelected(tags) {
+		const id = get().selectedNoteId
+		if (!id) return
+		const normalized = [...new Set(tags.map((tag) => normalizeTag(tag)).filter(Boolean))]
+		const updated = await notesService.update(id, { tags: normalized })
+		if (!updated) return
+		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+		await get().refreshTags()
+	},
+
+	setShowSettings(showSettings) {
+		set({ showSettings })
+	},
+
+	setShowFiltersPanel(showFiltersPanel) {
+		set({ showFiltersPanel })
+	},
+
+	async updateSettings(patch) {
+		set({ settings: await settingsService.set(patch) })
+	},
+
+	filteredNotes() {
+		const state = get()
+		return applyFiltersAndSort(state.notes, {
+			activeFilter: state.activeFilter,
+			selectedTag: state.selectedTag,
+			searchQuery: state.searchQuery,
+			sortMode: state.settings.sortMode,
+		})
+	},
+
+	selectedNote() {
+		const state = get()
+		return state.selectedNoteId ? state.notes.find((note) => note.id === state.selectedNoteId) ?? null : null
+	},
+
+	effectiveContent() {
+		const state = get()
+		if (!state.selectedNoteId) return ''
+		return state.drafts[state.selectedNoteId] ?? state.notes.find((note) => note.id === state.selectedNoteId)?.content ?? ''
+	},
+}))

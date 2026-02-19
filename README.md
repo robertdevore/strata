@@ -1,0 +1,176 @@
+# Strata
+
+Strata is a local-first desktop markdown notes app built with Electron, React, and TypeScript.
+
+It is designed for focused writing with fast note capture, keyboard-first workflows, and zero required cloud services.
+
+## Why Strata
+
+- Local-first by default (your notes stay on your machine)
+- Minimal UI with dark/light/system theme support
+- Fast filtering and search across notes
+- Markdown editing with autosave and save-state feedback
+- Tagging, starring, archiving, and keyboard shortcuts for daily flow
+
+## Features
+
+- Markdown notes with autosave (`Saving…`, `Saved`, `Save failed`)
+- Sidebar filters: `All`, `Starred`, `Archived`, `Untagged`
+- Full-text search and tag filtering
+- Star / archive / delete actions + right-click context menu
+- Tag editor with existing-tag suggestions
+- Settings for theme, default view, delete confirmation, and sort mode
+- Secure Electron defaults (`contextIsolation`, `sandbox`, no renderer Node access)
+
+## Installation
+
+### Option 1: Download a release build
+
+From GitHub Releases, download the build for your platform:
+
+- macOS: `.dmg`
+- Windows: `.exe` (NSIS)
+- Linux: `.AppImage`
+
+### Option 2: Run from source
+
+Requirements:
+
+- Node.js 20+
+- npm
+
+```bash
+npm install
+npm run dev
+```
+
+## Scripts
+
+```bash
+npm run dev        # Start Strata in development mode
+npm run build      # Build renderer + main + preload
+npm run dist       # Create release artifacts with electron-builder
+npm run test       # Run test suite once
+npm run test:watch # Run tests in watch mode
+npm run lint       # Lint project
+npm run format     # Format project
+npm run backup:notes # Backup local notes database files
+```
+
+## Build outputs
+
+- Application bundles: `dist/renderer`, `dist/main`, `dist/preload`
+- Release artifacts: `release/`
+
+## Data & privacy
+
+- Notes and settings are stored in local SQLite
+- Default path: `app.getPath('userData')/data/strata.sqlite`
+- No cloud sync is required
+
+## Backups
+
+Strata stores notes in SQLite and uses WAL mode, so backups should include all database sidecar files.
+
+Run a timestamped backup (default destination: `~/StrataBackups`):
+
+```bash
+npm run backup:notes
+```
+
+Backup to a custom location (for offsite sync folders, external drive paths, etc.):
+
+```bash
+./scripts/backup-notes.sh "$HOME/Dropbox/StrataBackups"
+```
+
+The backup includes:
+
+- `strata.sqlite`
+- `strata.sqlite-wal` (if present)
+- `strata.sqlite-shm` (if present)
+
+Default data source path on macOS:
+
+- `~/Library/Application Support/Strata/data`
+
+If your `userData` location is custom, override source path:
+
+```bash
+STRATA_USER_DATA_DIR="/custom/path/to/data" npm run backup:notes
+```
+
+## Keyboard shortcuts
+
+- `Cmd/Ctrl+N` — New note
+- `Cmd/Ctrl+F` — Focus search
+- `Cmd/Ctrl+Shift+F` — Toggle filters panel
+- `Cmd/Ctrl+S` — Save note
+- `Cmd/Ctrl+Backspace` — Delete selected note
+- `Cmd/Ctrl+Shift+A` — Toggle archive
+- `Cmd/Ctrl+Shift+S` — Toggle star
+- `Esc` — Close open modal/popover
+
+## Architecture
+
+### Main process (`app/main`)
+
+- Creates and secures the BrowserWindow
+- Registers typed IPC handlers
+- Manages SQLite access and migrations
+
+### Preload (`app/preload`)
+
+- Exposes typed API bridge as `window.strata`
+- Uses `ipcRenderer.invoke` for narrow, explicit IPC
+
+### Renderer (`app/renderer/src`)
+
+- React UI + Zustand app state
+- Services layer for notes/settings actions
+- Domain utilities for note filtering/sorting
+
+### Shared (`app/shared`)
+
+- Shared type contracts between main/preload/renderer
+
+## API surface (preload bridge)
+
+`window.strata` includes:
+
+- `notes.list(filters)`
+- `notes.get(id)`
+- `notes.create()`
+- `notes.update(id, patch)`
+- `notes.delete(id)`
+- `notes.archive(id, archived)`
+- `notes.star(id, starred)`
+- `tags.list()`
+- `settings.get()`
+- `settings.set(patch)`
+
+## Troubleshooting
+
+### Native module issues (`better-sqlite3`)
+
+If Electron cannot load `better-sqlite3`, rebuild it against your Electron version:
+
+```bash
+npm rebuild better-sqlite3 --runtime=electron --target=40.4.1 --disturl=https://electronjs.org/headers
+```
+
+### VS Code TypeScript phantom errors
+
+If editor-only errors appear but `npm run build` passes:
+
+- Run `TypeScript: Restart TS Server`
+- Or run `Developer: Reload Window`
+
+## Roadmap hooks
+
+Strata already includes a publish-provider abstraction for future integrations:
+
+- `integrations/publish/PublishProvider.ts`
+- `integrations/publish/providers/DummyProvider.ts`
+
+This keeps external publishing features decoupled from core note storage and UI flows.

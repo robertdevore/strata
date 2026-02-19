@@ -1,0 +1,76 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.pid
+
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+build
+release
+out
+dist-ssr
+index-*.js
+index-*.css
+*.tsbuildinfo
+
+# Test / coverage
+coverage
+.nyc_output
+
+# Local environment
+.env
+.env.*
+!.env.example
+*.local
+.envrc
+.direnv/
+
+# Secrets / credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+*.kdbx
+.npmrc
+.yarnrc
+.yarnrc.yml
+.pypirc
+.netrc
+.git-credentials
+
+# Local data files
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+# Package manager caches
+.npm
+.pnpm-store
+.yarn/cache
+.yarn/unplugged
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
