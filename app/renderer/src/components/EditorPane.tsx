@@ -9,7 +9,7 @@ import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
 import { CheatSheetModal } from './CheatSheetModal'
-import { ArchiveIcon, StarFilledIcon, StarOutlineIcon, TrashIcon } from './icons'
+import { ArchiveIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
 
 interface EditorPaneProps {
 	note: Note | null
@@ -97,8 +97,8 @@ export function EditorPane(props: EditorPaneProps) {
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
 					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
-					<button className="chip" onClick={() => setShowTagsEditor(true)}>Tags</button>
-					<button className={`chip ${showPreview ? 'chip-active' : ''}`} onClick={() => setShowPreview((value) => !value)}>Preview</button>
+					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
+					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => setShowPreview((value) => !value)} title="Preview"><EyeIcon /></button>
 				</div>
 			</header>
 			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showPreview ? `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)` : 'minmax(0, 1fr)' }}>

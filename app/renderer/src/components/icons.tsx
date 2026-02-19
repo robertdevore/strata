@@ -105,6 +105,26 @@ export function ArchiveIcon(props: IconProps) {
 	)
 }
 
+export function EyeIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+			<path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+		</BaseIcon>
+	)
+}
+
+export function TagIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M6.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+			<path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3" />
+		</BaseIcon>
+	)
+}
+
 export function CloseIcon(props: IconProps) {
 	return (
 		<BaseIcon {...props}>

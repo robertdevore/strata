@@ -329,9 +329,12 @@ button:focus-visible,
 	justify-content: space-between;
 	align-items: center;
 	gap: 10px;
+	min-width: 0;
 }
 
 .note-row-title {
+	flex: 1;
+	min-width: 0;
 	font-size: 14px;
 	white-space: nowrap;
 	overflow: hidden;
@@ -374,6 +377,7 @@ button:focus-visible,
 	display: flex;
 	align-items: center;
 	gap: 6px;
+	flex-shrink: 0;
 }
 
 .note-row-star {
@@ -500,6 +504,7 @@ button:focus-visible,
 	flex: 1;
 	display: grid;
 	grid-template-columns: 1fr auto;
+	padding: 10px;
 	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
@@ -604,6 +609,10 @@ button:focus-visible,
 	min-height: 0;
 	min-width: 0;
 	height: 100%;
+}
+
+.cm-content {
+	padding: 10px 12px;
 }
 
 .cm-scroller {
