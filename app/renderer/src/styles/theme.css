@@ -528,12 +528,45 @@ button:focus-visible,
 }
 
 .preview-panel {
-	width: min(40vw, 460px);
+	width: 100%;
 	overflow: auto;
 	padding: 14px;
 	color: var(--text-2);
 	min-height: 0;
 	min-width: 0;
+}
+
+.toolbar-menu {
+	position: relative;
+}
+
+.editor-export-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	min-width: 96px;
+	z-index: 96;
+	background: var(--sidebar-bg);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 6px;
+	display: grid;
+	gap: 4px;
+}
+
+.editor-export-menu button {
+	text-align: left;
+	border: none;
+	padding: 8px;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-2);
+	cursor: pointer;
+}
+
+.editor-export-menu button:hover {
+	background: var(--hover);
+	color: var(--text);
 }
 
 .panel-resizer {

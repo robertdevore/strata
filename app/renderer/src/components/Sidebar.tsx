@@ -121,17 +121,6 @@ export function Sidebar(props: SidebarProps) {
 							<div className="note-row-icons">
 								<button
 									type="button"
-									className={`note-row-star ${note.starred ? 'starred' : ''}`}
-									onClick={(event) => {
-										event.stopPropagation()
-										props.onStarToggle(note.id)
-									}}
-									title={note.starred ? 'Unstar Note' : 'Star Note'}
-								>
-									{note.starred ? <StarFilledIcon size={14} /> : <StarOutlineIcon size={14} />}
-								</button>
-								<button
-									type="button"
 									className="note-row-delete"
 									onClick={(event) => {
 										event.stopPropagation()
@@ -140,6 +129,17 @@ export function Sidebar(props: SidebarProps) {
 									title="Delete Note"
 								>
 									<TrashIcon size={14} />
+								</button>
+								<button
+									type="button"
+									className={`note-row-star ${note.starred ? 'starred' : ''}`}
+									onClick={(event) => {
+										event.stopPropagation()
+										props.onStarToggle(note.id)
+									}}
+									title={note.starred ? 'Unstar Note' : 'Star Note'}
+								>
+									{note.starred ? <StarFilledIcon size={14} /> : <StarOutlineIcon size={14} />}
 								</button>
 							</div>
 						</div>
