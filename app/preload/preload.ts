@@ -19,6 +19,9 @@ const api: StrataApi = {
 		get: () => ipcRenderer.invoke(IPC_CHANNELS.settingsGet),
 		set: (patch) => ipcRenderer.invoke(IPC_CHANNELS.settingsSet, patch),
 	},
+	exports: {
+		pdf: (payload) => ipcRenderer.invoke(IPC_CHANNELS.exportPdf, payload),
+	},
 	onCommand: (listener) => {
 		const wrapped = (_event: Electron.IpcRendererEvent, command: string) => listener(command)
 		ipcRenderer.on('ui:command', wrapped)

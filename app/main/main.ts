@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { StrataDatabase } from './db/index'
 import { registerNotesHandlers } from './ipc/notesHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
+import { registerExportHandlers } from './ipc/exportHandlers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -123,6 +124,7 @@ app.whenReady().then(() => {
 	const db = new StrataDatabase(app.getPath('userData'))
 	registerNotesHandlers(db)
 	registerSettingsHandlers(db)
+	registerExportHandlers()
 
 	createWindow()
 	app.on('activate', () => {

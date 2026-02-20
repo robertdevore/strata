@@ -9,4 +9,5 @@ export const IPC_CHANNELS = {
 	tagsList: 'tags:list',
 	settingsGet: 'settings:get',
 	settingsSet: 'settings:set',
+	exportPdf: 'export:pdf',
 } as const

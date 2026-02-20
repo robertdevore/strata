@@ -4,12 +4,13 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
 import ReactMarkdown from 'react-markdown'
+import { renderToStaticMarkup } from 'react-dom/server'
 import remarkGfm from 'remark-gfm'
 import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
 import { CheatSheetModal } from './CheatSheetModal'
-import { ArchiveIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ArchiveIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
 
 interface EditorPaneProps {
 	note: Note | null
@@ -32,15 +33,83 @@ const saveLabel = (state: string, last: string | null): string => {
 	return 'Saved'
 }
 
+const sanitizeFileName = (value: string): string => {
+	const cleaned = value.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim()
+	return cleaned || 'untitled-note'
+}
+
+const triggerDownload = (blob: Blob, file_name: string) => {
+	const url = URL.createObjectURL(blob)
+	const link = document.createElement('a')
+	link.href = url
+	link.download = file_name
+	document.body.appendChild(link)
+	link.click()
+	link.remove()
+	URL.revokeObjectURL(url)
+}
+
+const renderMarkdownHtmlFragment = (markdown_content: string): string => {
+	return renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown_content || ''}</ReactMarkdown>)
+}
+
+const renderStyledMarkdownHtml = (title: string, markdown_content: string): string => {
+	const html_content = renderMarkdownHtmlFragment(markdown_content)
+
+	return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${title}</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1f2730; margin: 32px; }
+h1,h2,h3,h4,h5,h6 { margin: 0 0 10px; line-height: 1.3; color: #0f1820; }
+p,ul,ol,blockquote,pre { margin: 0 0 10px; line-height: 1.55; }
+ul,ol { padding-left: 24px; }
+code { background: #eef1f4; border: 1px solid #d6dbe0; border-radius: 6px; padding: 0 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+pre code { display: block; padding: 10px; white-space: pre-wrap; }
+blockquote { border-left: 3px solid #d6dbe0; padding-left: 12px; color: #5a6670; }
+a { color: #3c6e8f; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 10px; }
+th,td { border: 1px solid #d6dbe0; padding: 6px 8px; text-align: left; }
+</style>
+</head>
+<body>
+${html_content}
+</body>
+</html>`
+}
+
+const exportAsPdf = async (title: string, markdown_content: string) => {
+	const html = renderStyledMarkdownHtml(title, markdown_content)
+	const pdf_bytes = await window.strata.exports.pdf({ html })
+	const pdf_data = pdf_bytes instanceof Uint8Array ? pdf_bytes : new Uint8Array(pdf_bytes)
+	const pdf_array = Uint8Array.from(pdf_data)
+	const output_title = sanitizeFileName(title)
+	triggerDownload(new Blob([pdf_array.buffer], { type: 'application/pdf' }), `${output_title}.pdf`)
+}
+
+const exportAsDoc = (title: string, markdown_content: string) => {
+	const html = renderStyledMarkdownHtml(title, markdown_content)
+	const output_title = sanitizeFileName(title)
+	triggerDownload(new Blob([html], { type: 'application/msword;charset=utf-8' }), `${output_title}.doc`)
+}
+
 export function EditorPane(props: EditorPaneProps) {
 	const { note, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
 	const [showCheatSheet, setShowCheatSheet] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
+	const [showExportMenu, setShowExportMenu] = useState(false)
+	const [exportStatus, setExportStatus] = useState('')
+	const [showSaveStatus, setShowSaveStatus] = useState(false)
 	const [previewWidth, setPreviewWidth] = useState(420)
 	const debounceRef = useRef<number | null>(null)
+	const exportStatusRef = useRef<number | null>(null)
+	const saveStatusRef = useRef<number | null>(null)
 	const noteIdRef = useRef<string | null>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
+	const exportMenuRef = useRef<HTMLDivElement>(null)
 	const isLightTheme = document.body.classList.contains('theme-light')
 
 	useEffect(() => {
@@ -53,8 +122,43 @@ export function EditorPane(props: EditorPaneProps) {
 	useEffect(() => {
 		return () => {
 			if (debounceRef.current) window.clearTimeout(debounceRef.current)
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
 		}
 	}, [])
+
+	useEffect(() => {
+		if ('saving' === saveState || 'failed' === saveState) {
+			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
+			setShowSaveStatus(true)
+			return
+		}
+
+		if ('saved' === saveState) {
+			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
+			setShowSaveStatus(true)
+			saveStatusRef.current = window.setTimeout(() => setShowSaveStatus(false), 3000)
+			return
+		}
+
+		if ('idle' === saveState && !lastSavedAt) {
+			setShowSaveStatus(false)
+		}
+	}, [saveState, lastSavedAt])
+
+	useEffect(() => {
+		if (!showExportMenu) return
+
+		const onPointerDown = (event: MouseEvent) => {
+			if (!exportMenuRef.current) return
+			if (event.target instanceof Node && !exportMenuRef.current.contains(event.target)) {
+				setShowExportMenu(false)
+			}
+		}
+
+		window.addEventListener('mousedown', onPointerDown)
+		return () => window.removeEventListener('mousedown', onPointerDown)
+	}, [showExportMenu])
 
 	const existingTags = tags.map((item) => item.name)
 
@@ -88,15 +192,52 @@ export function EditorPane(props: EditorPaneProps) {
 		)
 	}
 
+	const exportNote = async (format: 'md' | 'pdf' | 'doc') => {
+		const title = sanitizeFileName(deriveNoteTitle(content))
+		try {
+			if ('md' === format) {
+				triggerDownload(new Blob([content], { type: 'text/markdown;charset=utf-8' }), `${title}.md`)
+			}
+			if ('doc' === format) {
+				exportAsDoc(title, content)
+			}
+			if ('pdf' === format) {
+				await exportAsPdf(title, content)
+			}
+
+			setExportStatus(`Exported as .${format}`)
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+		} catch (_error) {
+			setExportStatus(`Export failed (.${format})`)
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+		}
+
+		setShowExportMenu(false)
+	}
+
+	const toolbar_status = exportStatus || (showSaveStatus ? saveLabel(saveState, lastSavedAt) : '')
+
 	return (
 		<section className="editor">
 			<header className="editor-header">
 				<h2>{deriveNoteTitle(content)}</h2>
 				<div className="editor-actions">
-					<span className="save-status">{saveLabel(saveState, lastSavedAt)}</span>
+					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
 					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
+					<div className="toolbar-menu" ref={exportMenuRef}>
+						<button className={`icon-button ${showExportMenu ? 'chip-active' : ''}`} onClick={() => setShowExportMenu((value) => !value)} title="Export Note"><ExportIcon /></button>
+						{showExportMenu && (
+							<div className="editor-export-menu">
+								<button onClick={() => void exportNote('md')}>.md</button>
+								<button onClick={() => void exportNote('pdf')}>.pdf</button>
+								<button onClick={() => void exportNote('doc')}>.doc</button>
+							</div>
+						)}
+					</div>
 					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
 					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => setShowPreview((value) => !value)} title="Preview"><EyeIcon /></button>
 				</div>

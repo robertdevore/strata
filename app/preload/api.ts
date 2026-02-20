@@ -17,5 +17,8 @@ export interface StrataApi {
 		get: () => Promise<Settings>
 		set: (patch: Partial<Settings>) => Promise<Settings>
 	}
+	exports: {
+		pdf: (payload: { html: string }) => Promise<Uint8Array>
+	}
 	onCommand: (listener: (command: string) => void) => () => void
 }
