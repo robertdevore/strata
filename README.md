@@ -22,6 +22,28 @@ It is designed for focused writing with fast note capture, keyboard-first workfl
 - Settings for theme, default view, delete confirmation, and sort mode
 - Secure Electron defaults (`contextIsolation`, `sandbox`, no renderer Node access)
 
+## 0.2.0 release notes
+
+- Rich-text paste now converts clipboard HTML into Markdown (headings, lists, emphasis, links, images, etc.)
+- Sidebar header now shows inline app version (`STRATA v0.2.0`)
+- New note UX now places the cursor after `# Untitled` with a blank line ready for writing
+- Desktop menu behavior improved with native window/application shortcuts (including `Cmd+W` on macOS)
+- Note switching regression fixed (selecting a note reliably opens that note)
+
+## Release checklist
+
+Use this sequence before publishing a GitHub release:
+
+```bash
+npm install
+npm run lint
+npm run test
+npm run build
+npm run dist
+```
+
+Artifacts are produced in `release/`.
+
 ## Installation
 
 ### Option 1: Download a release build
@@ -109,6 +131,7 @@ STRATA_USER_DATA_DIR="/custom/path/to/data" npm run backup:notes
 - `Cmd/Ctrl+Backspace` — Delete selected note
 - `Cmd/Ctrl+Shift+A` — Toggle archive
 - `Cmd/Ctrl+Shift+S` — Toggle star
+- `Cmd+W` (macOS) — Close window
 - `Esc` — Close open modal/popover
 
 ## Architecture
