@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
+import { EditorSelection } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import ReactMarkdown from 'react-markdown'
 import { renderToStaticMarkup } from 'react-dom/server'
 import remarkGfm from 'remark-gfm'
+import TurndownService from 'turndown'
 import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
@@ -95,6 +97,42 @@ const exportAsDoc = (title: string, markdown_content: string) => {
 	triggerDownload(new Blob([html], { type: 'application/msword;charset=utf-8' }), `${output_title}.doc`)
 }
 
+const turndown_service = new TurndownService({
+	headingStyle: 'atx',
+	codeBlockStyle: 'fenced',
+	bulletListMarker: '-',
+	emDelimiter: '*',
+})
+
+turndown_service.keep(['u'])
+
+const convertRichTextToMarkdown = (html_content: string): string => {
+	try {
+		return turndown_service.turndown(html_content).trimEnd()
+	} catch {
+		return ''
+	}
+}
+
+const richTextPasteExtension = EditorView.domEventHandlers({
+	paste: (event, view) => {
+		const html_content = event.clipboardData?.getData('text/html') ?? ''
+		if (!html_content.trim()) return false
+
+		const markdown_content = convertRichTextToMarkdown(html_content)
+		if (!markdown_content) return false
+
+		const transaction = view.state.changeByRange((range) => ({
+			changes: { from: range.from, to: range.to, insert: markdown_content },
+			range: EditorSelection.cursor(range.from + markdown_content.length),
+		}))
+
+		view.dispatch(transaction)
+		event.preventDefault()
+		return true
+	},
+})
+
 export function EditorPane(props: EditorPaneProps) {
 	const { note, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
@@ -108,6 +146,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const exportStatusRef = useRef<number | null>(null)
 	const saveStatusRef = useRef<number | null>(null)
 	const noteIdRef = useRef<string | null>(null)
+	const editorViewRef = useRef<EditorView | null>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
 	const exportMenuRef = useRef<HTMLDivElement>(null)
 	const isLightTheme = document.body.classList.contains('theme-light')
@@ -130,19 +169,19 @@ export function EditorPane(props: EditorPaneProps) {
 	useEffect(() => {
 		if ('saving' === saveState || 'failed' === saveState) {
 			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
-			setShowSaveStatus(true)
+			window.setTimeout(() => setShowSaveStatus(true), 0)
 			return
 		}
 
 		if ('saved' === saveState) {
 			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
-			setShowSaveStatus(true)
+			window.setTimeout(() => setShowSaveStatus(true), 0)
 			saveStatusRef.current = window.setTimeout(() => setShowSaveStatus(false), 3000)
 			return
 		}
 
 		if ('idle' === saveState && !lastSavedAt) {
-			setShowSaveStatus(false)
+			window.setTimeout(() => setShowSaveStatus(false), 0)
 		}
 	}, [saveState, lastSavedAt])
 
@@ -159,6 +198,19 @@ export function EditorPane(props: EditorPaneProps) {
 		window.addEventListener('mousedown', onPointerDown)
 		return () => window.removeEventListener('mousedown', onPointerDown)
 	}, [showExportMenu])
+
+	useEffect(() => {
+		if (!note || '# Untitled\n\n' !== content) return
+		window.setTimeout(() => {
+			if (!editorViewRef.current) return
+			const cursor_position = content.length
+			editorViewRef.current.dispatch({
+				selection: { anchor: cursor_position },
+				scrollIntoView: true,
+			})
+			editorViewRef.current.focus()
+		}, 0)
+	}, [note, content])
 
 	const existingTags = tags.map((item) => item.name)
 
@@ -208,7 +260,7 @@ export function EditorPane(props: EditorPaneProps) {
 			setExportStatus(`Exported as .${format}`)
 			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
 			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
-		} catch (_error) {
+		} catch {
 			setExportStatus(`Export failed (.${format})`)
 			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
 			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
@@ -247,7 +299,10 @@ export function EditorPane(props: EditorPaneProps) {
 					<CodeMirror
 						value={content}
 						height="100%"
-						extensions={[markdown(), EditorView.lineWrapping]}
+						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension]}
+						onCreateEditor={(view) => {
+							editorViewRef.current = view
+						}}
 						theme={isLightTheme ? 'light' : oneDark}
 						basicSetup={{
 							lineNumbers: false,
