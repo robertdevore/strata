@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
 import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
@@ -18,13 +18,14 @@ const applyThemeClass = (theme: 'dark' | 'light' | 'system') => {
 
 export function App() {
 	const store = useAppStore()
+	const load = useAppStore((state) => state.load)
 	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 	const [sidebarWidth, setSidebarWidth] = useState(320)
 
 	useEffect(() => {
-		void store.load()
-	}, [])
+		void load()
+	}, [load])
 
 	useEffect(() => {
 		document.body.classList.toggle('platform-mac', isMac)
@@ -35,21 +36,18 @@ export function App() {
 		applyThemeClass(store.settings.theme)
 	}, [store.settings.theme])
 
-	const notes = useMemo(
-		() => store.filteredNotes(),
-		[store.notes, store.activeFilter, store.searchQuery, store.selectedTag, store.settings.sortMode],
-	)
+	const notes = store.filteredNotes()
 
-	const onDelete = async (id: string) => {
+	const onDelete = useCallback(async (id: string) => {
 		if (store.settings.confirmDelete) {
 			setPendingDeleteId(id)
 			return
 		}
 		if (store.selectedNoteId !== id) store.selectNote(id)
 		await store.deleteSelected()
-	}
+	}, [store])
 
-	const runCommand = async (command: UiCommand) => {
+	const runCommand = useCallback(async (command: UiCommand) => {
 		if ('new-note' === command) return store.createNote()
 		if ('focus-search' === command) return window.dispatchEvent(new CustomEvent('strata:focus-search'))
 		if ('save-note' === command && store.selectedNoteId) return store.flushDraft(store.selectedNoteId)
@@ -57,7 +55,7 @@ export function App() {
 		if ('toggle-archive' === command && store.selectedNoteId) return store.toggleArchive(store.selectedNoteId)
 		if ('toggle-filters' === command) return store.setShowFiltersPanel(!store.showFiltersPanel)
 		if ('delete-note' === command && store.selectedNoteId) return onDelete(store.selectedNoteId)
-	}
+	}, [onDelete, store])
 
 	const startSidebarResize = (event: React.MouseEvent<HTMLDivElement>) => {
 		if (sidebarCollapsed) return
@@ -84,7 +82,7 @@ export function App() {
 			void runCommand(command as UiCommand)
 		})
 		return unsubscribe
-	}, [store.selectedNoteId, store.showFiltersPanel])
+	}, [runCommand])
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -128,7 +126,7 @@ export function App() {
 		}
 		window.addEventListener('keydown', onKeyDown)
 		return () => window.removeEventListener('keydown', onKeyDown)
-	}, [store.selectedNoteId, store.settings.confirmDelete, store.showFiltersPanel])
+	}, [runCommand, store])
 
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
