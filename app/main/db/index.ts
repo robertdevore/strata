@@ -87,7 +87,7 @@ export class StrataDatabase {
 		}
 		if (filters?.tag) {
 			where.push("tags LIKE ?")
-			values.push(`%\"${filters.tag}\"%`)
+			values.push(`%"${filters.tag}"%`)
 		}
 		if (filters?.query) {
 			where.push('(content LIKE ? OR tags LIKE ?)')

@@ -13,7 +13,9 @@ export function TagsEditor({ open, currentTags, existingTags, onClose, onApply }
 	const [value, setValue] = useState('')
 
 	useEffect(() => {
-		if (open) setValue(currentTags.join(', '))
+		if (open) {
+			window.setTimeout(() => setValue(currentTags.join(', ')), 0)
+		}
 	}, [open, currentTags])
 
 	const suggestions = useMemo(() => {

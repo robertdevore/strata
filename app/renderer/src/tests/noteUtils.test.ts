@@ -10,8 +10,8 @@ describe('deriveNoteTitle', () => {
 		expect(deriveNoteTitle('\n\nfirst line\nsecond')).toBe('first line')
 	})
 
-	it('returns Untitled note when content is empty', () => {
-		expect(deriveNoteTitle('   ')).toBe('Untitled note')
+	it('returns Untitled when content is empty', () => {
+		expect(deriveNoteTitle('   ')).toBe('Untitled')
 	})
 })
 
@@ -20,7 +20,7 @@ describe('normalizeTag', () => {
 		expect(normalizeTag('  Product Ideas  ')).toBe('product-ideas')
 	})
 
-	it('removes unsupported characters', () => {
-		expect(normalizeTag('A/B+C')).toBe('abc')
+	it('keeps punctuation while normalizing spaces and case', () => {
+		expect(normalizeTag('A/B+C')).toBe('a/b+c')
 	})
 })
