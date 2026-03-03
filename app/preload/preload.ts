@@ -9,6 +9,7 @@ const api: StrataApi = {
 		create: () => ipcRenderer.invoke(IPC_CHANNELS.notesCreate),
 		update: (id, patch) => ipcRenderer.invoke(IPC_CHANNELS.notesUpdate, { id, patch }),
 		delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesDelete, { id }),
+		restore: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesRestore, { id }),
 		archive: (id, archived) => ipcRenderer.invoke(IPC_CHANNELS.notesArchive, { id, archived }),
 		star: (id, starred) => ipcRenderer.invoke(IPC_CHANNELS.notesStar, { id, starred }),
 	},

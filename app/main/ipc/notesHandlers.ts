@@ -51,6 +51,11 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
 		return db.deleteNote(id)
 	})
 
+	ipcMain.handle(IPC_CHANNELS.notesRestore, (_event, payload) => {
+		const { id } = id_schema.parse(payload)
+		return db.restoreNote(id)
+	})
+
 	ipcMain.handle(IPC_CHANNELS.notesArchive, (_event, payload) => {
 		const { id, archived } = archive_schema.parse(payload)
 		return db.archiveNote(id, archived)

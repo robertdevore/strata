@@ -5,6 +5,7 @@ import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
 import { SettingsModal } from '@renderer/src/components/SettingsModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
+import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
 
 const isMac = navigator.userAgent.includes('Mac')
 
@@ -20,8 +21,18 @@ export function App() {
 	const store = useAppStore()
 	const load = useAppStore((state) => state.load)
 	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+	const [undoDelete, setUndoDelete] = useState<{ id: string; title: string } | null>(null)
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 	const [sidebarWidth, setSidebarWidth] = useState(320)
+	const [undoTimeoutId, setUndoTimeoutId] = useState<number | null>(null)
+
+	const clearUndoToast = useCallback(() => {
+		if (null !== undoTimeoutId) {
+			window.clearTimeout(undoTimeoutId)
+		}
+		setUndoTimeoutId(null)
+		setUndoDelete(null)
+	}, [undoTimeoutId])
 
 	useEffect(() => {
 		void load()
@@ -44,8 +55,23 @@ export function App() {
 			return
 		}
 		if (store.selectedNoteId !== id) store.selectNote(id)
-		await store.deleteSelected()
-	}, [store])
+		const deleted = await store.deleteSelected()
+		if (!deleted) return
+		if (null !== undoTimeoutId) {
+			window.clearTimeout(undoTimeoutId)
+		}
+		setUndoDelete({ id: deleted.id, title: deriveNoteTitle(deleted.content) })
+		setUndoTimeoutId(window.setTimeout(() => {
+			setUndoDelete(null)
+			setUndoTimeoutId(null)
+		}, 5000))
+	}, [store, undoTimeoutId])
+
+	const undoLastDelete = useCallback(async () => {
+		if (!undoDelete) return
+		await store.restoreDeletedNote(undoDelete.id)
+		clearUndoToast()
+	}, [clearUndoToast, store, undoDelete])
 
 	const runCommand = useCallback(async (command: UiCommand) => {
 		if ('new-note' === command) return store.createNote()
@@ -135,6 +161,14 @@ export function App() {
 		return () => window.removeEventListener('keydown', onKeyDown)
 	}, [runCommand, store])
 
+	useEffect(() => {
+		return () => {
+			if (null !== undoTimeoutId) {
+				window.clearTimeout(undoTimeoutId)
+			}
+		}
+	}, [undoTimeoutId])
+
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
 			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? '116px minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>
@@ -162,6 +196,8 @@ export function App() {
 					onStarToggle={(id) => void store.toggleStar(id)}
 					onArchiveToggle={(id) => void store.toggleArchive(id)}
 					onDelete={(id) => void onDelete(id)}
+					undoDeleteTitle={undoDelete?.title ?? null}
+					onUndoDelete={() => void undoLastDelete()}
 					theme={store.settings.theme}
 				/>
 				{!sidebarCollapsed && <div className="panel-resizer panel-resizer-sidebar" onMouseDown={startSidebarResize} role="separator" aria-orientation="vertical" aria-label="Resize sidebar" />}
@@ -183,11 +219,21 @@ export function App() {
 			<ConfirmModal
 				open={Boolean(pendingDeleteId)}
 				title="Delete note"
-				message="This note will be removed permanently."
+				message="This note will be removed. You can undo for a few seconds."
 				onCancel={() => setPendingDeleteId(null)}
 				onConfirm={async () => {
 					if (pendingDeleteId && store.selectedNoteId !== pendingDeleteId) store.selectNote(pendingDeleteId)
-					await store.deleteSelected()
+					const deleted = await store.deleteSelected()
+					if (deleted) {
+						if (null !== undoTimeoutId) {
+							window.clearTimeout(undoTimeoutId)
+						}
+						setUndoDelete({ id: deleted.id, title: deriveNoteTitle(deleted.content) })
+						setUndoTimeoutId(window.setTimeout(() => {
+							setUndoDelete(null)
+							setUndoTimeoutId(null)
+						}, 5000))
+					}
 					setPendingDeleteId(null)
 				}}
 			/>

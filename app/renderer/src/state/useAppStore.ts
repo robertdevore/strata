@@ -31,7 +31,8 @@ interface AppState {
 	flushDraft: (id: string) => Promise<void>
 	toggleStar: (id: string) => Promise<void>
 	toggleArchive: (id: string) => Promise<void>
-	deleteSelected: () => Promise<void>
+	deleteSelected: () => Promise<Note | null>
+	restoreDeletedNote: (id: string) => Promise<boolean>
 	setTagsForSelected: (tags: string[]) => Promise<void>
 	setShowSettings: (show: boolean) => void
 	setShowFiltersPanel: (show: boolean) => void
@@ -148,8 +149,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	async deleteSelected() {
 		const id = get().selectedNoteId
-		if (!id) return
-		if (!(await notesService.delete(id))) return
+		if (!id) return null
+		const deleted_note = get().notes.find((note) => note.id === id) ?? null
+		if (!(await notesService.delete(id))) return null
 		set((state) => {
 			const notes = state.notes.filter((note) => note.id !== id)
 			const drafts = { ...state.drafts }
@@ -161,6 +163,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 			}
 		})
 		await get().refreshTags()
+		return deleted_note
+	},
+
+	async restoreDeletedNote(id) {
+		const restored = await notesService.restore(id)
+		if (!restored) return false
+		set((state) => ({
+			notes: [restored, ...state.notes.filter((note) => note.id !== restored.id)],
+			selectedNoteId: restored.id,
+			drafts: { ...state.drafts, [restored.id]: restored.content },
+			saveState: 'saved',
+			lastSavedAt: restored.updatedAt,
+		}))
+		await get().refreshTags()
+		return true
 	},
 
 	async setTagsForSelected(tags) {

@@ -16,6 +16,9 @@ export const notesService = {
 	delete(id: string): Promise<boolean> {
 		return window.strata.notes.delete(id)
 	},
+	restore(id: string): Promise<Note | null> {
+		return window.strata.notes.restore(id)
+	},
 	archive(id: string, archived: boolean): Promise<Note | null> {
 		return window.strata.notes.archive(id, archived)
 	},

@@ -26,6 +26,8 @@ interface SidebarProps {
 	onStarToggle: (id: string) => void
 	onArchiveToggle: (id: string) => void
 	onDelete: (id: string) => void
+	undoDeleteTitle: string | null
+	onUndoDelete: () => void
 	theme: ThemeMode
 }
 
@@ -153,6 +155,12 @@ export function Sidebar(props: SidebarProps) {
 					</div>
 				))}
 			</div>}
+			{!props.sidebarCollapsed && props.undoDeleteTitle && (
+				<div className="sidebar-undo-toast" role="status" aria-live="polite">
+					<span className="sidebar-undo-text">Deleted “{props.undoDeleteTitle}”</span>
+					<button className="ghost-button sidebar-undo-button" onClick={props.onUndoDelete}>Undo</button>
+				</div>
+			)}
 			{!props.sidebarCollapsed && <div className="sidebar-bottom">
 				<button className="primary-button" onClick={props.onNewNote}>New Note</button>
 				<div className="bottom-actions">

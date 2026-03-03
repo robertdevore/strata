@@ -145,8 +145,14 @@ export class StrataDatabase {
 	}
 
 	deleteNote(id: string): boolean {
-		const result = this.db.prepare('DELETE FROM notes WHERE id = ?').run(id)
+		const result = this.db.prepare('UPDATE notes SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(new Date().toISOString(), new Date().toISOString(), id)
 		return result.changes > 0
+	}
+
+	restoreNote(id: string): Note | null {
+		const result = this.db.prepare('UPDATE notes SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL').run(new Date().toISOString(), id)
+		if (0 === result.changes) return null
+		return this.getNote(id)
 	}
 
 	archiveNote(id: string, archived: boolean): Note | null {

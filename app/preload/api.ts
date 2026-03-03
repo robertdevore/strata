@@ -7,6 +7,7 @@ export interface StrataApi {
 		create: () => Promise<Note>
 		update: (id: string, patch: NoteUpdatePatch) => Promise<Note | null>
 		delete: (id: string) => Promise<boolean>
+		restore: (id: string) => Promise<Note | null>
 		archive: (id: string, archived: boolean) => Promise<Note | null>
 		star: (id: string, starred: boolean) => Promise<Note | null>
 	}
