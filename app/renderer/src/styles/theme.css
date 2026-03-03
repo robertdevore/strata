@@ -831,3 +831,42 @@ body.theme-light .cm-gutters {
 	gap: 6px;
 	color: var(--text-2);
 }
+
+.sidebar-undo-toast {
+	margin-top: auto;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 10px;
+	border: 1px solid var(--accent);
+	border-radius: 10px;
+	background: var(--selected);
+	color: var(--text);
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+	-webkit-app-region: no-drag;
+}
+
+.sidebar-undo-text {
+	font-size: 12px;
+	line-height: 1.35;
+	color: var(--text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sidebar-undo-button {
+	flex-shrink: 0;
+	padding: 4px 10px;
+	font-size: 12px;
+	border-color: var(--accent);
+	color: var(--text);
+	background: var(--accent-subtle);
+}
+
+.sidebar-undo-button:hover,
+.sidebar-undo-button:focus-visible {
+	background: var(--accent);
+	color: #fff;
+}
