@@ -5,10 +5,12 @@ import { StrataDatabase } from './db/index'
 import { registerNotesHandlers } from './ipc/notesHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerExportHandlers } from './ipc/exportHandlers'
+import { startNotesApiServer } from './api/notesApiServer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let main_window: BrowserWindow | null = null
+let notes_api_server: { close: () => Promise<void> } | null = null
 
 const createAppMenu = () => {
 	if (!main_window) return
@@ -170,7 +172,7 @@ const createWindow = () => {
 	}
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
 	setCspHeaders()
 
 	const db = new StrataDatabase(app.getPath('userData'))
@@ -178,9 +180,23 @@ app.whenReady().then(() => {
 	registerSettingsHandlers(db)
 	registerExportHandlers()
 
+	try {
+		notes_api_server = await startNotesApiServer(db, {
+			onNotesChanged: () => main_window?.webContents.send('notes:changed'),
+		})
+	} catch (error) {
+		console.error('[strata-api] Failed to start notes API server', error)
+	}
+
 	createWindow()
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow()
+	})
+})
+
+app.on('before-quit', () => {
+	void notes_api_server?.close().catch((error) => {
+		console.error('[strata-api] Failed to stop notes API server', error)
 	})
 })
 

@@ -85,6 +85,13 @@ export function App() {
 	}, [runCommand])
 
 	useEffect(() => {
+		const unsubscribe = window.strata.onNotesChanged(() => {
+			void load()
+		})
+		return unsubscribe
+	}, [load])
+
+	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
 			const meta = isMac ? event.metaKey : event.ctrlKey
 			if (!meta) {

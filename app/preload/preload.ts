@@ -27,6 +27,11 @@ const api: StrataApi = {
 		ipcRenderer.on('ui:command', wrapped)
 		return () => ipcRenderer.removeListener('ui:command', wrapped)
 	},
+	onNotesChanged: (listener) => {
+		const wrapped = () => listener()
+		ipcRenderer.on('notes:changed', wrapped)
+		return () => ipcRenderer.removeListener('notes:changed', wrapped)
+	},
 }
 
 contextBridge.exposeInMainWorld('strata', api)

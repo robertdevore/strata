@@ -21,4 +21,5 @@ export interface StrataApi {
 		pdf: (payload: { html: string }) => Promise<Uint8Array>
 	}
 	onCommand: (listener: (command: string) => void) => () => void
+	onNotesChanged: (listener: () => void) => () => void
 }
