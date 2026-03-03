@@ -77,6 +77,7 @@ npm run test:watch # Run tests in watch mode
 npm run lint       # Lint project
 npm run format     # Format project
 npm run backup:notes # Backup local notes database files
+npm run notes:api -- <command> [args] # CLI helper for local notes HTTP API
 ```
 
 ## Build outputs
@@ -171,6 +172,72 @@ STRATA_USER_DATA_DIR="/custom/path/to/data" npm run backup:notes
 - `tags.list()`
 - `settings.get()`
 - `settings.set(patch)`
+
+## Local notes HTTP API
+
+Strata now exposes a local HTTP API for notes CRUD so other apps/scripts on your computer can create, read, update, and delete notes.
+
+For a full, agent-focused API playbook with end-to-end examples, see `API.md`.
+
+- Base URL: `http://127.0.0.1:3939`
+- Health check: `GET /health`
+
+Environment overrides:
+
+- `STRATA_API_HOST` (default: `127.0.0.1`)
+- `STRATA_API_PORT` (default: `3939`)
+- `STRATA_API_TOKEN` (optional; when set, all requests must include matching token)
+
+Auth headers (when `STRATA_API_TOKEN` is set):
+
+- `X-Strata-Token: <your-token>`
+- or `Authorization: Bearer <your-token>`
+
+Endpoints:
+
+- `GET /notes`
+	- Query params: `query`, `starred=true|false`, `archived=true|false`, `tag`, `includeDeleted=true|false`
+- `GET /notes/:id`
+- `POST /notes` (optional JSON body: `content`, `starred`, `archived`, `tags`)
+- `PUT /notes/:id` or `PATCH /notes/:id` (JSON body: any of `content`, `starred`, `archived`, `tags`)
+- `DELETE /notes/:id`
+
+Example calls:
+
+```bash
+curl http://127.0.0.1:3939/notes
+
+curl http://127.0.0.1:3939/notes \
+	-H "X-Strata-Token: your-secret-token"
+
+curl -X POST http://127.0.0.1:3939/notes \
+	-H "Content-Type: application/json" \
+	-H "X-Strata-Token: your-secret-token" \
+	-d '{"content":"# API note\n\nCreated from curl","tags":["api","automation"]}'
+
+curl -X PATCH http://127.0.0.1:3939/notes/<NOTE_ID> \
+	-H "Content-Type: application/json" \
+	-H "Authorization: Bearer your-secret-token" \
+	-d '{"starred":true}'
+
+curl -X DELETE http://127.0.0.1:3939/notes/<NOTE_ID> \
+	-H "X-Strata-Token: your-secret-token"
+```
+
+CLI helper:
+
+```bash
+npm run notes:api -- health
+npm run notes:api -- list
+npm run notes:api -- create '{"content":"# Script note","tags":["automation"]}'
+npm run notes:api -- update <NOTE_ID> '{"starred":true}'
+npm run notes:api -- delete <NOTE_ID>
+```
+
+Set these when needed:
+
+- `STRATA_API_BASE_URL` (default: `http://127.0.0.1:3939`)
+- `STRATA_API_TOKEN` (for protected API)
 
 ## Troubleshooting
 
