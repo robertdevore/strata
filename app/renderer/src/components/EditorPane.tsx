@@ -12,7 +12,7 @@ import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
 import { CheatSheetModal } from './CheatSheetModal'
-import { ArchiveIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ArchiveIcon, CopyIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
 
 interface EditorPaneProps {
 	note: Note | null
@@ -95,6 +95,22 @@ const exportAsDoc = (title: string, markdown_content: string) => {
 	const html = renderStyledMarkdownHtml(title, markdown_content)
 	const output_title = sanitizeFileName(title)
 	triggerDownload(new Blob([html], { type: 'application/msword;charset=utf-8' }), `${output_title}.doc`)
+}
+
+const copyRichTextToClipboard = async (markdown_content: string): Promise<void> => {
+	const html_fragment = renderMarkdownHtmlFragment(markdown_content)
+	if (!navigator.clipboard) throw new Error('Clipboard API unavailable')
+
+	if ('undefined' !== typeof ClipboardItem && navigator.clipboard.write) {
+		const item = new ClipboardItem({
+			'text/html': new Blob([html_fragment], { type: 'text/html' }),
+			'text/plain': new Blob([markdown_content], { type: 'text/plain' }),
+		})
+		await navigator.clipboard.write([item])
+		return
+	}
+
+	await navigator.clipboard.writeText(markdown_content)
 }
 
 const turndown_service = new TurndownService({
@@ -269,6 +285,19 @@ export function EditorPane(props: EditorPaneProps) {
 		setShowExportMenu(false)
 	}
 
+	const copyRichText = async () => {
+		try {
+			await copyRichTextToClipboard(content)
+			setExportStatus('Rich text copied')
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+		} catch {
+			setExportStatus('Rich text copy failed')
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+		}
+	}
+
 	const toolbar_status = exportStatus || (showSaveStatus ? saveLabel(saveState, lastSavedAt) : '')
 
 	return (
@@ -292,6 +321,7 @@ export function EditorPane(props: EditorPaneProps) {
 					</div>
 					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
 					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => setShowPreview((value) => !value)} title="Preview"><EyeIcon /></button>
+					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
 				</div>
 			</header>
 			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showPreview ? `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)` : 'minmax(0, 1fr)' }}>
