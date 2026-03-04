@@ -74,7 +74,7 @@ export function Sidebar(props: SidebarProps) {
 					{!props.sidebarCollapsed && <div className="app-title-left">
 						<div className="app-title-group">
 							<p className="app-title">STRATA</p>
-							<p className="app-version">v0.2.0</p>
+							<p className="app-version">v0.3.0</p>
 						</div>
 					</div>}
 					<button className="icon-button sidebar-collapse-button" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>

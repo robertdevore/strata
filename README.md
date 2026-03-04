@@ -22,10 +22,10 @@ It is designed for focused writing with fast note capture, keyboard-first workfl
 - Settings for theme, default view, delete confirmation, and sort mode
 - Secure Electron defaults (`contextIsolation`, `sandbox`, no renderer Node access)
 
-## 0.2.0 release notes
+## 0.3.0 release notes
 
 - Rich-text paste now converts clipboard HTML into Markdown (headings, lists, emphasis, links, images, etc.)
-- Sidebar header now shows inline app version (`STRATA v0.2.0`)
+- Sidebar header now shows inline app version (`STRATA v0.3.0`)
 - New note UX now places the cursor after `# Untitled` with a blank line ready for writing
 - Desktop menu behavior improved with native window/application shortcuts (including `Cmd+W` on macOS)
 - Note switching regression fixed (selecting a note reliably opens that note)
