@@ -11,7 +11,6 @@ import TurndownService from 'turndown'
 import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
-import { CheatSheetModal } from './CheatSheetModal'
 import { ArchiveIcon, CopyIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
 
 interface EditorPaneProps {
@@ -152,7 +151,6 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 export function EditorPane(props: EditorPaneProps) {
 	const { note, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
-	const [showCheatSheet, setShowCheatSheet] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
 	const [showExportMenu, setShowExportMenu] = useState(false)
 	const [exportStatus, setExportStatus] = useState('')
@@ -306,9 +304,8 @@ export function EditorPane(props: EditorPaneProps) {
 				<h2>{deriveNoteTitle(content)}</h2>
 				<div className="editor-actions">
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
+					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
-					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
-					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
 					<div className="toolbar-menu" ref={exportMenuRef}>
 						<button className={`icon-button ${showExportMenu ? 'chip-active' : ''}`} onClick={() => setShowExportMenu((value) => !value)} title="Export Note"><ExportIcon /></button>
 						{showExportMenu && (
@@ -321,7 +318,6 @@ export function EditorPane(props: EditorPaneProps) {
 					</div>
 					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
 					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => setShowPreview((value) => !value)} title="Preview"><EyeIcon /></button>
-					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
 				</div>
 			</header>
 			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showPreview ? `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)` : 'minmax(0, 1fr)' }}>
@@ -356,10 +352,12 @@ export function EditorPane(props: EditorPaneProps) {
 			</div>
 			<footer className="editor-footer">
 				<span>{countWords(content)} words</span>
-				<button className="icon-button" onClick={() => setShowCheatSheet(true)} title="Markdown Help">?</button>
+				<div className="editor-footer-actions">
+					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
+					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
+				</div>
 			</footer>
 			<TagsEditor open={showTagsEditor} currentTags={note.tags} existingTags={existingTags} onClose={() => setShowTagsEditor(false)} onApply={onSetTags} />
-			<CheatSheetModal open={showCheatSheet} onClose={() => setShowCheatSheet(false)} />
 		</section>
 	)
 }

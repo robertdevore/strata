@@ -82,7 +82,7 @@ export function Sidebar(props: SidebarProps) {
 					</button>
 				</div>
 				{!props.sidebarCollapsed && (
-				<input ref={searchRef} className="search-input" placeholder="Search notes" value={props.searchQuery} onChange={(event) => props.onSearchChange(event.target.value)} />
+				<input ref={searchRef} className="search-input" placeholder={`Search ${props.notes.length} notes`} value={props.searchQuery} onChange={(event) => props.onSearchChange(event.target.value)} />
 				)}
 				{!props.sidebarCollapsed && props.showFiltersPanel && (
 					<>
