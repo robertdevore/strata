@@ -793,6 +793,34 @@ body.theme-light .cm-gutters {
 	font-size: 12px;
 }
 
+.find-replace-modal {
+	width: min(460px, 92vw);
+	gap: 12px;
+}
+
+.find-replace-field {
+	display: grid;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--text-2);
+}
+
+.find-replace-status {
+	margin: 0;
+	font-size: 12px;
+	color: var(--text-3);
+}
+
+.find-replace-actions {
+	justify-content: flex-end;
+}
+
+.find-replace-actions .primary-button {
+	width: auto;
+	padding-left: 12px;
+	padding-right: 12px;
+}
+
 .context-menu {
 	position: fixed;
 	min-width: 180px;

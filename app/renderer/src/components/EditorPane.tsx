@@ -11,7 +11,7 @@ import TurndownService from 'turndown'
 import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, CopyIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ArchiveIcon, CloseIcon, CopyIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
 
 interface EditorPaneProps {
 	note: Note | null
@@ -129,6 +129,14 @@ const convertRichTextToMarkdown = (html_content: string): string => {
 	}
 }
 
+const locateNextMatch = (content: string, query: string, start_at: number): number => {
+	if (!query) return -1
+	const direct_index = content.indexOf(query, start_at)
+	if (-1 !== direct_index) return direct_index
+	if (start_at > 0) return content.indexOf(query, 0)
+	return -1
+}
+
 const richTextPasteExtension = EditorView.domEventHandlers({
 	paste: (event, view) => {
 		const html_content = event.clipboardData?.getData('text/html') ?? ''
@@ -155,12 +163,17 @@ export function EditorPane(props: EditorPaneProps) {
 	const [showExportMenu, setShowExportMenu] = useState(false)
 	const [exportStatus, setExportStatus] = useState('')
 	const [showSaveStatus, setShowSaveStatus] = useState(false)
+	const [showFindReplace, setShowFindReplace] = useState(false)
+	const [findQuery, setFindQuery] = useState('')
+	const [replaceQuery, setReplaceQuery] = useState('')
+	const [findReplaceStatus, setFindReplaceStatus] = useState('')
 	const [previewWidth, setPreviewWidth] = useState(420)
 	const debounceRef = useRef<number | null>(null)
 	const exportStatusRef = useRef<number | null>(null)
 	const saveStatusRef = useRef<number | null>(null)
 	const noteIdRef = useRef<string | null>(null)
 	const editorViewRef = useRef<EditorView | null>(null)
+	const findInputRef = useRef<HTMLInputElement>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
 	const exportMenuRef = useRef<HTMLDivElement>(null)
 	const isLightTheme = document.body.classList.contains('theme-light')
@@ -226,7 +239,131 @@ export function EditorPane(props: EditorPaneProps) {
 		}, 0)
 	}, [note, content])
 
+	useEffect(() => {
+		if (!showFindReplace) return
+		window.setTimeout(() => {
+			findInputRef.current?.focus()
+			findInputRef.current?.select()
+		}, 0)
+	}, [showFindReplace])
+
+	useEffect(() => {
+		const openFindReplace = () => {
+			const view = editorViewRef.current
+			if (view) {
+				const selection = view.state.selection.main
+				if (selection.from !== selection.to) {
+					setFindQuery(view.state.sliceDoc(selection.from, selection.to))
+				}
+			}
+			setFindReplaceStatus('')
+			setShowFindReplace(true)
+		}
+
+		window.addEventListener('strata:open-find-replace', openFindReplace)
+		return () => window.removeEventListener('strata:open-find-replace', openFindReplace)
+	}, [])
+
 	const existingTags = tags.map((item) => item.name)
+
+	const findNextMatch = () => {
+		const view = editorViewRef.current
+		if (!view || !findQuery) {
+			setFindReplaceStatus(findQuery ? 'Editor is unavailable' : 'Enter text to find')
+			return false
+		}
+
+		const doc_content = view.state.doc.toString()
+		const selection_end = view.state.selection.main.to
+		const next_index = locateNextMatch(doc_content, findQuery, selection_end)
+		if (-1 === next_index) {
+			setFindReplaceStatus('No matches found')
+			return false
+		}
+
+		view.dispatch({
+			selection: { anchor: next_index, head: next_index + findQuery.length },
+			scrollIntoView: true,
+		})
+		view.focus()
+		setFindReplaceStatus('Match selected')
+		return true
+	}
+
+	const replaceSelection = () => {
+		const view = editorViewRef.current
+		if (!view || !findQuery) {
+			setFindReplaceStatus(findQuery ? 'Editor is unavailable' : 'Enter text to find')
+			return
+		}
+
+		const selection = view.state.selection.main
+		const selected_text = view.state.sliceDoc(selection.from, selection.to)
+
+		if (selected_text !== findQuery) {
+			if (!findNextMatch()) return
+		}
+
+		const active_selection = view.state.selection.main
+		view.dispatch({
+			changes: { from: active_selection.from, to: active_selection.to, insert: replaceQuery },
+			selection: EditorSelection.cursor(active_selection.from + replaceQuery.length),
+			scrollIntoView: true,
+		})
+		view.focus()
+		setFindReplaceStatus('Replaced one match')
+		window.setTimeout(() => {
+			findNextMatch()
+		}, 0)
+	}
+
+	const replaceAllMatches = () => {
+		const view = editorViewRef.current
+		if (!view || !findQuery) {
+			setFindReplaceStatus(findQuery ? 'Editor is unavailable' : 'Enter text to find')
+			return
+		}
+
+		const doc_content = view.state.doc.toString()
+		let match_count = 0
+		let search_from = 0
+		let found_at = doc_content.indexOf(findQuery, search_from)
+		while (-1 !== found_at) {
+			match_count += 1
+			search_from = found_at + findQuery.length
+			found_at = doc_content.indexOf(findQuery, search_from)
+		}
+
+		if (0 === match_count) {
+			setFindReplaceStatus('No matches found')
+			return
+		}
+
+		const updated_content = doc_content.split(findQuery).join(replaceQuery)
+		view.dispatch({
+			changes: { from: 0, to: view.state.doc.length, insert: updated_content },
+			selection: EditorSelection.cursor(0),
+			scrollIntoView: true,
+		})
+		view.focus()
+		setFindReplaceStatus(`Replaced ${match_count} match${1 === match_count ? '' : 'es'}`)
+	}
+
+	const onFindReplaceInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+		if ('Escape' === event.key) {
+			event.preventDefault()
+			setShowFindReplace(false)
+			return
+		}
+
+		if ('Enter' !== event.key || event.shiftKey) return
+		event.preventDefault()
+		if (findInputRef.current === event.currentTarget) {
+			findNextMatch()
+			return
+		}
+		replaceSelection()
+	}
 
 	const startPreviewResize = (event: React.MouseEvent<HTMLDivElement>) => {
 		event.preventDefault()
@@ -304,6 +441,10 @@ export function EditorPane(props: EditorPaneProps) {
 				<h2>{deriveNoteTitle(content)}</h2>
 				<div className="editor-actions">
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
+					<button className={`chip ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
+						setFindReplaceStatus('')
+						setShowFindReplace(true)
+					}} title="Find and Replace">Find</button>
 					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
 					<div className="toolbar-menu" ref={exportMenuRef}>
@@ -357,6 +498,41 @@ export function EditorPane(props: EditorPaneProps) {
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
 				</div>
 			</footer>
+			{showFindReplace && (
+				<div className="modal-overlay" onClick={() => setShowFindReplace(false)}>
+					<div className="modal-card find-replace-modal" onClick={(event) => event.stopPropagation()}>
+						<button className="icon-button modal-close-button" onClick={() => setShowFindReplace(false)} aria-label="Close find and replace" title="Close find and replace">
+							<CloseIcon />
+						</button>
+						<h3>Find and replace</h3>
+						<label className="find-replace-field">
+							Find
+							<input
+								ref={findInputRef}
+								className="search-input"
+								value={findQuery}
+								onChange={(event) => setFindQuery(event.target.value)}
+								onKeyDown={onFindReplaceInputKeyDown}
+							/>
+						</label>
+						<label className="find-replace-field">
+							Replace with
+							<input
+								className="search-input"
+								value={replaceQuery}
+								onChange={(event) => setReplaceQuery(event.target.value)}
+								onKeyDown={onFindReplaceInputKeyDown}
+							/>
+						</label>
+						{findReplaceStatus && <p className="find-replace-status">{findReplaceStatus}</p>}
+						<div className="modal-actions find-replace-actions">
+							<button className="ghost-button" onClick={findNextMatch}>Find next</button>
+							<button className="ghost-button" onClick={replaceSelection}>Replace</button>
+							<button className="primary-button" onClick={replaceAllMatches}>Replace all</button>
+						</div>
+					</div>
+				</div>
+			)}
 			<TagsEditor open={showTagsEditor} currentTags={note.tags} existingTags={existingTags} onClose={() => setShowTagsEditor(false)} onApply={onSetTags} />
 		</section>
 	)
