@@ -134,7 +134,13 @@ export function App() {
 			}
 			if ('f' === key && !event.shiftKey) {
 				event.preventDefault()
-				void runCommand('focus-search')
+				const active_element = document.activeElement
+				const editor_focused = active_element instanceof HTMLElement && Boolean(active_element.closest('.cm-editor'))
+				if (editor_focused) {
+					window.dispatchEvent(new CustomEvent('strata:open-find-replace'))
+				} else {
+					void runCommand('focus-search')
+				}
 			}
 			if ('f' === key && event.shiftKey) {
 				event.preventDefault()
