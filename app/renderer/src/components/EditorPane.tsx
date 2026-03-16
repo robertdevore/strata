@@ -11,7 +11,7 @@ import TurndownService from 'turndown'
 import type { Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, CloseIcon, CopyIcon, ExportIcon, EyeIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ArchiveIcon, CloseIcon, CopyIcon, ExportIcon, EyeIcon, PrinterIcon, SearchIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
 
 interface EditorPaneProps {
 	note: Note | null
@@ -433,6 +433,22 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}
 
+	const printNote = async () => {
+		const title = sanitizeFileName(deriveNoteTitle(content))
+		const html = renderStyledMarkdownHtml(title, content)
+
+		try {
+			await window.strata.exports.print({ html })
+			setExportStatus('Print dialog opened')
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+		} catch {
+			setExportStatus('Print failed')
+			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
+			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+		}
+	}
+
 	const toolbar_status = exportStatus || (showSaveStatus ? saveLabel(saveState, lastSavedAt) : '')
 
 	return (
@@ -441,10 +457,6 @@ export function EditorPane(props: EditorPaneProps) {
 				<h2>{deriveNoteTitle(content)}</h2>
 				<div className="editor-actions">
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
-					<button className={`chip ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
-						setFindReplaceStatus('')
-						setShowFindReplace(true)
-					}} title="Find and Replace">Find</button>
 					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
 					<div className="toolbar-menu" ref={exportMenuRef}>
@@ -494,6 +506,11 @@ export function EditorPane(props: EditorPaneProps) {
 			<footer className="editor-footer">
 				<span>{countWords(content)} words</span>
 				<div className="editor-footer-actions">
+					<button className={`icon-button ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
+						setFindReplaceStatus('')
+						setShowFindReplace(true)
+					}} title="Find and Replace"><SearchIcon /></button>
+					<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
 					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
 				</div>
