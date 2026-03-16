@@ -20,6 +20,7 @@ export interface StrataApi {
 	}
 	exports: {
 		pdf: (payload: { html: string }) => Promise<Uint8Array>
+		print: (payload: { html: string }) => Promise<boolean>
 	}
 	onCommand: (listener: (command: string) => void) => () => void
 	onNotesChanged: (listener: () => void) => () => void

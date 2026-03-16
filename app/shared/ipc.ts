@@ -11,4 +11,5 @@ export const IPC_CHANNELS = {
 	settingsGet: 'settings:get',
 	settingsSet: 'settings:set',
 	exportPdf: 'export:pdf',
+	printHtml: 'print:html',
 } as const
