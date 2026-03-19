@@ -11,6 +11,7 @@ It is designed for focused writing with fast note capture, keyboard-first workfl
 - Fast filtering and search across notes
 - Markdown editing with autosave and save-state feedback
 - Tagging, starring, archiving, and keyboard shortcuts for daily flow
+- Built-in AI chat panel for note analysis and chat-history search (read-only tools in v1)
 
 ## Features
 
@@ -91,9 +92,51 @@ npm run notes:api -- <command> [args] # CLI helper for local notes HTTP API
 - Default path: `app.getPath('userData')/data/strata.sqlite`
 - No cloud sync is required
 
+## AI chat panel (GPT-4o)
+
+Strata includes an in-app AI panel (chatbot icon in the editor footer) that can:
+
+- Analyze your local notes
+- Search notes by content/tags
+- Search previous AI chats
+- Retrieve chat threads for context
+
+The assistant can also create new notes and edit existing notes when requested.
+
+The assistant does not delete notes.
+
+### Secure key setup
+
+Option 1 (recommended): set your API key as an environment variable before launching Strata:
+
+```bash
+export STRATA_OPENAI_API_KEY="your-openai-key"
+npm run dev
+```
+
+Option 2: open `Settings` in Strata and paste your key into `OpenAI API Key`.
+
+The key is stored in local Strata settings (`strata.sqlite`) so it persists across launches.
+
+Priority order for key resolution:
+
+1. `STRATA_OPENAI_API_KEY` environment variable
+2. Stored `OpenAI API Key` from Settings
+
 ## Backups
 
 Strata stores notes in SQLite and uses WAL mode, so backups should include all database sidecar files.
+
+You can now manage backups directly in `Settings`:
+
+- `Create backup now` creates an immediate snapshot.
+- `Open backups folder` opens the local backup directory.
+- `Auto Backup Frequency` controls periodic automatic backups (default: every day).
+
+Backup location:
+
+- Development: `<project>/backups`
+- Packaged app: `<userData>/backups`
 
 Run a timestamped backup (default destination: `~/StrataBackups`):
 
