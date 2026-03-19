@@ -2,15 +2,19 @@ import path from 'node:path'
 import { app, BrowserWindow, Menu, session } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { StrataDatabase } from './db/index'
+import { BackupManager } from './backup/backupManager'
 import { registerNotesHandlers } from './ipc/notesHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerExportHandlers } from './ipc/exportHandlers'
+import { registerAiHandlers } from './ipc/aiHandlers'
+import { registerBackupHandlers } from './ipc/backupHandlers'
 import { startNotesApiServer } from './api/notesApiServer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let main_window: BrowserWindow | null = null
 let notes_api_server: { close: () => Promise<void> } | null = null
+let backup_manager: BackupManager | null = null
 
 const createAppMenu = () => {
 	if (!main_window) return
@@ -175,10 +179,28 @@ const createWindow = () => {
 app.whenReady().then(async () => {
 	setCspHeaders()
 
-	const db = new StrataDatabase(app.getPath('userData'))
+	const user_data_path = app.getPath('userData')
+	const db = new StrataDatabase(user_data_path)
+	const db_file_path = path.join(user_data_path, 'data', 'strata.sqlite')
+	const backup_directory = process.env.VITE_DEV_SERVER_URL
+		? path.join(process.cwd(), 'backups')
+		: path.join(user_data_path, 'backups')
+
+	backup_manager = new BackupManager({
+		dbFilePath: db_file_path,
+		backupDir: backup_directory,
+		getSettings: () => db.getSettings(),
+		onAutoBackupCreated: (created_at) => {
+			db.setSettings({ lastAutoBackupAt: created_at })
+		},
+	})
+
 	registerNotesHandlers(db)
 	registerSettingsHandlers(db)
 	registerExportHandlers()
+	registerAiHandlers(db, () => main_window?.webContents.send('notes:changed'))
+	registerBackupHandlers(backup_manager)
+	backup_manager.start()
 
 	try {
 		notes_api_server = await startNotesApiServer(db, {
@@ -195,6 +217,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+	backup_manager?.stop()
 	void notes_api_server?.close().catch((error) => {
 		console.error('[strata-api] Failed to stop notes API server', error)
 	})

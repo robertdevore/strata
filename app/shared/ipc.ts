@@ -12,4 +12,12 @@ export const IPC_CHANNELS = {
 	settingsSet: 'settings:set',
 	exportPdf: 'export:pdf',
 	printHtml: 'print:html',
+	backupCreateNow: 'backup:create-now',
+	backupOpenFolder: 'backup:open-folder',
+	aiThreadsList: 'ai:threads:list',
+	aiThreadDelete: 'ai:thread:delete',
+	aiMessagesList: 'ai:messages:list',
+	aiSendMessage: 'ai:send',
+	aiSearchChats: 'ai:search',
+	aiTranscribeAudio: 'ai:transcribe',
 } as const

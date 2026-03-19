@@ -1,4 +1,4 @@
-import type { Note, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
+import type { AiChatResponse, AiMessage, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
 
 export interface StrataApi {
 	notes: {
@@ -21,6 +21,18 @@ export interface StrataApi {
 	exports: {
 		pdf: (payload: { html: string }) => Promise<Uint8Array>
 		print: (payload: { html: string }) => Promise<boolean>
+	}
+	backups: {
+		createNow: () => Promise<BackupResult>
+		openFolder: () => Promise<boolean>
+	}
+	ai: {
+		listThreads: () => Promise<AiThreadSummary[]>
+		deleteThread: (thread_id: string) => Promise<boolean>
+		listMessages: (thread_id: string) => Promise<AiMessage[]>
+		sendMessage: (payload: { threadId?: string; message: string }) => Promise<AiChatResponse>
+		searchChats: (query: string) => Promise<AiSearchResult[]>
+		transcribeAudio: (payload: { base64Audio: string; mimeType: string; prompt?: string; language?: string }) => Promise<AiTranscriptionResult>
 	}
 	onCommand: (listener: (command: string) => void) => () => void
 	onNotesChanged: (listener: () => void) => () => void

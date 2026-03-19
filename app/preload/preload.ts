@@ -24,6 +24,18 @@ const api: StrataApi = {
 		pdf: (payload) => ipcRenderer.invoke(IPC_CHANNELS.exportPdf, payload),
 		print: (payload) => ipcRenderer.invoke(IPC_CHANNELS.printHtml, payload),
 	},
+	backups: {
+		createNow: () => ipcRenderer.invoke(IPC_CHANNELS.backupCreateNow),
+		openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.backupOpenFolder),
+	},
+	ai: {
+		listThreads: () => ipcRenderer.invoke(IPC_CHANNELS.aiThreadsList),
+		deleteThread: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiThreadDelete, { threadId: thread_id }),
+		listMessages: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiMessagesList, { threadId: thread_id }),
+		sendMessage: (payload) => ipcRenderer.invoke(IPC_CHANNELS.aiSendMessage, payload),
+		searchChats: (query) => ipcRenderer.invoke(IPC_CHANNELS.aiSearchChats, { query }),
+		transcribeAudio: (payload) => ipcRenderer.invoke(IPC_CHANNELS.aiTranscribeAudio, payload),
+	},
 	onCommand: (listener) => {
 		const wrapped = (_event: Electron.IpcRendererEvent, command: string) => listener(command)
 		ipcRenderer.on('ui:command', wrapped)

@@ -47,6 +47,10 @@ const defaultSettings: Settings = {
 	defaultView: 'all',
 	confirmDelete: true,
 	sortMode: 'updated_desc',
+	openAiApiKey: '',
+	openAiModel: 'gpt-4o',
+	autoBackupFrequency: '24h',
+	lastAutoBackupAt: null,
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
