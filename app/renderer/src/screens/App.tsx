@@ -73,6 +73,17 @@ export function App() {
 		clearUndoToast()
 	}, [clearUndoToast, store, undoDelete])
 
+	const openNoteFromChat = useCallback(async (note_id: string) => {
+		const target_note = store.notes.find((candidate) => candidate.id === note_id)
+		if (!target_note) return
+
+		if (store.selectedNoteId && store.selectedNoteId !== note_id) {
+			await store.flushDraft(store.selectedNoteId)
+		}
+
+		store.selectNote(note_id)
+	}, [store])
+
 	const runCommand = useCallback(async (command: UiCommand) => {
 		if ('new-note' === command) return store.createNote()
 		if ('focus-search' === command) return window.dispatchEvent(new CustomEvent('strata:focus-search'))
@@ -209,6 +220,8 @@ export function App() {
 				{!sidebarCollapsed && <div className="panel-resizer panel-resizer-sidebar" onMouseDown={startSidebarResize} role="separator" aria-orientation="vertical" aria-label="Resize sidebar" />}
 				<EditorPane
 					note={store.selectedNote()}
+					notes={store.notes}
+					openAiModel={store.settings.openAiModel}
 					content={store.effectiveContent()}
 					tags={store.tags}
 					saveState={store.saveState}
@@ -219,9 +232,23 @@ export function App() {
 					onToggleArchive={(id) => void store.toggleArchive(id)}
 					onDelete={(id) => void onDelete(id)}
 					onSetTags={(tags) => void store.setTagsForSelected(tags)}
+					onOpenNoteFromChat={openNoteFromChat}
 				/>
 			</div>
-			<SettingsModal open={store.showSettings} settings={store.settings} onClose={() => store.setShowSettings(false)} onUpdate={(patch) => void store.updateSettings(patch)} />
+			<SettingsModal
+				open={store.showSettings}
+				settings={store.settings}
+				onClose={() => store.setShowSettings(false)}
+				onUpdate={(patch) => void store.updateSettings(patch)}
+				onCreateBackup={async () => {
+					const result = await window.strata.backups.createNow()
+					await store.updateSettings({ lastAutoBackupAt: result.createdAt })
+					return result
+				}}
+				onOpenBackupsFolder={async () => {
+					await window.strata.backups.openFolder()
+				}}
+			/>
 			<ConfirmModal
 				open={Boolean(pendingDeleteId)}
 				title="Delete note"

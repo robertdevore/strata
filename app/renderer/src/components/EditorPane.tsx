@@ -8,13 +8,17 @@ import ReactMarkdown from 'react-markdown'
 import { renderToStaticMarkup } from 'react-dom/server'
 import remarkGfm from 'remark-gfm'
 import TurndownService from 'turndown'
-import type { Note } from '@shared/types'
+import type { AiMessage, AiSearchResult, AiThreadSummary, Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
+import { aiService } from '@renderer/src/services/aiService'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, CloseIcon, CopyIcon, ExportIcon, EyeIcon, PrinterIcon, SearchIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ArchiveIcon, ChatbotIcon, CloseIcon, CopyIcon, ExportIcon, EyeIcon, PrinterIcon, SearchIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ChatPanel } from './ChatPanel'
 
 interface EditorPaneProps {
 	note: Note | null
+	notes: Note[]
+	openAiModel: string
 	content: string
 	tags: Array<{ name: string; count: number }>
 	saveState: 'idle' | 'saving' | 'saved' | 'failed'
@@ -25,6 +29,7 @@ interface EditorPaneProps {
 	onToggleArchive: (id: string) => void
 	onDelete: (id: string) => void
 	onSetTags: (tags: string[]) => void
+	onOpenNoteFromChat: (note_id: string) => Promise<void>
 }
 
 const saveLabel = (state: string, last: string | null): string => {
@@ -157,9 +162,10 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 })
 
 export function EditorPane(props: EditorPaneProps) {
-	const { note, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags } = props
+	const { note, notes, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
+	const [showChatPanel, setShowChatPanel] = useState(false)
 	const [showExportMenu, setShowExportMenu] = useState(false)
 	const [exportStatus, setExportStatus] = useState('')
 	const [showSaveStatus, setShowSaveStatus] = useState(false)
@@ -168,11 +174,23 @@ export function EditorPane(props: EditorPaneProps) {
 	const [replaceQuery, setReplaceQuery] = useState('')
 	const [findReplaceStatus, setFindReplaceStatus] = useState('')
 	const [previewWidth, setPreviewWidth] = useState(420)
+	const [chatThreads, setChatThreads] = useState<AiThreadSummary[]>([])
+	const [chatThreadId, setChatThreadId] = useState<string | null>(null)
+	const [chatMessages, setChatMessages] = useState<AiMessage[]>([])
+	const [chatSearchQuery, setChatSearchQuery] = useState('')
+	const [chatSearchResults, setChatSearchResults] = useState<AiSearchResult[]>([])
+	const [chatLoadingThreads, setChatLoadingThreads] = useState(false)
+	const [chatLoadingMessages, setChatLoadingMessages] = useState(false)
+	const [chatSending, setChatSending] = useState(false)
+	const [chatAssistantTyping, setChatAssistantTyping] = useState(false)
+	const [chatDeleting, setChatDeleting] = useState(false)
+	const [chatErrorMessage, setChatErrorMessage] = useState('')
 	const debounceRef = useRef<number | null>(null)
 	const exportStatusRef = useRef<number | null>(null)
 	const saveStatusRef = useRef<number | null>(null)
 	const noteIdRef = useRef<string | null>(null)
 	const editorViewRef = useRef<EditorView | null>(null)
+	const chatTypingIntervalRef = useRef<number | null>(null)
 	const findInputRef = useRef<HTMLInputElement>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
 	const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -190,6 +208,7 @@ export function EditorPane(props: EditorPaneProps) {
 			if (debounceRef.current) window.clearTimeout(debounceRef.current)
 			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
 			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
+			if (chatTypingIntervalRef.current) window.clearInterval(chatTypingIntervalRef.current)
 		}
 	}, [])
 
@@ -248,6 +267,58 @@ export function EditorPane(props: EditorPaneProps) {
 	}, [showFindReplace])
 
 	useEffect(() => {
+		if (!showChatPanel) return
+		let disposed = false
+		setChatLoadingThreads(true)
+		void aiService
+			.listThreads()
+			.then((threads) => {
+				if (disposed) return
+				setChatThreads(threads)
+			})
+			.catch((error) => {
+				if (disposed) return
+				setChatErrorMessage(error instanceof Error ? error.message : 'Failed to load chats')
+			})
+			.finally(() => {
+				if (disposed) return
+				setChatLoadingThreads(false)
+			})
+
+		return () => {
+			disposed = true
+		}
+	}, [showChatPanel])
+
+	useEffect(() => {
+		if (!showChatPanel || !chatThreadId) {
+			setChatMessages([])
+			return
+		}
+
+		let disposed = false
+		setChatLoadingMessages(true)
+		void aiService
+			.listMessages(chatThreadId)
+			.then((messages) => {
+				if (disposed) return
+				setChatMessages(messages)
+			})
+			.catch((error) => {
+				if (disposed) return
+				setChatErrorMessage(error instanceof Error ? error.message : 'Failed to load messages')
+			})
+			.finally(() => {
+				if (disposed) return
+				setChatLoadingMessages(false)
+			})
+
+		return () => {
+			disposed = true
+		}
+	}, [chatThreadId, showChatPanel])
+
+	useEffect(() => {
 		const openFindReplace = () => {
 			const view = editorViewRef.current
 			if (view) {
@@ -265,6 +336,22 @@ export function EditorPane(props: EditorPaneProps) {
 	}, [])
 
 	const existingTags = tags.map((item) => item.name)
+	const note_titles_by_id = notes.reduce<Record<string, string>>((carry, item) => {
+		carry[item.id.toLowerCase()] = deriveNoteTitle(item.content)
+		return carry
+	}, {})
+	const active_chat_model = chatThreadId
+		? chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model || openAiModel
+		: openAiModel
+	const showSidePanel = showPreview || showChatPanel
+
+	const stopAssistantTypingAnimation = () => {
+		if (chatTypingIntervalRef.current) {
+			window.clearInterval(chatTypingIntervalRef.current)
+			chatTypingIntervalRef.current = null
+		}
+		setChatAssistantTyping(false)
+	}
 
 	const findNextMatch = () => {
 		const view = editorViewRef.current
@@ -449,6 +536,107 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}
 
+	const refreshChatThreads = async () => {
+		const threads = await aiService.listThreads()
+		setChatThreads(threads)
+	}
+
+	const sendChatMessage = async (message: string) => {
+		if (chatSending || chatAssistantTyping) return
+		setChatErrorMessage('')
+		setChatSending(true)
+		const optimistic_message: AiMessage = {
+			id: `optimistic-${Date.now()}`,
+			threadId: chatThreadId ?? 'pending',
+			role: 'user',
+			content: message,
+			createdAt: new Date().toISOString(),
+		}
+		setChatMessages((current) => [...current, optimistic_message])
+
+		try {
+			const response = await aiService.sendMessage({
+				threadId: chatThreadId ?? undefined,
+				message,
+			})
+			setChatThreadId(response.thread.id)
+			await refreshChatThreads()
+
+			const persisted_messages = await aiService.listMessages(response.thread.id)
+			const base_messages = persisted_messages.filter((item) => item.id !== response.message.id)
+			const animated_message: AiMessage = { ...response.message, content: '' }
+			setChatMessages([...base_messages, animated_message])
+			setChatAssistantTyping(true)
+
+			const full_content = response.message.content
+			let cursor = 0
+			const step = Math.max(1, Math.ceil(full_content.length / 140))
+
+			await new Promise<void>((resolve) => {
+				stopAssistantTypingAnimation()
+				chatTypingIntervalRef.current = window.setInterval(() => {
+					cursor = Math.min(full_content.length, cursor + step)
+					setChatMessages([...base_messages, { ...animated_message, content: full_content.slice(0, cursor) }])
+					if (cursor >= full_content.length) {
+						stopAssistantTypingAnimation()
+						setChatMessages(persisted_messages)
+						resolve()
+					}
+				}, 16)
+			})
+		} catch (error) {
+			stopAssistantTypingAnimation()
+			setChatMessages((current) => current.filter((item) => item.id !== optimistic_message.id))
+			setChatErrorMessage(error instanceof Error ? error.message : 'Failed to send chat message')
+		} finally {
+			setChatSending(false)
+		}
+	}
+
+	const runChatSearch = async () => {
+		const query = chatSearchQuery.trim()
+		if (!query) {
+			setChatSearchResults([])
+			return
+		}
+		setChatErrorMessage('')
+		try {
+			setChatSearchResults(await aiService.searchChats(query))
+		} catch (error) {
+			setChatErrorMessage(error instanceof Error ? error.message : 'Failed to search previous chats')
+		}
+	}
+
+	const deleteSelectedChatThread = async () => {
+		if (!chatThreadId) return
+		stopAssistantTypingAnimation()
+		setChatErrorMessage('')
+		setChatDeleting(true)
+
+		try {
+			const deleted = await aiService.deleteThread(chatThreadId)
+			if (!deleted) {
+				setChatErrorMessage('Chat could not be deleted')
+				return
+			}
+
+			const threads = await aiService.listThreads()
+			setChatThreads(threads)
+			setChatSearchResults((current) => current.filter((item) => item.thread.id !== chatThreadId))
+
+			if (threads[0]) {
+				setChatThreadId(threads[0].thread.id)
+			} else {
+				setChatThreadId(null)
+				setChatMessages([])
+			}
+		} catch (error) {
+			setChatErrorMessage(error instanceof Error ? error.message : 'Failed to delete chat')
+		} finally {
+			setChatDeleting(false)
+		}
+	}
+
 	const toolbar_status = exportStatus || (showSaveStatus ? saveLabel(saveState, lastSavedAt) : '')
 
 	return (
@@ -459,22 +647,32 @@ export function EditorPane(props: EditorPaneProps) {
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
 					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
-					<div className="toolbar-menu" ref={exportMenuRef}>
-						<button className={`icon-button ${showExportMenu ? 'chip-active' : ''}`} onClick={() => setShowExportMenu((value) => !value)} title="Export Note"><ExportIcon /></button>
-						{showExportMenu && (
-							<div className="editor-export-menu">
-								<button onClick={() => void exportNote('md')}>.md</button>
-								<button onClick={() => void exportNote('pdf')}>.pdf</button>
-								<button onClick={() => void exportNote('doc')}>.doc</button>
-							</div>
-						)}
-					</div>
 					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
-					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => setShowPreview((value) => !value)} title="Preview"><EyeIcon /></button>
+					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => {
+						setShowPreview((value) => {
+							const next = !value
+							if (next) setShowChatPanel(false)
+							return next
+						})
+					}} title="Preview"><EyeIcon /></button>
+					<button className={`icon-button ${showChatPanel ? 'chip-active' : ''}`} onClick={() => {
+						setShowChatPanel((value) => {
+							const next = !value
+							if (next) {
+								setShowPreview(false)
+								setChatThreadId(null)
+								setChatMessages([])
+								setChatSearchResults([])
+								setChatSearchQuery('')
+								setChatErrorMessage('')
+							}
+							return next
+						})
+					}} title="Open AI Chat"><ChatbotIcon /></button>
 				</div>
 			</header>
-			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showPreview ? `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)` : 'minmax(0, 1fr)' }}>
-				<div className={`editor-input ${showPreview ? 'editor-input-split' : ''}`}>
+			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)` : 'minmax(0, 1fr)' }}>
+				<div className={`editor-input ${showSidePanel ? 'editor-input-split' : ''}`}>
 					<CodeMirror
 						value={content}
 						height="100%"
@@ -494,12 +692,58 @@ export function EditorPane(props: EditorPaneProps) {
 						}}
 					/>
 				</div>
-				{showPreview && (
+				{showSidePanel && (
 					<>
-						<div className="panel-resizer panel-resizer-preview" onMouseDown={startPreviewResize} role="separator" aria-orientation="vertical" aria-label="Resize preview panel" />
-						<article className="preview-panel preview-markdown">
-							<ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-						</article>
+						<div className="panel-resizer panel-resizer-preview" onMouseDown={startPreviewResize} role="separator" aria-orientation="vertical" aria-label={showChatPanel ? 'Resize chat panel' : 'Resize preview panel'} />
+						{showChatPanel ? (
+							<ChatPanel
+								threads={chatThreads}
+								activeThreadId={chatThreadId}
+								messages={chatMessages}
+								modelName={active_chat_model}
+								noteTitlesById={note_titles_by_id}
+								searchQuery={chatSearchQuery}
+								searchResults={chatSearchResults}
+								loadingThreads={chatLoadingThreads}
+								loadingMessages={chatLoadingMessages}
+								sending={chatSending}
+								assistantTyping={chatAssistantTyping}
+								deleting={chatDeleting}
+								errorMessage={chatErrorMessage}
+								onSelectThread={(thread_id) => {
+									stopAssistantTypingAnimation()
+									if (!thread_id) {
+										setChatThreadId(null)
+										setChatMessages([])
+										return
+									}
+									setChatThreadId(thread_id)
+									setChatSearchResults([])
+								}}
+								onCreateThread={() => {
+									stopAssistantTypingAnimation()
+									setChatThreadId(null)
+									setChatMessages([])
+									setChatSearchResults([])
+									setChatErrorMessage('')
+								}}
+								onDeleteThread={deleteSelectedChatThread}
+								onSearchQueryChange={setChatSearchQuery}
+								onRunSearch={() => void runChatSearch()}
+								onClearSearch={() => {
+									setChatSearchQuery('')
+									setChatSearchResults([])
+								}}
+								onSendMessage={sendChatMessage}
+								onOpenNote={(note_id) => {
+									void onOpenNoteFromChat(note_id)
+								}}
+							/>
+						) : (
+							<article className="preview-panel preview-markdown">
+								<ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+							</article>
+						)}
 					</>
 				)}
 			</div>
@@ -510,6 +754,16 @@ export function EditorPane(props: EditorPaneProps) {
 						setFindReplaceStatus('')
 						setShowFindReplace(true)
 					}} title="Find and Replace"><SearchIcon /></button>
+					<div className="toolbar-menu toolbar-menu-footer" ref={exportMenuRef}>
+						<button className={`icon-button ${showExportMenu ? 'chip-active' : ''}`} onClick={() => setShowExportMenu((value) => !value)} title="Export Note"><ExportIcon /></button>
+						{showExportMenu && (
+							<div className="editor-export-menu">
+								<button onClick={() => void exportNote('md')}>.md</button>
+								<button onClick={() => void exportNote('pdf')}>.pdf</button>
+								<button onClick={() => void exportNote('doc')}>.doc</button>
+							</div>
+						)}
+					</div>
 					<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
 					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>

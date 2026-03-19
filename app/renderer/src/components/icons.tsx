@@ -177,6 +177,65 @@ export function CloseIcon(props: IconProps) {
 	)
 }
 
+export function ChatbotIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12" />
+			<path d="M9.5 9h.01" />
+			<path d="M14.5 9h.01" />
+			<path d="M9.5 13a3.5 3.5 0 0 0 5 0" />
+		</BaseIcon>
+	)
+}
+
+export function MessagePlusIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M8 9h8" />
+			<path d="M8 13h6" />
+			<path d="M12.01 18.594l-4.01 2.406v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v5.5" />
+			<path d="M16 19h6" />
+			<path d="M19 16v6" />
+		</BaseIcon>
+	)
+}
+
+export function MessageOffIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M8 9h1m4 0h3" />
+			<path d="M8 13h5" />
+			<path d="M8 4h10a3 3 0 0 1 3 3v8c0 .577 -.163 1.116 -.445 1.573m-2.555 1.427h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8c0 -1.085 .576 -2.036 1.439 -2.562" />
+			<path d="M3 3l18 18" />
+		</BaseIcon>
+	)
+}
+
+export function SendIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M10 14l11 -11" />
+			<path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5" />
+		</BaseIcon>
+	)
+}
+
+export function MicrophoneIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M9 5a3 3 0 0 1 3 -3a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3a3 3 0 0 1 -3 -3l0 -5" />
+			<path d="M5 10a7 7 0 0 0 14 0" />
+			<path d="M8 21l8 0" />
+			<path d="M12 17l0 4" />
+		</BaseIcon>
+	)
+}
+
 export function CheckIcon(props: IconProps) {
 	return (
 		<BaseIcon {...props}>

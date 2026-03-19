@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
-import type { Note, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
+import type { AiMessage, AiThread, AiThreadSummary, Note, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
 import { migrations } from './migrations/index'
 
 interface DbNoteRow {
@@ -16,11 +16,31 @@ interface DbNoteRow {
 	deleted_at: string | null
 }
 
+interface DbAiThreadRow {
+	id: string
+	title: string
+	model: string | null
+	created_at: string
+	updated_at: string
+}
+
+interface DbAiMessageRow {
+	id: string
+	thread_id: string
+	role: 'user' | 'assistant' | 'system'
+	content: string
+	created_at: string
+}
+
 const DEFAULT_SETTINGS: Settings = {
 	theme: 'dark',
 	defaultView: 'all',
 	confirmDelete: true,
 	sortMode: 'updated_desc',
+	openAiApiKey: '',
+	openAiModel: 'gpt-4o',
+	autoBackupFrequency: '24h',
+	lastAutoBackupAt: null,
 }
 
 export class StrataDatabase {
@@ -68,6 +88,26 @@ export class StrataDatabase {
 			archived: Boolean(row.archived),
 			tags: JSON.parse(row.tags) as string[],
 			deletedAt: row.deleted_at,
+		}
+	}
+
+	private mapAiThread(row: DbAiThreadRow): AiThread {
+		return {
+			id: row.id,
+			title: row.title,
+			model: row.model,
+			createdAt: row.created_at,
+			updatedAt: row.updated_at,
+		}
+	}
+
+	private mapAiMessage(row: DbAiMessageRow): AiMessage {
+		return {
+			id: row.id,
+			threadId: row.thread_id,
+			role: row.role,
+			content: row.content,
+			createdAt: row.created_at,
 		}
 	}
 
@@ -174,6 +214,145 @@ export class StrataDatabase {
 		return [...counts.entries()]
 			.map(([name, count]) => ({ name, count }))
 			.sort((a, b) => a.name.localeCompare(b.name))
+	}
+
+	listAiThreads(): AiThreadSummary[] {
+		const rows = this.db.prepare('SELECT * FROM ai_threads ORDER BY updated_at DESC').all() as DbAiThreadRow[]
+		const last_message_stmt = this.db.prepare('SELECT * FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT 1')
+		return rows.map((thread_row) => {
+			const last_message_row = last_message_stmt.get(thread_row.id) as DbAiMessageRow | undefined
+			return {
+				thread: this.mapAiThread(thread_row),
+				lastMessage: last_message_row ? this.mapAiMessage(last_message_row) : null,
+			}
+		})
+	}
+
+	getAiThread(id: string): AiThread | null {
+		const row = this.db.prepare('SELECT * FROM ai_threads WHERE id = ? LIMIT 1').get(id) as DbAiThreadRow | undefined
+		if (!row) return null
+		return this.mapAiThread(row)
+	}
+
+	createAiThread(title: string, model: string): AiThread {
+		const now = new Date().toISOString()
+		const id = uuidv4()
+		this.db.prepare('INSERT INTO ai_threads (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, title, model, now, now)
+		const created = this.getAiThread(id)
+		if (!created) throw new Error('Failed to create AI thread')
+		return created
+	}
+
+	setAiThreadModel(id: string, model: string): AiThread | null {
+		const result = this.db.prepare('UPDATE ai_threads SET model = ?, updated_at = ? WHERE id = ?').run(model, new Date().toISOString(), id)
+		if (0 === result.changes) return null
+		return this.getAiThread(id)
+	}
+
+	deleteAiThread(id: string): boolean {
+		const transaction = this.db.transaction((thread_id: string) => {
+			this.db.prepare('DELETE FROM ai_messages WHERE thread_id = ?').run(thread_id)
+			const deleted_thread = this.db.prepare('DELETE FROM ai_threads WHERE id = ?').run(thread_id)
+			return deleted_thread.changes > 0
+		})
+
+		return transaction(id)
+	}
+
+	touchAiThread(id: string): void {
+		this.db.prepare('UPDATE ai_threads SET updated_at = ? WHERE id = ?').run(new Date().toISOString(), id)
+	}
+
+	listAiMessages(thread_id: string): AiMessage[] {
+		const rows = this.db.prepare('SELECT * FROM ai_messages WHERE thread_id = ? ORDER BY created_at ASC').all(thread_id) as DbAiMessageRow[]
+		return rows.map((row) => this.mapAiMessage(row))
+	}
+
+	createAiMessage(thread_id: string, role: 'user' | 'assistant' | 'system', content: string): AiMessage {
+		const now = new Date().toISOString()
+		const id = uuidv4()
+		this.db.prepare('INSERT INTO ai_messages (id, thread_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)').run(id, thread_id, role, content, now)
+		this.touchAiThread(thread_id)
+		const row = this.db.prepare('SELECT * FROM ai_messages WHERE id = ? LIMIT 1').get(id) as DbAiMessageRow | undefined
+		if (!row) throw new Error('Failed to create AI message')
+		return this.mapAiMessage(row)
+	}
+
+	searchAiMessages(query: string, limit = 20): Array<{ thread: AiThread; message: AiMessage }> {
+		const rows = this.db
+			.prepare(
+				`SELECT m.id as message_id, m.thread_id, m.role, m.content, m.created_at,
+					t.id as thread_id_2, t.title, t.model as thread_model, t.created_at as thread_created_at, t.updated_at as thread_updated_at
+				 FROM ai_messages m
+				 JOIN ai_threads t ON t.id = m.thread_id
+				 WHERE m.content LIKE ?
+				 ORDER BY m.created_at DESC
+				 LIMIT ?`,
+			)
+			.all(`%${query}%`, Math.max(1, Math.min(100, limit))) as Array<{
+				message_id: string
+				thread_id: string
+				role: 'user' | 'assistant' | 'system'
+				content: string
+				created_at: string
+				thread_id_2: string
+				title: string
+				thread_model: string | null
+				thread_created_at: string
+				thread_updated_at: string
+			}>
+
+		return rows.map((row) => ({
+			thread: {
+				id: row.thread_id_2,
+				title: row.title,
+				model: row.thread_model,
+				createdAt: row.thread_created_at,
+				updatedAt: row.thread_updated_at,
+			},
+			message: {
+				id: row.message_id,
+				threadId: row.thread_id,
+				role: row.role,
+				content: row.content,
+				createdAt: row.created_at,
+			},
+		}))
+	}
+
+	aiListNotes(limit = 50, include_archived = true): Note[] {
+		const rows = this.db
+			.prepare(
+				`SELECT * FROM notes
+				 WHERE deleted_at IS NULL
+				 ${include_archived ? '' : 'AND archived = 0'}
+				 ORDER BY updated_at DESC
+				 LIMIT ?`,
+			)
+			.all(Math.max(1, Math.min(200, limit))) as DbNoteRow[]
+		return rows.map((row) => this.mapNote(row))
+	}
+
+	aiSearchNotes(query: string, limit = 20): Note[] {
+		const wildcard = `%${query}%`
+		const rows = this.db
+			.prepare(
+				`SELECT * FROM notes
+				 WHERE deleted_at IS NULL
+				 AND (content LIKE ? OR tags LIKE ?)
+				 ORDER BY updated_at DESC
+				 LIMIT ?`,
+			)
+			.all(wildcard, wildcard, Math.max(1, Math.min(200, limit))) as DbNoteRow[]
+		return rows.map((row) => this.mapNote(row))
+	}
+
+	aiGetNoteById(id: string, include_deleted = false): Note | null {
+		const row = this.db
+			.prepare(`SELECT * FROM notes WHERE id = ? ${include_deleted ? '' : 'AND deleted_at IS NULL'} LIMIT 1`)
+			.get(id) as DbNoteRow | undefined
+		if (!row) return null
+		return this.mapNote(row)
 	}
 
 	getSettings(): Settings {

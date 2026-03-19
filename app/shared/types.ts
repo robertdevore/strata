@@ -4,6 +4,8 @@ export type ViewMode = 'all' | 'starred'
 
 export type SortMode = 'updated_desc' | 'created_desc' | 'title_asc'
 
+export type AutoBackupFrequency = 'off' | '12h' | '24h' | '168h'
+
 export interface Note {
 	id: string
 	content: string
@@ -28,6 +30,10 @@ export interface Settings {
 	defaultView: ViewMode
 	confirmDelete: boolean
 	sortMode: SortMode
+	openAiApiKey: string
+	openAiModel: string
+	autoBackupFrequency: AutoBackupFrequency
+	lastAutoBackupAt: string | null
 }
 
 export interface NoteUpdatePatch {
@@ -39,4 +45,45 @@ export interface NoteUpdatePatch {
 
 export interface ListResult {
 	notes: Note[]
+}
+
+export interface AiThread {
+	id: string
+	title: string
+	model: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export interface AiMessage {
+	id: string
+	threadId: string
+	role: 'user' | 'assistant' | 'system'
+	content: string
+	createdAt: string
+}
+
+export interface AiThreadSummary {
+	thread: AiThread
+	lastMessage: AiMessage | null
+}
+
+export interface AiChatResponse {
+	thread: AiThread
+	message: AiMessage
+}
+
+export interface AiSearchResult {
+	message: AiMessage
+	thread: AiThread
+}
+
+export interface AiTranscriptionResult {
+	text: string
+}
+
+export interface BackupResult {
+	createdAt: string
+	directory: string
+	files: string[]
 }
