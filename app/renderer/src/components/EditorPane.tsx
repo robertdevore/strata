@@ -173,7 +173,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [findQuery, setFindQuery] = useState('')
 	const [replaceQuery, setReplaceQuery] = useState('')
 	const [findReplaceStatus, setFindReplaceStatus] = useState('')
-	const [previewWidth, setPreviewWidth] = useState(420)
+	const [previewWidth, setPreviewWidth] = useState<number | null>(null)
 	const [chatThreads, setChatThreads] = useState<AiThreadSummary[]>([])
 	const [chatThreadId, setChatThreadId] = useState<string | null>(null)
 	const [chatMessages, setChatMessages] = useState<AiMessage[]>([])
@@ -457,7 +457,7 @@ export function EditorPane(props: EditorPaneProps) {
 		if (!editorBodyRef.current) return
 		const bounds = editorBodyRef.current.getBoundingClientRect()
 		const start_x = event.clientX
-		const start_width = previewWidth
+		const start_width = null !== previewWidth ? previewWidth : Math.max(280, (bounds.width - 6) / 2)
 
 		const onMouseMove = (move_event: MouseEvent) => {
 			const next_width = start_width - (move_event.clientX - start_x)
@@ -671,7 +671,7 @@ export function EditorPane(props: EditorPaneProps) {
 					}} title="Open AI Chat"><ChatbotIcon /></button>
 				</div>
 			</header>
-			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)` : 'minmax(0, 1fr)' }}>
+			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 6px minmax(0, 1fr)' : `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}>
 				<div className={`editor-input ${showSidePanel ? 'editor-input-split' : ''}`}>
 					<CodeMirror
 						value={content}
