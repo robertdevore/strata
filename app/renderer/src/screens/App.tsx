@@ -6,6 +6,7 @@ import { SettingsModal } from '@renderer/src/components/SettingsModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
+import { CircleChevronRightIcon } from '@renderer/src/components/icons'
 
 const isMac = navigator.userAgent.includes('Mac')
 
@@ -189,6 +190,16 @@ export function App() {
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
 			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>
+				{sidebarCollapsed && (
+					<button
+						className="standalone-sidebar-toggle"
+						onClick={() => setSidebarCollapsed(false)}
+						title="Open Sidebar"
+						aria-label="Open Sidebar"
+					>
+						<CircleChevronRightIcon />
+					</button>
+				)}
 				<Sidebar
 					notes={notes}
 					selectedId={store.selectedNoteId}

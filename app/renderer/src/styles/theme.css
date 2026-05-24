@@ -180,38 +180,45 @@ body.platform-mac .sidebar-collapse-button {
 	padding: 0;
 }
 
-.app-shell.sidebar-collapsed .sidebar .sidebar-top {
-	position: static;
-	display: block;
-}
-
-.app-shell.sidebar-collapsed .sidebar .app-title-row {
-	position: static;
-	padding-left: 0;
-	justify-content: flex-start;
-}
-
-.app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button {
-	position: absolute;
-	left: 8px;
-	top: 14px;
-	z-index: 11;
-	pointer-events: auto;
-}
-
+.app-shell.sidebar-collapsed .sidebar .sidebar-top,
+.app-shell.sidebar-collapsed .sidebar .app-title-row,
 .app-shell.sidebar-collapsed .sidebar .app-title-left,
 .app-shell.sidebar-collapsed .sidebar .search-input,
 .app-shell.sidebar-collapsed .sidebar .chip-row,
 .app-shell.sidebar-collapsed .sidebar .tags-section,
 .app-shell.sidebar-collapsed .sidebar .notes-list,
 .app-shell.sidebar-collapsed .sidebar .sidebar-bottom,
-.app-shell.sidebar-collapsed .sidebar .sidebar-undo-toast {
+.app-shell.sidebar-collapsed .sidebar .sidebar-undo-toast,
+.app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button {
 	display: none;
 }
 
-body.platform-mac .app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button {
-	left: 74px;
+/* Standalone toggle button — lives outside sidebar, nothing can block it */
+.standalone-sidebar-toggle {
+	position: absolute;
+	left: 8px;
 	top: 14px;
+	z-index: 20;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-2);
+	cursor: pointer;
+	-webkit-app-region: no-drag;
+}
+
+.standalone-sidebar-toggle:hover {
+	color: var(--text);
+}
+
+body.platform-mac .standalone-sidebar-toggle {
+	left: 74px;
+	top: 4px;
 }
 
 .search-input,
