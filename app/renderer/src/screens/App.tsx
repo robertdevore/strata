@@ -188,7 +188,7 @@ export function App() {
 
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? '116px minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>
+			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>
 				<Sidebar
 					notes={notes}
 					selectedId={store.selectedNoteId}

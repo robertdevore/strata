@@ -74,7 +74,7 @@ body.theme-light {
 }
 
 .app-shell.sidebar-collapsed {
-	grid-template-columns: 116px 1fr;
+	position: relative;
 }
 
 .app-shell.sidebar-collapsed .app-title-row {
@@ -168,16 +168,35 @@ body.platform-mac .sidebar-collapse-button {
 }
 
 .app-shell.sidebar-collapsed .sidebar {
-	padding-left: 10px;
-	padding-right: 10px;
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 10;
+	width: 52px;
+	padding: 14px 8px;
+	background: transparent;
+	border-right: none;
+	pointer-events: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button,
+.app-shell.sidebar-collapsed .sidebar .app-title-row {
+	pointer-events: auto;
 }
 
 body.platform-mac .app-shell.sidebar-collapsed .app-title-row {
-	padding-left: 64px;
+	padding-left: 72px;
 }
 
 body.platform-mac .app-shell.sidebar-collapsed .sidebar-collapse-button {
-	margin-left: 6px;
+	margin-left: 0;
+}
+
+body.platform-mac .app-shell.sidebar-collapsed .sidebar {
+	padding-left: 74px;
+	padding-right: 8px;
+	width: auto;
 }
 
 .search-input,
@@ -486,6 +505,10 @@ button:focus-visible,
 
 .editor-header {
 	-webkit-app-region: drag;
+}
+
+body.platform-mac .app-shell.sidebar-collapsed .editor-header {
+	padding-left: 80px;
 }
 
 .editor-footer {
