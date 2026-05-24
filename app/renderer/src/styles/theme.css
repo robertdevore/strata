@@ -198,7 +198,7 @@ body.platform-mac .sidebar-collapse-button {
 .standalone-sidebar-toggle {
 	position: fixed;
 	left: 8px;
-	top: 19px;
+	top: 16px;
 	z-index: 99999;
 	display: inline-flex;
 	align-items: center;
@@ -219,7 +219,7 @@ body.platform-mac .sidebar-collapse-button {
 
 body.platform-mac .standalone-sidebar-toggle {
 	left: 74px;
-	top: 9px;
+	top: 6px;
 }
 
 .search-input,
