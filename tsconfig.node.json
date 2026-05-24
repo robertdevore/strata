@@ -6,10 +6,9 @@
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-      "@main/*": ["app/main/*"],
-      "@shared/*": ["app/shared/*"]
+      "@main/*": ["./app/main/*"],
+      "@shared/*": ["./app/shared/*"]
     },
 
     /* Bundler mode */

@@ -535,6 +535,7 @@ button:focus-visible,
 	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
+	position: relative;
 }
 
 .editor-input > div {
@@ -545,6 +546,45 @@ button:focus-visible,
 
 .editor-input-split {
 	border-right: 1px solid var(--border);
+}
+
+.editor-input.note-dictation-enabled .cm-content {
+	padding-bottom: 52px;
+}
+
+.note-mic-button {
+	position: absolute;
+	right: 12px;
+	bottom: 12px;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border-radius: 8px;
+	z-index: 3;
+}
+
+.note-dictation-status {
+	position: absolute;
+	left: 12px;
+	right: 52px;
+	bottom: 14px;
+	margin: 0;
+	padding: 4px 8px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--editor-bg) 80%, transparent);
+	border: 1px solid var(--border);
+	font-size: 12px;
+	line-height: 1.35;
+	color: var(--text-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	pointer-events: none;
+	z-index: 2;
+}
+
+.note-dictation-status-error {
+	color: var(--accent-hover);
 }
 
 .preview-panel {

@@ -7,11 +7,10 @@
     "module": "ESNext",
     "types": ["vite/client"],
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-    "@renderer/*": ["app/renderer/*"],
-      "@shared/*": ["app/shared/*"],
-      "@preload/*": ["app/preload/*"]
+      "@renderer/*": ["./app/renderer/*"],
+      "@shared/*": ["./app/shared/*"],
+      "@preload/*": ["./app/preload/*"]
     },
 
     /* Bundler mode */
