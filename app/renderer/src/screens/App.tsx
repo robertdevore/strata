@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
 import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
@@ -189,17 +190,18 @@ export function App() {
 
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+			{sidebarCollapsed && createPortal(
+				<button
+					className="standalone-sidebar-toggle"
+					onClick={() => setSidebarCollapsed(false)}
+					title="Open Sidebar"
+					aria-label="Open Sidebar"
+				>
+					<CircleChevronRightIcon />
+				</button>,
+				document.body
+			)}
 			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>
-				{sidebarCollapsed && (
-					<button
-						className="standalone-sidebar-toggle"
-						onClick={() => setSidebarCollapsed(false)}
-						title="Open Sidebar"
-						aria-label="Open Sidebar"
-					>
-						<CircleChevronRightIcon />
-					</button>
-				)}
 				<Sidebar
 					notes={notes}
 					selectedId={store.selectedNoteId}

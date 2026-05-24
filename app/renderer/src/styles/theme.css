@@ -193,12 +193,13 @@ body.platform-mac .sidebar-collapse-button {
 	display: none;
 }
 
-/* Standalone toggle button — lives outside sidebar, nothing can block it */
+/* Standalone toggle button — rendered via Portal to document.body.
+   Nothing in the component tree can block its clicks. */
 .standalone-sidebar-toggle {
-	position: absolute;
+	position: fixed;
 	left: 8px;
-	top: 14px;
-	z-index: 20;
+	top: 19px;
+	z-index: 99999;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -218,7 +219,7 @@ body.platform-mac .sidebar-collapse-button {
 
 body.platform-mac .standalone-sidebar-toggle {
 	left: 74px;
-	top: 4px;
+	top: 9px;
 }
 
 .search-input,
