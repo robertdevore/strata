@@ -173,32 +173,45 @@ body.platform-mac .sidebar-collapse-button {
 	top: 0;
 	bottom: 0;
 	z-index: 10;
-	width: 52px;
-	padding: 14px 8px;
+	width: 0;
+	overflow: visible;
 	background: transparent;
 	border-right: none;
-	pointer-events: none;
+	padding: 0;
 }
 
-.app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button,
+.app-shell.sidebar-collapsed .sidebar .sidebar-top {
+	position: static;
+	display: block;
+}
+
 .app-shell.sidebar-collapsed .sidebar .app-title-row {
+	position: static;
+	padding-left: 0;
+	justify-content: flex-start;
+}
+
+.app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button {
+	position: absolute;
+	left: 8px;
+	top: 14px;
+	z-index: 11;
 	pointer-events: auto;
 }
 
-body.platform-mac .app-shell.sidebar-collapsed .app-title-row {
-	padding-left: 0;
+.app-shell.sidebar-collapsed .sidebar .app-title-left,
+.app-shell.sidebar-collapsed .sidebar .search-input,
+.app-shell.sidebar-collapsed .sidebar .chip-row,
+.app-shell.sidebar-collapsed .sidebar .tags-section,
+.app-shell.sidebar-collapsed .sidebar .notes-list,
+.app-shell.sidebar-collapsed .sidebar .sidebar-bottom,
+.app-shell.sidebar-collapsed .sidebar .sidebar-undo-toast {
+	display: none;
 }
 
-body.platform-mac .app-shell.sidebar-collapsed .sidebar-collapse-button {
-	margin-left: 0;
-}
-
-body.platform-mac .app-shell.sidebar-collapsed .sidebar {
-	padding-left: 74px;
-	padding-right: 10px;
-	padding-top: 14px;
-	padding-bottom: 14px;
-	width: auto;
+body.platform-mac .app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button {
+	left: 74px;
+	top: 14px;
 }
 
 .search-input,
