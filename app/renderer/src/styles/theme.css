@@ -186,7 +186,7 @@ body.platform-mac .sidebar-collapse-button {
 }
 
 body.platform-mac .app-shell.sidebar-collapsed .app-title-row {
-	padding-left: 72px;
+	padding-left: 0;
 }
 
 body.platform-mac .app-shell.sidebar-collapsed .sidebar-collapse-button {
@@ -195,7 +195,9 @@ body.platform-mac .app-shell.sidebar-collapsed .sidebar-collapse-button {
 
 body.platform-mac .app-shell.sidebar-collapsed .sidebar {
 	padding-left: 74px;
-	padding-right: 8px;
+	padding-right: 10px;
+	padding-top: 14px;
+	padding-bottom: 14px;
 	width: auto;
 }
 
@@ -508,7 +510,7 @@ button:focus-visible,
 }
 
 body.platform-mac .app-shell.sidebar-collapsed .editor-header {
-	padding-left: 80px;
+	padding-left: 112px;
 }
 
 .editor-footer {
