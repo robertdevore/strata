@@ -94,6 +94,8 @@ export function App() {
 		if ('toggle-archive' === command && store.selectedNoteId) return store.toggleArchive(store.selectedNoteId)
 		if ('toggle-filters' === command) return store.setShowFiltersPanel(!store.showFiltersPanel)
 		if ('delete-note' === command && store.selectedNoteId) return onDelete(store.selectedNoteId)
+		if ('open-tags-editor' === command) return window.dispatchEvent(new CustomEvent('strata:open-tags-editor'))
+		if ('copy-rich-text' === command) return window.dispatchEvent(new CustomEvent('strata:copy-rich-text'))
 	}, [onDelete, store])
 
 	const startSidebarResize = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -170,6 +172,14 @@ export function App() {
 			if ('a' === key && event.shiftKey) {
 				event.preventDefault()
 				void runCommand('toggle-archive')
+			}
+			if ('t' === key && !event.shiftKey) {
+				event.preventDefault()
+				void runCommand('open-tags-editor')
+			}
+			if ('c' === key && event.shiftKey) {
+				event.preventDefault()
+				void runCommand('copy-rich-text')
 			}
 			if ('Backspace' === event.key) {
 				event.preventDefault()

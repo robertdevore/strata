@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
@@ -194,7 +194,56 @@ export function EditorPane(props: EditorPaneProps) {
 	const findInputRef = useRef<HTMLInputElement>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
 	const exportMenuRef = useRef<HTMLDivElement>(null)
+	const [editingTitle, setEditingTitle] = useState(false)
+	const [titleDraft, setTitleDraft] = useState('')
+	const titleInputRef = useRef<HTMLInputElement>(null)
+	const contentRef = useRef(content)
+	contentRef.current = content
 	const isLightTheme = document.body.classList.contains('theme-light')
+
+	const updateH1InContent = useCallback((current_content: string, new_title: string): string => {
+		const lines = current_content.split('\n')
+		// Find first H1 line and replace it
+		for (let i = 0; i < lines.length; i++) {
+			if (lines[i].startsWith('# ')) {
+				lines[i] = `# ${new_title}`
+				return lines.join('\n')
+			}
+		}
+		// No H1 found — prepend one
+		const trimmed = current_content.trimStart()
+		const leading = current_content.slice(0, current_content.length - trimmed.length)
+		return `${leading}# ${new_title}\n\n${trimmed}`
+	}, [])
+
+	const commitTitle = useCallback(() => {
+		if (!note || !titleDraft.trim()) {
+			setEditingTitle(false)
+			return
+		}
+		const current_content = content
+		const new_content = updateH1InContent(current_content, titleDraft.trim())
+		onChangeDraft(note.id, new_content)
+		setEditingTitle(false)
+	}, [note, titleDraft, content, updateH1InContent, onChangeDraft])
+
+	useEffect(() => {
+		const openTags = () => setShowTagsEditor(true)
+		const copyRich = () => void copyRichTextToClipboard(contentRef.current).catch(() => {})
+		window.addEventListener('strata:open-tags-editor', openTags)
+		window.addEventListener('strata:copy-rich-text', copyRich)
+		return () => {
+			window.removeEventListener('strata:open-tags-editor', openTags)
+			window.removeEventListener('strata:copy-rich-text', copyRich)
+		}
+	}, [])
+
+	useEffect(() => {
+		if (editingTitle && titleInputRef.current) {
+			titleInputRef.current.focus()
+			titleInputRef.current.select()
+		}
+	}, [editingTitle])
 
 	useEffect(() => {
 		if (noteIdRef.current && noteIdRef.current !== note?.id) {
@@ -642,7 +691,36 @@ export function EditorPane(props: EditorPaneProps) {
 	return (
 		<section className="editor">
 			<header className="editor-header">
-				<h2>{deriveNoteTitle(content)}</h2>
+				{editingTitle ? (
+					<input
+						ref={titleInputRef}
+						className="editor-title-input"
+						value={titleDraft}
+						onChange={(event) => setTitleDraft(event.target.value)}
+						onBlur={() => commitTitle()}
+						onKeyDown={(event) => {
+							if ('Enter' === event.key) {
+								event.preventDefault()
+								commitTitle()
+							}
+							if ('Escape' === event.key) {
+								event.preventDefault()
+								setEditingTitle(false)
+							}
+						}}
+					/>
+				) : (
+					<h2
+						className="editor-title-text"
+						onClick={() => {
+							setTitleDraft(deriveNoteTitle(content))
+							setEditingTitle(true)
+						}}
+						title="Click to edit title"
+					>
+						{deriveNoteTitle(content)}
+					</h2>
+				)}
 				<div className="editor-actions">
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
 					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>

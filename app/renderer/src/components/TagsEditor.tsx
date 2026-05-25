@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckIcon, CloseIcon } from './icons'
 
 interface TagsEditorProps {
@@ -11,10 +11,12 @@ interface TagsEditorProps {
 
 export function TagsEditor({ open, currentTags, existingTags, onClose, onApply }: TagsEditorProps) {
 	const [value, setValue] = useState('')
+	const inputRef = useRef<HTMLInputElement>(null)
 
 	useEffect(() => {
 		if (open) {
-			window.setTimeout(() => setValue(currentTags.join(', ')), 0)
+			setValue(currentTags.join(', '))
+			window.setTimeout(() => inputRef.current?.focus(), 0)
 		}
 	}, [open, currentTags])
 
@@ -34,6 +36,7 @@ export function TagsEditor({ open, currentTags, existingTags, onClose, onApply }
 				</button>
 				<p>Edit tags</p>
 				<input
+					ref={inputRef}
 					value={value}
 					onChange={(event) => setValue(event.target.value)}
 					onKeyDown={(event) => {

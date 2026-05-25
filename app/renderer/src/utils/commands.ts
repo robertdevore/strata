@@ -6,3 +6,5 @@ export type UiCommand =
 	| 'toggle-star'
 	| 'toggle-archive'
 	| 'toggle-filters'
+	| 'open-tags-editor'
+	| 'copy-rich-text'
