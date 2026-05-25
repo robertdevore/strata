@@ -406,6 +406,10 @@ button:focus-visible,
 	transition: padding-right 120ms ease;
 }
 
+.note-row:has(.note-row-star.starred) .note-row-title {
+	padding-right: 30px;
+}
+
 .note-row:hover .note-row-title,
 .note-row:focus-within .note-row-title,
 .note-row-active .note-row-title {
