@@ -392,6 +392,7 @@ button:focus-visible,
 	align-items: center;
 	gap: 10px;
 	min-width: 0;
+	position: relative;
 }
 
 .note-row-title {
@@ -451,10 +452,13 @@ button:focus-visible,
 }
 
 .note-row-icons {
+	position: absolute;
+	right: 0;
+	top: 50%;
+	transform: translateY(-50%);
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	flex-shrink: 0;
 }
 
 .note-row-star {
