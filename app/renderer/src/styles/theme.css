@@ -90,6 +90,7 @@ body.theme-light {
 	padding: 14px;
 	min-width: 0;
 	min-height: 0;
+	overflow-y: auto;
 }
 
 .sidebar-top {
@@ -358,6 +359,7 @@ button:focus-visible,
 	align-content: start;
 	grid-auto-rows: max-content;
 	scrollbar-color: var(--scrollbar-thumb) var(--sidebar-bg);
+	min-height: 0;
 }
 
 .notes-list::-webkit-scrollbar-track {
@@ -593,6 +595,7 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	cursor: pointer;
+	-webkit-app-region: no-drag;
 }
 
 .editor-title-input {
@@ -608,6 +611,7 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 	border: 1px solid var(--accent);
 	border-radius: 6px;
 	outline: none;
+	-webkit-app-region: no-drag;
 }
 
 .editor-actions {

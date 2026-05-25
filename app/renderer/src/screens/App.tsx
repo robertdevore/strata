@@ -150,7 +150,7 @@ export function App() {
 			if ('f' === key && !event.shiftKey) {
 				event.preventDefault()
 				const active_element = document.activeElement
-				const editor_focused = active_element instanceof HTMLElement && Boolean(active_element.closest('.cm-editor'))
+				const editor_focused = active_element instanceof HTMLElement && Boolean(active_element.closest('.cm-editor, .cm-content, .cm-scroller'))
 				if (editor_focused) {
 					window.dispatchEvent(new CustomEvent('strata:open-find-replace'))
 				} else {
