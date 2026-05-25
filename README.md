@@ -15,18 +15,35 @@ It is designed for focused writing with fast note capture, keyboard-first workfl
 
 ## Features
 
-- Markdown notes with autosave (`Saving…`, `Saved`, `Save failed`)
-- Sidebar filters: `All`, `Starred`, `Archived`, `Untagged`
-- Full-text search and tag filtering
-- Star / archive / delete actions + right-click context menu
-- Tag editor with existing-tag suggestions
-- Settings for theme, default view, delete confirmation, and sort mode
-- Secure Electron defaults (`contextIsolation`, `sandbox`, no renderer Node access)
+- **Markdown editor** with autosave, save-state feedback, rich-text paste, and find/replace
+- **Sidebar** with fast filtering (`All`, `Starred`, `Archived`, `Untagged`), full-text search, and tag filtering
+- **Clean Codex-style note cards** — compact single-line layout with relative timestamps, icons on hover
+- **Collapsible sidebar** that fully disappears so the editor fills the full window
+- **Built-in AI chat** (GPT-4o) for note analysis, chat-history search, and thread management
+- **Live Markdown preview** and **50/50 split-pane** with the editor
+- **Tag editor** with autocomplete suggestions from existing tags
+- **Export** to `.md`, `.pdf`, `.doc`, rich-text copy, and print
+- **Star / archive / delete** with undo, right-click context menu, and keyboard shortcuts
+- **Settings** for theme (dark/light/system), default view, delete confirmation, sort mode, and auto-backup frequency
+- **Local HTTP API** for notes CRUD — scriptable from any language or AI agent
+- **Secure Electron defaults** (`contextIsolation`, `sandbox`, no renderer Node access)
+
+## 0.4.0 release notes
+
+- **Sidebar UX overhaul**: cleaner, Codex-style note cards — borderless by default, compact single-line layout (title + relative time), star/trash icons hidden until hover, starred notes always show their star with automatic title truncation
+- **Collapsed sidebar now fully disappears**: the sidebar collapses to a zero-width transparent overlay so the editor fills the full window width — no more wasted gray strip
+- **Preview & AI Chat panels split 50/50**: both panels now open at an equal `1fr` split instead of a fixed pixel width, dynamically adapting to sidebar open/closed state
+- **Editor header refined**: note title and icon buttons scaled down to match the sidebar title row height; icon buttons are borderless with color-only hover feedback
+- **Smart note ordering**: notes only rise to the top when content or tags change — starring, archiving, or just clicking a note no longer reorders the list
+- **Enter to save tags**: pressing Enter in the tag editor now applies and saves tags
+- **Context menu dismiss**: right-click menus now close when clicking anywhere outside them
+- **CLI helper for AI agents**: `scripts/strata-note.sh` — pipe markdown directly into Strata from any terminal or AI agent session
+- **TypeScript**: migrated away from deprecated `baseUrl` for TS 7.0 compatibility
 
 ## 0.3.0 release notes
 
 - Rich-text paste now converts clipboard HTML into Markdown (headings, lists, emphasis, links, images, etc.)
-- Sidebar header now shows inline app version (`STRATA v0.3.0`)
+- Sidebar header shows inline app version
 - New note UX now places the cursor after `# Untitled` with a blank line ready for writing
 - Desktop menu behavior improved with native window/application shortcuts (including `Cmd+W` on macOS)
 - Note switching regression fixed (selecting a note reliably opens that note)
@@ -94,7 +111,7 @@ npm run notes:api -- <command> [args] # CLI helper for local notes HTTP API
 
 ## AI chat panel (GPT-4o)
 
-Strata includes an in-app AI panel (chatbot icon in the editor footer) that can:
+Strata includes an in-app AI panel (chatbot icon in the editor header) that can:
 
 - Analyze your local notes
 - Search notes by content/tags
