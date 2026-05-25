@@ -96,7 +96,7 @@ export function Sidebar(props: SidebarProps) {
 				{!props.sidebarCollapsed && (
 				<input ref={searchRef} className="search-input" placeholder={`Search ${props.notes.length} notes`} value={props.searchQuery} onChange={(event) => props.onSearchChange(event.target.value)} />
 				)}
-				{!props.sidebarCollapsed && props.showFiltersPanel && (
+			{!props.sidebarCollapsed && props.showFiltersPanel && (
 					<>
 						<div className="chip-row">
 							{filters.map((chip) => (
@@ -105,6 +105,12 @@ export function Sidebar(props: SidebarProps) {
 								</button>
 							))}
 						</div>
+					</>
+				)}
+			</div>
+			{!props.sidebarCollapsed && (
+				<div className="sidebar-scroll">
+					{props.showFiltersPanel && (
 						<div className="tags-section">
 							<p className="tags-label">Tags</p>
 							<button className={`tag-filter ${null === props.selectedTag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(null)}>
@@ -117,10 +123,8 @@ export function Sidebar(props: SidebarProps) {
 								</button>
 							))}
 						</div>
-					</>
-				)}
-			</div>
-			{!props.sidebarCollapsed && <div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
+					)}
+					<div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
 				{props.notes.map((note) => (
 					<div
 						key={note.id}
@@ -163,7 +167,9 @@ export function Sidebar(props: SidebarProps) {
 						</div>
 					</div>
 				))}
-			</div>}
+				</div>
+			</div>
+			)}
 			{!props.sidebarCollapsed && props.undoDeleteTitle && (
 				<div className="sidebar-undo-toast" role="status" aria-live="polite">
 					<span className="sidebar-undo-text">Deleted “{props.undoDeleteTitle}”</span>
@@ -171,8 +177,8 @@ export function Sidebar(props: SidebarProps) {
 				</div>
 			)}
 			{!props.sidebarCollapsed && <div className="sidebar-bottom">
-				<button className="primary-button" onClick={props.onNewNote}>New Note</button>
 				<div className="bottom-actions">
+					<button className="primary-button new-note-button" onClick={props.onNewNote}>New Note</button>
 					<button className="icon-button" onClick={props.onToggleFiltersPanel} title="Toggle Filters"><MenuIcon /></button>
 					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
 					<button className="icon-button" onClick={props.onOpenSettings} title="Settings"><SettingsIcon /></button>
