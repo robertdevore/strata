@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
-import { deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
+import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
 import { CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
@@ -147,10 +147,6 @@ export function Sidebar(props: SidebarProps) {
 									{note.starred ? <StarFilledIcon size={14} /> : <StarOutlineIcon size={14} />}
 								</button>
 							</div>
-						</div>
-						<div className="note-row-meta">
-							<div className="note-row-tags">{note.tags.slice(0, 3).map((tag) => <span key={tag} className="tag-pill">#{tag}</span>)}</div>
-							<span>{formatLastEdited(note.updatedAt)}</span>
 						</div>
 					</div>
 				))}

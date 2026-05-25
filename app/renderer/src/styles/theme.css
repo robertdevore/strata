@@ -365,7 +365,7 @@ button:focus-visible,
 }
 
 .note-row {
-	border: 1px solid var(--border);
+	border: 1px solid transparent;
 	border-radius: 10px;
 	padding: 9px;
 	background: transparent;
@@ -378,6 +378,7 @@ button:focus-visible,
 
 .note-row:hover {
 	background: var(--hover);
+	border-color: var(--border);
 }
 
 .note-row-active {

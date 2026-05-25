@@ -173,7 +173,13 @@ export class StrataDatabase {
 		const next_starred = typeof patch.starred === 'boolean' ? patch.starred : current.starred
 		const next_archived = typeof patch.archived === 'boolean' ? patch.archived : current.archived
 		const next_tags = Array.isArray(patch.tags) ? patch.tags : current.tags
-		const next_updated = new Date().toISOString()
+
+		// Only bump updated_at when content or tags actually change —
+		// star/archive toggles and no-op flushes should not reorder the list.
+		const has_real_change =
+			(typeof patch.content === 'string' && patch.content !== current.content) ||
+			(Array.isArray(patch.tags) && JSON.stringify(patch.tags) !== JSON.stringify(current.tags))
+		const next_updated = has_real_change ? new Date().toISOString() : current.updatedAt
 
 		this.db
 			.prepare(
