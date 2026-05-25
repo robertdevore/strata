@@ -407,7 +407,15 @@ button:focus-visible,
 	flex-shrink: 0;
 	font-size: 11px;
 	color: var(--text-3);
-	margin-left: 8px;
+	margin-left: auto;
+	opacity: 1;
+	transition: opacity 120ms ease;
+}
+
+.note-row:hover .note-row-time,
+.note-row:focus-within .note-row-time,
+.note-row-active .note-row-time {
+	opacity: 0;
 }
 
 .note-row-meta {
@@ -1037,6 +1045,11 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 	scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
+/* Sidebar scrollbar track must match sidebar background exactly */
+.notes-list {
+	scrollbar-color: var(--scrollbar-thumb) var(--sidebar-bg);
+}
+
 .notes-list::-webkit-scrollbar,
 .preview-panel::-webkit-scrollbar,
 .cm-scroller::-webkit-scrollbar {
@@ -1044,7 +1057,10 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 	height: 10px;
 }
 
-.notes-list::-webkit-scrollbar-track,
+.notes-list::-webkit-scrollbar-track {
+	background: var(--sidebar-bg);
+}
+
 .preview-panel::-webkit-scrollbar-track,
 .cm-scroller::-webkit-scrollbar-track {
 	background: var(--scrollbar-track);

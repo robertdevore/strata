@@ -42,6 +42,7 @@ const filters: ActiveFilter[] = ['all', 'starred', 'archived', 'untagged']
 export function Sidebar(props: SidebarProps) {
 	const [menu, setMenu] = useState<MenuState | null>(null)
 	const searchRef = useRef<HTMLInputElement>(null)
+	const menuRef = useRef<HTMLDivElement>(null)
 	const selectedIndex = useMemo(() => props.notes.findIndex((note) => note.id === props.selectedId), [props.notes, props.selectedId])
 
 	useEffect(() => {
@@ -49,6 +50,17 @@ export function Sidebar(props: SidebarProps) {
 		window.addEventListener('strata:focus-search', focus)
 		return () => window.removeEventListener('strata:focus-search', focus)
 	}, [])
+
+	useEffect(() => {
+		if (!menu) return
+		const onPointerDown = (event: MouseEvent) => {
+			if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+				setMenu(null)
+			}
+		}
+		window.addEventListener('mousedown', onPointerDown)
+		return () => window.removeEventListener('mousedown', onPointerDown)
+	}, [menu])
 
 	const onListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 		if (0 === props.notes.length) return
@@ -167,7 +179,7 @@ export function Sidebar(props: SidebarProps) {
 				</div>
 			</div>}
 			{menu && (
-				<div className="context-menu" style={{ left: menu.x, top: menu.y }}>
+				<div className="context-menu" ref={menuRef} style={{ left: menu.x, top: menu.y }}>
 					<button onClick={() => { props.onStarToggle(menu.noteId); setMenu(null) }}>Star / Unstar</button>
 					<button onClick={() => { props.onArchiveToggle(menu.noteId); setMenu(null) }}>Archive / Unarchive</button>
 					<button className="danger" onClick={() => { props.onDelete(menu.noteId); setMenu(null) }}>Delete</button>
