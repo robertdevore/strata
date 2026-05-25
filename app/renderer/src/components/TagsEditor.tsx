@@ -33,7 +33,18 @@ export function TagsEditor({ open, currentTags, existingTags, onClose, onApply }
 					<CloseIcon />
 				</button>
 				<p>Edit tags</p>
-				<input value={value} onChange={(event) => setValue(event.target.value)} placeholder="comma,separated,tags" />
+				<input
+					value={value}
+					onChange={(event) => setValue(event.target.value)}
+					onKeyDown={(event) => {
+						if ('Enter' === event.key) {
+							event.preventDefault()
+							onApply(value.split(',').map((item) => item.trim()).filter(Boolean))
+							onClose()
+						}
+					}}
+					placeholder="comma,separated,tags"
+				/>
 				<div className="suggestions">
 					{suggestions.map((tag) => (
 						<button key={tag} onClick={() => setValue(value ? `${value}, ${tag}` : tag)}>

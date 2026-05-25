@@ -357,6 +357,11 @@ button:focus-visible,
 	gap: 6px;
 	align-content: start;
 	grid-auto-rows: max-content;
+	scrollbar-color: var(--scrollbar-thumb) var(--sidebar-bg);
+}
+
+.notes-list::-webkit-scrollbar-track {
+	background: var(--sidebar-bg);
 }
 
 .note-row {
@@ -564,6 +569,17 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 
 .editor-actions .icon-button {
 	padding: 3px 6px;
+	border: none;
+	background: transparent;
+}
+
+.editor-actions .icon-button:hover {
+	background: var(--hover);
+}
+
+.editor-actions .icon-button.chip-active {
+	background: var(--accent-subtle);
+	border: 1px solid var(--accent);
 }
 
 .editor-actions .icon-button svg {
