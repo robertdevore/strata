@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
-import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
+import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
 import { CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
@@ -123,6 +123,7 @@ export function Sidebar(props: SidebarProps) {
 					>
 						<div className="note-row-title-wrap">
 							<span className="note-row-title">{deriveNoteTitle(note.content)}</span>
+							<span className="note-row-time">{formatRelativeTime(note.updatedAt)}</span>
 							<div className="note-row-icons">
 								<button
 									type="button"

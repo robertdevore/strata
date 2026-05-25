@@ -403,6 +403,13 @@ button:focus-visible,
 	text-overflow: ellipsis;
 }
 
+.note-row-time {
+	flex-shrink: 0;
+	font-size: 11px;
+	color: var(--text-3);
+	margin-left: 8px;
+}
+
 .note-row-meta {
 	display: flex;
 	justify-content: space-between;
@@ -569,23 +576,32 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 }
 
 .editor-actions .icon-button {
-	padding: 3px 6px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	width: 28px;
+	height: 28px;
 	border: none;
 	background: transparent;
+	color: var(--text-2);
 }
 
 .editor-actions .icon-button:hover {
-	background: var(--hover);
+	background: transparent;
+	color: var(--text);
 }
 
 .editor-actions .icon-button.chip-active {
 	background: var(--accent-subtle);
 	border: 1px solid var(--accent);
+	color: var(--text);
 }
 
 .editor-actions .icon-button svg {
 	width: 15px;
 	height: 15px;
+	display: block;
 }
 
 .save-status {
