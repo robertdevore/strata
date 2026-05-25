@@ -402,6 +402,14 @@ button:focus-visible,
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	padding-right: 0;
+	transition: padding-right 120ms ease;
+}
+
+.note-row:hover .note-row-title,
+.note-row:focus-within .note-row-title,
+.note-row-active .note-row-title {
+	padding-right: 56px;
 }
 
 .note-row-time {
