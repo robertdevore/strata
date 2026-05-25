@@ -522,7 +522,7 @@ button:focus-visible,
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 12px 16px;
+	padding: 6px 14px;
 	border-bottom: 1px solid var(--border);
 }
 
@@ -549,7 +549,8 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 
 .editor-header h2 {
 	margin: 0;
-	font-size: 16px;
+	font-size: 14px;
+	font-weight: 500;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -558,7 +559,16 @@ body.platform-mac .app-shell.sidebar-collapsed .editor-header {
 .editor-actions {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 4px;
+}
+
+.editor-actions .icon-button {
+	padding: 3px 6px;
+}
+
+.editor-actions .icon-button svg {
+	width: 15px;
+	height: 15px;
 }
 
 .save-status {
