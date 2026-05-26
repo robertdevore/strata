@@ -1309,7 +1309,12 @@ body.theme-light .cm-gutters {
 	color: var(--text-2);
 }
 
-.sidebar-undo-toast {
+.sidebar-load-more {
+\tpadding: 8px 4px;
+\tfont-size: 11px;
+\tcolor: var(--text-3);
+\ttext-align: center;
+}
 	margin-top: auto;
 	display: flex;
 	align-items: center;

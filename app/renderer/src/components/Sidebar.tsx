@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
@@ -41,9 +41,29 @@ const filters: ActiveFilter[] = ['all', 'starred', 'archived', 'untagged']
 
 export function Sidebar(props: SidebarProps) {
 	const [menu, setMenu] = useState<MenuState | null>(null)
+	const [visibleCount, setVisibleCount] = useState(50)
 	const searchRef = useRef<HTMLInputElement>(null)
 	const menuRef = useRef<HTMLDivElement>(null)
+	const scrollRef = useRef<HTMLDivElement>(null)
 	const selectedIndex = useMemo(() => props.notes.findIndex((note) => note.id === props.selectedId), [props.notes, props.selectedId])
+
+	// Reset visible count when the note list changes (filter, search, tag, sort)
+	useEffect(() => {
+		setVisibleCount(50)
+	}, [props.notes])
+
+	// Auto-load more notes on scroll
+	const onScrollNearBottom = useCallback(() => {
+		const el = scrollRef.current
+		if (!el) return
+		const threshold = 80 // px from bottom to trigger load
+		if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
+			setVisibleCount((prev) => Math.min(prev + 50, props.notes.length))
+		}
+	}, [props.notes.length])
+
+	const visibleNotes = props.notes.slice(0, visibleCount)
+	const hasMore = visibleCount < props.notes.length
 
 	useEffect(() => {
 		const focus = () => searchRef.current?.focus()
@@ -109,7 +129,7 @@ export function Sidebar(props: SidebarProps) {
 				)}
 			</div>
 			{!props.sidebarCollapsed && (
-				<div className="sidebar-scroll">
+				<div className="sidebar-scroll" ref={scrollRef} onScroll={onScrollNearBottom}>
 					{props.showFiltersPanel && (
 						<div className="tags-section">
 							<p className="tags-label">Tags</p>
@@ -125,7 +145,7 @@ export function Sidebar(props: SidebarProps) {
 						</div>
 					)}
 					<div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
-				{props.notes.map((note) => (
+				{visibleNotes.map((note) => (
 					<div
 						key={note.id}
 						className={`note-row ${props.selectedId === note.id ? 'note-row-active' : ''}`}
@@ -167,6 +187,11 @@ export function Sidebar(props: SidebarProps) {
 						</div>
 					</div>
 				))}
+				{hasMore && (
+					<div className="sidebar-load-more">
+						{visibleCount} of {props.notes.length} notes · scroll for more
+					</div>
+				)}
 				</div>
 			</div>
 			)}
