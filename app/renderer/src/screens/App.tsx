@@ -4,6 +4,7 @@ import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
 import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
 import { SettingsModal } from '@renderer/src/components/SettingsModal'
+import { CommandPalette, type PaletteMode } from '@renderer/src/components/CommandPalette'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
@@ -27,7 +28,7 @@ export function App() {
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 	const [sidebarWidth, setSidebarWidth] = useState(320)
 	const [undoTimeoutId, setUndoTimeoutId] = useState<number | null>(null)
-
+	const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
 	const clearUndoToast = useCallback(() => {
 		if (null !== undoTimeoutId) {
 			window.clearTimeout(undoTimeoutId)
@@ -137,12 +138,26 @@ export function App() {
 			const meta = isMac ? event.metaKey : event.ctrlKey
 			if (!meta) {
 				if ('Escape' === event.key) {
+					if (paletteMode) {
+						setPaletteMode(null)
+						return
+					}
 					setPendingDeleteId(null)
 					store.setShowSettings(false)
 				}
 				return
 			}
 			const key = event.key.toLowerCase()
+			if ('p' === key && !event.shiftKey) {
+					event.preventDefault()
+					setPaletteMode('quick-open')
+					return
+			}
+			if ('k' === key && !event.shiftKey) {
+					event.preventDefault()
+					setPaletteMode('commands')
+					return
+			}
 			if ('n' === key) {
 				event.preventDefault()
 				void runCommand('new-note')
@@ -188,7 +203,7 @@ export function App() {
 		}
 		window.addEventListener('keydown', onKeyDown)
 		return () => window.removeEventListener('keydown', onKeyDown)
-	}, [runCommand, store])
+	}, [runCommand, store, paletteMode])
 
 	useEffect(() => {
 		return () => {
@@ -293,6 +308,22 @@ export function App() {
 					setPendingDeleteId(null)
 				}}
 			/>
+			{paletteMode && (
+				<CommandPalette
+					mode={paletteMode}
+					notes={store.notes}
+					selectedNoteId={store.selectedNoteId}
+					onClose={() => setPaletteMode(null)}
+					onOpenNote={async (id) => {
+						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId)
+						store.selectNote(id)
+					}}
+					onRunCommand={(cmd) => void runCommand(cmd)}
+					onTogglePreview={() => window.dispatchEvent(new CustomEvent('strata:toggle-preview'))}
+					onToggleChatPanel={() => window.dispatchEvent(new CustomEvent('strata:toggle-chat-panel'))}
+					onOpenSettings={() => store.setShowSettings(true)}
+				/>
+			)}
 		</div>
 	)
 }

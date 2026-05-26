@@ -230,11 +230,17 @@ export function EditorPane(props: EditorPaneProps) {
 	useEffect(() => {
 		const openTags = () => setShowTagsEditor(true)
 		const copyRich = () => void copyRichTextToClipboard(contentRef.current).catch(() => {})
+		const togglePreview = () => setShowPreview((v) => { const n = !v; if (n) setShowChatPanel(false); return n })
+		const toggleChat = () => setShowChatPanel((v) => { const n = !v; if (n) setShowPreview(false); return n })
 		window.addEventListener('strata:open-tags-editor', openTags)
 		window.addEventListener('strata:copy-rich-text', copyRich)
+		window.addEventListener('strata:toggle-preview', togglePreview)
+		window.addEventListener('strata:toggle-chat-panel', toggleChat)
 		return () => {
 			window.removeEventListener('strata:open-tags-editor', openTags)
 			window.removeEventListener('strata:copy-rich-text', copyRich)
+			window.removeEventListener('strata:toggle-preview', togglePreview)
+			window.removeEventListener('strata:toggle-chat-panel', toggleChat)
 		}
 	}, [])
 
