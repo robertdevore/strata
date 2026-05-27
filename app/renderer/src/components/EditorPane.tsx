@@ -124,7 +124,6 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 		const html_content = event.clipboardData?.getData('text/html') ?? ''
 		const plain_text = event.clipboardData?.getData('text/plain') ?? ''
 
-		// Determine the markdown content to insert
 		let insert_content = ''
 		if (html_content.trim()) {
 			const converted = convertRichTextToMarkdown(html_content)
@@ -136,32 +135,6 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 			return false
 		}
 
-		// H1 auto-strip: if pasting into an empty note with an H1, strip it as title
-		const current_doc = view.state.doc.toString()
-		const doc_is_empty = !current_doc.trim() || /^#\s[^\n]*\n?\n?$/.test(current_doc.trim())
-		const lines = insert_content.split('\n')
-		const first_line = (lines[0] ?? '').trim()
-
-		if (doc_is_empty && first_line.startsWith('# ')) {
-			// Strip the H1 and any blank line after it — the H1 becomes the title
-			let body = ''
-			if (lines[1] === '') {
-				body = lines.slice(2).join('\n')
-			} else {
-				body = lines.slice(1).join('\n')
-			}
-			// Prepend a fresh H1 with the extracted title so deriveNoteTitle picks it up
-			const extracted_title = first_line.slice(2).trim()
-			const full = `# ${extracted_title}\n\n${body}`
-			view.dispatch({
-				changes: { from: 0, to: view.state.doc.length, insert: full },
-				selection: { anchor: full.length },
-			})
-			event.preventDefault()
-			return true
-		}
-
-		// Normal paste
 		const transaction = view.state.changeByRange((range) => ({
 			changes: { from: range.from, to: range.to, insert: insert_content },
 			range: EditorSelection.cursor(range.from + insert_content.length),
@@ -969,7 +942,19 @@ export function EditorPane(props: EditorPaneProps) {
 							foldGutter: false,
 						}}
 						onChange={(value) => {
-							const full = fullContentWithTitle(value, currentTitle)
+							let body = value
+							let title = currentTitle
+							// Auto-detect pasted/typed H1 in editor: extract as title, strip from body
+							const val_lines = value.split('\n')
+							if (val_lines[0] && val_lines[0].startsWith('# ') && val_lines[0].trim().length > 2) {
+								title = val_lines[0].slice(2).trim()
+								if (val_lines[1] === '') {
+									body = val_lines.slice(2).join('\n')
+								} else {
+									body = val_lines.slice(1).join('\n')
+								}
+							}
+							const full = fullContentWithTitle(body, title)
 							onChangeDraft(note.id, full)
 							if (debounceRef.current) window.clearTimeout(debounceRef.current)
 							debounceRef.current = window.setTimeout(() => void onFlush(note.id), 420)

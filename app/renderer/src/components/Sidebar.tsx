@@ -99,7 +99,7 @@ export function Sidebar(props: SidebarProps) {
 					{!props.sidebarCollapsed && <div className="app-title-left">
 						<p className="app-title">STRATA</p>
 					</div>}
-					{!props.sidebarCollapsed && <button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: 4 }}><PlusIcon size={15} /></button>}
+					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note"><PlusIcon size={15} /></button>
 					<button className="icon-button sidebar-collapse-button" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
