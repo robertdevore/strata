@@ -1429,6 +1429,54 @@ body.theme-light .cm-gutters {
 	align-items: center;
 }
 
+/* ---- Settings Tabs ---- */
+
+.settings-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0;
+}
+
+.settings-tab {
+	flex: 1;
+	padding: 8px 12px;
+	border: none;
+	background: transparent;
+	color: var(--text-2);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	transition: color 0.15s, border-color 0.15s;
+}
+
+.settings-tab:hover {
+	color: var(--text);
+}
+
+.settings-tab-active {
+	color: var(--accent);
+	border-bottom-color: var(--accent);
+}
+
+.settings-tab-content {
+	max-height: 60vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.settings-section-title {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text);
+	margin: 16px 0 8px;
+	padding-bottom: 4px;
+	border-bottom: 1px solid var(--border);
+}
+
 .coming-soon {
 	background: var(--accent-subtle);
 	color: var(--text-2);
