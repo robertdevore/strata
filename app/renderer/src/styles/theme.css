@@ -438,6 +438,19 @@ button:focus-visible,
 	color: var(--text);
 }
 
+.tag-hotkey {
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--text-3);
+	background: var(--hover);
+	border-radius: 3px;
+	padding: 1px 4px;
+	margin-right: 4px;
+	flex-shrink: 0;
+	min-width: 22px;
+	text-align: center;
+}
+
 .tags-modal-list {
 	display: grid;
 	gap: 6px;
@@ -830,7 +843,7 @@ button:focus-visible,
 
 body.platform-mac .app-shell.sidebar-collapsed .editor-header,
 body.platform-mac .app-shell.sidebar-collapsed .tab-bar {
-	padding-left: 112px;
+	padding-left: 144px;
 }
 
 /* When tabs are visible and sidebar collapsed, title should align left with content, not with tabs/stoplights */

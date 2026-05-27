@@ -307,7 +307,7 @@ export function App() {
 					onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
 					onOpenTagsModal={() => setShowTagsModal(true)}
 					onFilterChange={store.setActiveFilter}
-					onTagFilter={store.setSelectedTag}
+					onTagFilter={(tag) => store.setSelectedTag(store.selectedTag === tag ? null : tag)}
 					onStarToggle={(id) => void store.toggleStar(id)}
 					onArchiveToggle={(id) => void store.toggleArchive(id)}
 					onDelete={(id) => void onDelete(id)}
@@ -319,6 +319,7 @@ export function App() {
 						const current = store.settings.pinnedTags ?? []
 						store.updateSettings({ pinnedTags: current.filter((t) => t !== tag) })
 					}}
+					onReorderPinned={(tags) => store.updateSettings({ pinnedTags: tags })}
 					undoDeleteTitle={undoDelete?.title ?? null}
 					onUndoDelete={() => void undoLastDelete()}
 					theme={store.settings.theme}

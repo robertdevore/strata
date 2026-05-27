@@ -29,6 +29,7 @@ interface SidebarProps {
 	onDelete: (id: string) => void
 	onPinTag: (tag: string) => void
 	onUnpinTag: (tag: string) => void
+	onReorderPinned: (tags: string[]) => void
 	undoDeleteTitle: string | null
 	onUndoDelete: () => void
 	theme: ThemeMode
@@ -41,9 +42,10 @@ interface MenuState {
 }
 
 export function Sidebar(props: SidebarProps) {
-	const { pinnedTags, onPinTag, onUnpinTag } = props
+	const { pinnedTags, onPinTag, onUnpinTag, onReorderPinned } = props
 	const [menu, setMenu] = useState<MenuState | null>(null)
-	const [pinnedTagsCollapsed, setPinnedTagsCollapsed] = useState(false)
+	const [tagsCollapsed, setTagsCollapsed] = useState(false)
+	const [dragIndex, setDragIndex] = useState<number | null>(null)
 	const [visibleCount, setVisibleCount] = useState(50)
 	const menuRef = useRef<HTMLDivElement>(null)
 	const scrollRef = useRef<HTMLDivElement>(null)
@@ -102,7 +104,7 @@ export function Sidebar(props: SidebarProps) {
 					{!props.sidebarCollapsed && <div className="app-title-left">
 						<p className="app-title">STRATA</p>
 					</div>}
-					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note"><PlusIcon size={15} /></button>
+					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: 2 }}><PlusIcon size={15} /></button>
 					<button className="icon-button sidebar-collapse-button sidebar-toggle-btn" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
@@ -110,39 +112,59 @@ export function Sidebar(props: SidebarProps) {
 			</div>
 			{!props.sidebarCollapsed && (
 				<div className="sidebar-scroll" ref={scrollRef} onScroll={onScrollNearBottom}>
-					{/* Tags — always visible */}
+					{/* Tags — collapsible */}
 					<div className="tags-section">
 						<div className="tags-header-row">
 							<p className="tags-label">Tags</p>
-							{pinnedTags.length > 0 && (
-								<button className="icon-button tags-collapse-btn" onClick={() => setPinnedTagsCollapsed((v) => !v)} title={pinnedTagsCollapsed ? 'Show pinned tags' : 'Hide pinned tags'}>
-									{pinnedTagsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
-								</button>
-							)}
+							<button className="icon-button tags-collapse-btn" onClick={() => setTagsCollapsed((v) => !v)} title={tagsCollapsed ? 'Show tags' : 'Hide tags'}>
+								{tagsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
+							</button>
 						</div>
-						{/* Pinned tags — collapsible */}
-						{pinnedTags.length > 0 && !pinnedTagsCollapsed && (
-							<div className="pinned-tags">
-								{pinnedTags.map((tag) => (
-									<button key={tag} className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag)}>
-										<span>#{tag}</span>
+						{!tagsCollapsed && (
+							<>
+								{/* Pinned tags — drag-and-drop reorderable */}
+								{pinnedTags.length > 0 && (
+									<div className="pinned-tags">
+										{pinnedTags.map((tag, idx) => (
+											<button
+												key={tag}
+												draggable
+												className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`}
+												onClick={() => props.onTagFilter(tag)}
+												onDragStart={() => setDragIndex(idx)}
+												onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+												onDrop={() => {
+													if (null !== dragIndex && dragIndex !== idx) {
+														const reordered = [...pinnedTags]
+														const [moved] = reordered.splice(dragIndex, 1)
+														reordered.splice(idx, 0, moved)
+														onReorderPinned(reordered)
+													}
+													setDragIndex(null)
+												}}
+												onDragEnd={() => setDragIndex(null)}
+											>
+												<span className="tag-hotkey">⌘{idx + 1}</span>
+												<span>#{tag}</span>
+												<span className="tag-count-row">
+													<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag">📌</button>
+												</span>
+											</button>
+										))}
+									</div>
+								)}
+								{/* Top 5 popular tags — with hotkeys continuing from pinned */}
+								{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, Math.max(0, 5 - pinnedTags.length)).map((tag, idx) => (
+									<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>
+										<span className="tag-hotkey">⌘{pinnedTags.length + idx + 1}</span>
+										<span>#{tag.name}</span>
 										<span className="tag-count-row">
-											<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag">📌</button>
+											<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin tag">📌</button>
 										</span>
 									</button>
 								))}
-							</div>
+							</>
 						)}
-						{/* Top 5 popular tags — always visible */}
-						{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, 5).map((tag) => (
-							<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>
-								<span>#{tag.name}</span>
-								<span className="tag-count-row">
-									<span>{tag.count}</span>
-									<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin tag">📌</button>
-								</span>
-							</button>
-						))}
 					</div>
 					<p className="tags-label sidebar-notes-heading">Notes</p>
 					<div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
