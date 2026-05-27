@@ -97,12 +97,9 @@ export function Sidebar(props: SidebarProps) {
 			<div className="sidebar-top">
 				<div className="app-title-row">
 					{!props.sidebarCollapsed && <div className="app-title-left">
-						<div className="app-title-group">
-							<p className="app-title">STRATA</p>
-								<p className="app-version">v0.4.0</p>
-						</div>
+						<p className="app-title">STRATA</p>
 					</div>}
-					{!props.sidebarCollapsed && <button className="icon-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: 4 }}><PlusIcon /></button>}
+					{!props.sidebarCollapsed && <button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: 4 }}><PlusIcon size={15} /></button>}
 					<button className="icon-button sidebar-collapse-button" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>

@@ -122,50 +122,51 @@ const locateNextMatch = (content: string, query: string, start_at: number): numb
 const richTextPasteExtension = EditorView.domEventHandlers({
 	paste: (event, view) => {
 		const html_content = event.clipboardData?.getData('text/html') ?? ''
-		if (!html_content.trim()) return false
-
-		const markdown_content = convertRichTextToMarkdown(html_content)
-		if (!markdown_content) return false
-
-		const transaction = view.state.changeByRange((range) => ({
-			changes: { from: range.from, to: range.to, insert: markdown_content },
-			range: EditorSelection.cursor(range.from + markdown_content.length),
-		}))
-
-		view.dispatch(transaction)
-		event.preventDefault()
-		return true
-	},
-})
-
-// Auto-strip leading H1 when pasting into an empty note — the H1 becomes the title
-const h1AutoStripExtension = EditorView.domEventHandlers({
-	paste: (event, view) => {
 		const plain_text = event.clipboardData?.getData('text/plain') ?? ''
-		if (!plain_text.trim()) return false
 
-		// Check if the note is currently empty (just the auto-generated H1 or blank)
-		const current_doc = view.state.doc.toString()
-		const doc_is_empty = !current_doc.trim() || /^#\s[^\n]*\n?\n?$/.test(current_doc.trim())
-
-		// Check if the pasted text starts with an H1
-		const lines = plain_text.split('\n')
-		const first_line = lines[0]?.trim() ?? ''
-		if (!doc_is_empty || !first_line.startsWith('# ')) return false
-
-		// Strip the H1 and any blank line after it
-		let new_body = plain_text
-		if (lines[1] === '') {
-			new_body = lines.slice(2).join('\n')
+		// Determine the markdown content to insert
+		let insert_content = ''
+		if (html_content.trim()) {
+			const converted = convertRichTextToMarkdown(html_content)
+			if (!converted) return false
+			insert_content = converted
+		} else if (plain_text) {
+			insert_content = plain_text
 		} else {
-			new_body = lines.slice(1).join('\n')
+			return false
 		}
 
-		// Replace the entire document with the body only
-		view.dispatch({
-			changes: { from: 0, to: view.state.doc.length, insert: new_body },
-			selection: { anchor: 0 },
-		})
+		// H1 auto-strip: if pasting into an empty note with an H1, strip it as title
+		const current_doc = view.state.doc.toString()
+		const doc_is_empty = !current_doc.trim() || /^#\s[^\n]*\n?\n?$/.test(current_doc.trim())
+		const lines = insert_content.split('\n')
+		const first_line = (lines[0] ?? '').trim()
+
+		if (doc_is_empty && first_line.startsWith('# ')) {
+			// Strip the H1 and any blank line after it — the H1 becomes the title
+			let body = ''
+			if (lines[1] === '') {
+				body = lines.slice(2).join('\n')
+			} else {
+				body = lines.slice(1).join('\n')
+			}
+			// Prepend a fresh H1 with the extracted title so deriveNoteTitle picks it up
+			const extracted_title = first_line.slice(2).trim()
+			const full = `# ${extracted_title}\n\n${body}`
+			view.dispatch({
+				changes: { from: 0, to: view.state.doc.length, insert: full },
+				selection: { anchor: full.length },
+			})
+			event.preventDefault()
+			return true
+		}
+
+		// Normal paste
+		const transaction = view.state.changeByRange((range) => ({
+			changes: { from: range.from, to: range.to, insert: insert_content },
+			range: EditorSelection.cursor(range.from + insert_content.length),
+		}))
+		view.dispatch(transaction)
 		event.preventDefault()
 		return true
 	},
@@ -958,7 +959,7 @@ export function EditorPane(props: EditorPaneProps) {
 					<CodeMirror
 						value={editorContent}
 						height="100%"
-						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, h1AutoStripExtension, autocompletion({ override: [wikiLinkCompletions] })]}
+						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, autocompletion({ override: [wikiLinkCompletions] })]}
 						onCreateEditor={(view) => {
 							editorViewRef.current = view
 						}}
