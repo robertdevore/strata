@@ -3,6 +3,7 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
 import type { AiMessage, AiNoteEdit, AiRouteLog, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
+import { DEFAULT_HOTKEYS } from '../../shared/hotkeys'
 import { migrations } from './migrations/index'
 
 interface DbNoteRow {
@@ -84,6 +85,7 @@ const DEFAULT_SETTINGS: Settings = {
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
 	pinnedTags: [],
+	hotkeys: DEFAULT_HOTKEYS,
 }
 
 export class StrataDatabase {

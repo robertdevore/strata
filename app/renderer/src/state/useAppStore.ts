@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Note, Settings } from '@shared/types'
+import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
 import { applyFiltersAndSort, type ActiveFilter } from '@renderer/src/domain/filtering'
 import { normalizeTag } from '@renderer/src/domain/noteUtils'
 import { notesService } from '@renderer/src/services/notesService'
@@ -7,10 +8,20 @@ import { settingsService } from '@renderer/src/services/settingsService'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
 
+interface FlushDraftOptions {
+	allowDiscardUntouchedEmpty?: boolean
+}
+
+const is_effectively_untouched_content = (content: string): boolean => {
+	const normalized = content.replace(/\r\n/g, '\n').trim()
+	return '' === normalized || '# Untitled' === normalized
+}
+
 interface AppState {
 	notes: Note[]
 	selectedNoteId: string | null
 	drafts: Record<string, string>
+	untouchedNewNoteIds: Record<string, true>
 	tags: Array<{ name: string; count: number }>
 	activeFilter: ActiveFilter
 	selectedTag: string | null
@@ -36,7 +47,7 @@ interface AppState {
 	navigateForward: () => void
 	createNote: () => Promise<void>
 	setDraft: (id: string, content: string) => void
-	flushDraft: (id: string) => Promise<void>
+	flushDraft: (id: string, options?: FlushDraftOptions) => Promise<void>
 	toggleStar: (id: string) => Promise<void>
 	toggleArchive: (id: string) => Promise<void>
 	deleteSelected: () => Promise<Note | null>
@@ -75,12 +86,14 @@ const defaultSettings: Settings = {
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
 	pinnedTags: [],
+	hotkeys: DEFAULT_HOTKEYS,
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
 	notes: [],
 	selectedNoteId: null,
 	drafts: {},
+	untouchedNewNoteIds: {},
 	tags: [],
 	activeFilter: 'all',
 	selectedTag: null,
@@ -97,7 +110,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 	async load() {
 		const [notes, tags, settings] = await Promise.all([notesService.list(), notesService.listTags(), settingsService.get()])
 		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
-		set({ notes, tags, settings, activeFilter, selectedNoteId: null, openTabs: [] })
+		set({ notes, tags, settings, activeFilter, selectedNoteId: null, openTabs: [], untouchedNewNoteIds: {} })
 	},
 
 	async refreshTags() {
@@ -136,13 +149,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const state = get()
 		const tabs = state.openTabs.filter((t) => t !== id)
 		const drafts = { ...state.drafts }
+		const untouched_new_note_ids = { ...state.untouchedNewNoteIds }
 		delete drafts[id]
+		delete untouched_new_note_ids[id]
 		let next = state.selectedNoteId
 		if (next === id) {
 			const idx = state.openTabs.indexOf(id)
 			next = tabs[Math.min(idx, tabs.length - 1)] ?? null
 		}
-		set({ openTabs: tabs, selectedNoteId: next, drafts })
+		set({ openTabs: tabs, selectedNoteId: next, drafts, untouchedNewNoteIds: untouched_new_note_ids })
 	},
 
 	activateTab(id) {
@@ -182,6 +197,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 			notes: [note, ...state.notes],
 			selectedNoteId: note.id, openTabs: [...state.openTabs, note.id],
 			drafts: { ...state.drafts, [note.id]: note.content },
+			untouchedNewNoteIds: { ...state.untouchedNewNoteIds, [note.id]: true },
 			saveState: 'saved',
 			lastSavedAt: note.updatedAt,
 		}))
@@ -189,23 +205,71 @@ export const useAppStore = create<AppState>((set, get) => ({
 	},
 
 	setDraft(id, content) {
-		set((state) => ({
-			drafts: { ...state.drafts, [id]: content },
-			saveState: 'saving',
-		}))
+		set((state) => {
+			const untouched_new_note_ids = { ...state.untouchedNewNoteIds }
+			if (untouched_new_note_ids[id] && !is_effectively_untouched_content(content)) {
+				delete untouched_new_note_ids[id]
+			}
+			return {
+				drafts: { ...state.drafts, [id]: content },
+				untouchedNewNoteIds: untouched_new_note_ids,
+				saveState: 'saving',
+			}
+		})
 	},
 
-	async flushDraft(id) {
-		const draft = get().drafts[id]
+	async flushDraft(id, options) {
+		const state = get()
+		const draft = state.drafts[id]
 		if ('string' !== typeof draft) return
+
+		const note = state.notes.find((item) => item.id === id)
+		if (
+			Boolean(options?.allowDiscardUntouchedEmpty) &&
+			state.untouchedNewNoteIds[id] &&
+			note &&
+			is_effectively_untouched_content(draft) &&
+			is_effectively_untouched_content(note.content) &&
+			!note.starred &&
+			!note.archived &&
+			0 === note.tags.length
+		) {
+			if (await notesService.delete(id)) {
+				set((current) => {
+					const drafts = { ...current.drafts }
+					const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
+					delete drafts[id]
+					delete untouched_new_note_ids[id]
+					return {
+						notes: current.notes.filter((item) => item.id !== id),
+						drafts,
+						untouchedNewNoteIds: untouched_new_note_ids,
+						openTabs: current.openTabs.filter((tab_id) => tab_id !== id),
+						navigationBackStack: current.navigationBackStack.filter((tab_id) => tab_id !== id),
+						navigationForwardStack: current.navigationForwardStack.filter((tab_id) => tab_id !== id),
+						saveState: 'saved',
+					}
+				})
+				await get().refreshTags()
+			}
+			return
+		}
+
 		try {
 			const updated = await notesService.update(id, { content: draft })
 			if (!updated) return
-			set((state) => ({
-				notes: state.notes.map((note) => (note.id === id ? updated : note)),
-				saveState: 'saved',
-				lastSavedAt: updated.updatedAt,
-			}))
+			set((current) => {
+				const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
+				if (untouched_new_note_ids[id] && !is_effectively_untouched_content(draft)) {
+					delete untouched_new_note_ids[id]
+				}
+				return {
+					notes: current.notes.map((item) => (item.id === id ? updated : item)),
+					untouchedNewNoteIds: untouched_new_note_ids,
+					saveState: 'saved',
+					lastSavedAt: updated.updatedAt,
+				}
+			})
 		} catch {
 			set({ saveState: 'failed' })
 		}
@@ -236,10 +300,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 		set((state) => {
 			const notes = state.notes.filter((note) => note.id !== id)
 			const drafts = { ...state.drafts }
+			const untouched_new_note_ids = { ...state.untouchedNewNoteIds }
 			delete drafts[id]
+			delete untouched_new_note_ids[id]
 			return {
 				notes,
 				drafts,
+				untouchedNewNoteIds: untouched_new_note_ids,
 				selectedNoteId: notes[0]?.id ?? null, openTabs: state.openTabs.filter((t) => t !== id), navigationBackStack: state.navigationBackStack.filter((t) => t !== id), navigationForwardStack: state.navigationForwardStack.filter((t) => t !== id),
 			}
 		})

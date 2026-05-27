@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { app, BrowserWindow, Menu, session } from 'electron'
 import { fileURLToPath } from 'node:url'
+import type { Settings } from '../shared/types'
+import { DEFAULT_HOTKEYS } from '../shared/hotkeys'
 import { StrataDatabase } from './db/index'
 import { BackupManager } from './backup/backupManager'
 import { registerNotesHandlers } from './ipc/notesHandlers'
@@ -17,9 +19,44 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let main_window: BrowserWindow | null = null
 let notes_api_server: { close: () => Promise<void> } | null = null
 let backup_manager: BackupManager | null = null
+let current_settings: Settings | null = null
 
-const createAppMenu = () => {
+const hotkey_to_electron_accelerator = (hotkey: string): string | undefined => {
+	const value = hotkey.trim()
+	if (!value) return undefined
+	const tokens = value.split('+').map((token) => token.trim()).filter(Boolean)
+	if (0 === tokens.length) return undefined
+
+	const key_token = tokens[tokens.length - 1].toLowerCase()
+	const modifiers = new Set<string>()
+	for (let i = 0; i < tokens.length - 1; i++) {
+		const token = tokens[i].toLowerCase()
+		if ('cmd' === token || 'command' === token || 'meta' === token || '⌘' === token) modifiers.add('CmdOrCtrl')
+		if ('ctrl' === token || 'control' === token || '⌃' === token) modifiers.add('Ctrl')
+		if ('shift' === token || '⇧' === token) modifiers.add('Shift')
+		if ('alt' === token || 'option' === token || 'opt' === token || '⌥' === token) modifiers.add('Alt')
+	}
+
+	let key: string | null = null
+	if ('backspace' === key_token || 'delete' === key_token || '⌫' === key_token) key = 'Backspace'
+	if ('space' === key_token) key = 'Space'
+	if ('[' === key_token || ']' === key_token) key = key_token
+	if (!key && 1 === key_token.length) key = key_token.toUpperCase()
+	if (!key) return undefined
+
+	const parts = Array.from(modifiers)
+	parts.push(key)
+	return parts.join('+')
+}
+
+const resolve_hotkeys = (settings?: Settings) => ({
+	...DEFAULT_HOTKEYS,
+	...(settings?.hotkeys ?? {}),
+})
+
+const createAppMenu = (settings?: Settings) => {
 	if (!main_window) return
+	const hotkeys = resolve_hotkeys(settings)
 	const is_mac = 'darwin' === process.platform
 	const template: Electron.MenuItemConstructorOptions[] = []
 
@@ -44,12 +81,12 @@ const createAppMenu = () => {
 	const file_submenu: Electron.MenuItemConstructorOptions[] = [
 		{
 			label: 'New Note',
-			accelerator: 'CmdOrCtrl+N',
+			accelerator: hotkey_to_electron_accelerator(hotkeys.newNote),
 			click: () => main_window?.webContents.send('ui:command', 'new-note'),
 		},
 		{
 			label: 'Delete Note',
-			accelerator: 'CmdOrCtrl+Backspace',
+			accelerator: hotkey_to_electron_accelerator(hotkeys.deleteNote),
 			click: () => main_window?.webContents.send('ui:command', 'delete-note'),
 		},
 		{ type: 'separator' },
@@ -75,27 +112,27 @@ const createAppMenu = () => {
 			{ type: 'separator' },
 			{
 				label: 'Focus Search',
-				accelerator: 'CmdOrCtrl+F',
+				accelerator: hotkey_to_electron_accelerator(hotkeys.findOrSearch),
 				click: () => main_window?.webContents.send('ui:command', 'focus-search'),
 			},
 			{
 				label: 'Save',
-				accelerator: 'CmdOrCtrl+S',
+				accelerator: hotkey_to_electron_accelerator(hotkeys.saveNote),
 				click: () => main_window?.webContents.send('ui:command', 'save-note'),
 			},
 			{
 				label: 'Toggle Star',
-				accelerator: 'CmdOrCtrl+Shift+S',
+				accelerator: hotkey_to_electron_accelerator(hotkeys.toggleStar),
 				click: () => main_window?.webContents.send('ui:command', 'toggle-star'),
 			},
 			{
 				label: 'Toggle Archive',
-				accelerator: 'CmdOrCtrl+Shift+A',
+				accelerator: hotkey_to_electron_accelerator(hotkeys.toggleArchive),
 				click: () => main_window?.webContents.send('ui:command', 'toggle-archive'),
 			},
 			{
 				label: 'Toggle Filters Panel',
-				accelerator: 'CmdOrCtrl+Shift+F',
+				accelerator: hotkey_to_electron_accelerator(hotkeys.toggleFilters),
 				click: () => main_window?.webContents.send('ui:command', 'toggle-filters'),
 			},
 		],
@@ -169,7 +206,7 @@ const createWindow = () => {
 
 	main_window = new BrowserWindow(window_options)
 
-	createAppMenu()
+	createAppMenu(current_settings ?? undefined)
 
 	if (process.env.VITE_DEV_SERVER_URL) {
 		main_window.loadURL(process.env.VITE_DEV_SERVER_URL)
@@ -183,6 +220,7 @@ app.whenReady().then(async () => {
 
 	const user_data_path = app.getPath('userData')
 	const db = new StrataDatabase(user_data_path)
+	current_settings = db.getSettings()
 	const db_file_path = path.join(user_data_path, 'data', 'strata.sqlite')
 	const backup_directory = process.env.VITE_DEV_SERVER_URL
 		? path.join(process.cwd(), 'backups')
@@ -198,7 +236,10 @@ app.whenReady().then(async () => {
 	})
 
 	registerNotesHandlers(db)
-	registerSettingsHandlers(db)
+	registerSettingsHandlers(db, (settings) => {
+		current_settings = settings
+		createAppMenu(current_settings)
+	})
 	registerExportHandlers()
 	registerAiHandlers(db, () => main_window?.webContents.send('notes:changed'))
 	registerBackupHandlers(backup_manager)

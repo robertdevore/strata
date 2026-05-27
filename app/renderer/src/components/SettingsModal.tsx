@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Settings } from '@shared/types'
+import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
+import type { HotkeyAction, HotkeysSettings } from '@shared/hotkeys'
 import { CloseIcon } from './icons'
 
 interface SettingsModalProps {
@@ -35,6 +37,25 @@ const PREMIUM_PROVIDERS = [
 	{ value: 'custom', label: 'Custom OpenAI-compatible' },
 ]
 
+const HOTKEY_FIELDS: Array<{ id: HotkeyAction; label: string }> = [
+	{ id: 'quickOpen', label: 'Quick Open' },
+	{ id: 'commandPalette', label: 'Command Palette' },
+	{ id: 'newNote', label: 'New Note' },
+	{ id: 'editNoteTags', label: 'Edit Note Tags' },
+	{ id: 'allTagsModal', label: 'All Tags' },
+	{ id: 'findOrSearch', label: 'Find in Note / Focus Search' },
+	{ id: 'toggleFilters', label: 'Toggle Filters Panel' },
+	{ id: 'saveNote', label: 'Save Note' },
+	{ id: 'toggleStar', label: 'Toggle Star' },
+	{ id: 'toggleArchive', label: 'Toggle Archive' },
+	{ id: 'copyRichText', label: 'Copy Rich Text' },
+	{ id: 'deleteNote', label: 'Delete Note' },
+	{ id: 'toggleSidebar', label: 'Toggle Sidebar' },
+	{ id: 'relatedNotes', label: 'Related Notes' },
+	{ id: 'navigateBack', label: 'Navigate Back' },
+	{ id: 'navigateForward', label: 'Navigate Forward' },
+]
+
 export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBackup, onOpenBackupsFolder, onListBackups }: SettingsModalProps) {
 	const [tab, setTab] = useState<SettingsTab>('general')
 	const [backup_status, set_backup_status] = useState('')
@@ -67,6 +88,11 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 	const ai_routing_mode = settings.aiRoutingMode || 'auto'
 	const ai_cheap_provider = settings.aiCheapProvider || 'deepseek-flash'
 	const ai_premium_provider = settings.aiPremiumProvider || 'openai'
+	const resolved_hotkeys: HotkeysSettings = { ...DEFAULT_HOTKEYS, ...(settings.hotkeys ?? {}) }
+
+	const update_hotkey = (id: HotkeyAction, value: string) => {
+		onUpdate({ hotkeys: { ...resolved_hotkeys, [id]: value } })
+	}
 
 	return (
 		<div className="modal-overlay" onClick={onClose}>
@@ -115,10 +141,6 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 									<option value="created_desc">Created date</option>
 									<option value="title_asc">Title</option>
 								</select>
-							</label>
-							<label className="inline-toggle">
-								<input type="checkbox" checked={settings.confirmDelete} onChange={(event) => onUpdate({ confirmDelete: event.target.checked })} />
-								Confirm before delete
 							</label>
 						</>
 					)}
@@ -368,44 +390,23 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 						<>
 							<p className="tags-label" style={{ marginBottom: 10, lineHeight: 1.4 }}>
 								Enter your preferred keyboard shortcuts. Use modifier keys like <code>Cmd</code>, <code>Ctrl</code>, <code>Shift</code>, <code>Alt</code>.
-								Changes take effect after restart.
+								Changes apply immediately.
 							</p>
-							<label>
-								Quick Open (Cmd+P)
-								<input type="text" className="search-input" defaultValue="Cmd+P" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								Command Palette (Cmd+K)
-								<input type="text" className="search-input" defaultValue="Cmd+K" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								New Note (Cmd+N)
-								<input type="text" className="search-input" defaultValue="Cmd+N" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								Find in Note (Cmd+F)
-								<input type="text" className="search-input" defaultValue="Cmd+F" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								Toggle Sidebar (Cmd+Shift+B)
-								<input type="text" className="search-input" defaultValue="Cmd+Shift+B" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								All Tags (Cmd+T)
-								<input type="text" className="search-input" defaultValue="Cmd+T" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								Related Notes (Cmd+R)
-								<input type="text" className="search-input" defaultValue="Cmd+R" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								Navigate Back (Cmd+[)
-								<input type="text" className="search-input" defaultValue="Cmd+[" readOnly disabled spellCheck={false} />
-							</label>
-							<label>
-								Navigate Forward (Cmd+])
-								<input type="text" className="search-input" defaultValue="Cmd+]" readOnly disabled spellCheck={false} />
-							</label>
+							{HOTKEY_FIELDS.map((field) => (
+								<label key={field.id}>
+									{field.label}
+									<input
+										type="text"
+										className="search-input"
+										value={resolved_hotkeys[field.id]}
+										onChange={(event) => update_hotkey(field.id, event.target.value)}
+										spellCheck={false}
+									/>
+								</label>
+							))}
+							<p className="tags-label" style={{ marginTop: 4, lineHeight: 1.4 }}>
+								Pinned tags use <code>Cmd/Ctrl + 1-9</code> based on your pinned order in the sidebar.
+							</p>
 						</>
 					)}
 				</div>

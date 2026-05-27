@@ -181,7 +181,7 @@ export function CommandPalette({
 										<div className="palette-item-meta">
 											{note.tags.length > 0 && (
 												<span className="palette-item-tags">
-													{note.tags.slice(0, 3).map((t) => `#${t}`).join(' ')}
+													{note.tags.slice(0, 3).join(' ')}
 												</span>
 											)}
 											<span className="palette-item-time">{formatRelativeTime(note.updatedAt)}</span>

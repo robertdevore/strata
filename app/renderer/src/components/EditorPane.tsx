@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useRef, useState } from 'react'
+import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
@@ -47,8 +47,25 @@ const sanitizeFileName = (value: string): string => {
 	return cleaned || 'untitled-note'
 }
 
+const normalizeLooseTaskCheckboxes = (markdown_content: string): string => {
+	return markdown_content
+		.split('\n')
+		.map((line) => {
+			const match = /^(\s*)\[(\s|x|X)?\]\s*(.*)$/.exec(line)
+			if (!match) return line
+
+			const indent = match[1] ?? ''
+			const marker = ((match[2] ?? '').toLowerCase() === 'x') ? 'x' : ' '
+			const rest = match[3] ?? ''
+
+			return `${indent}- [${marker}] ${rest}`
+		})
+		.join('\n')
+}
+
 const renderMarkdownHtmlFragment = (markdown_content: string): string => {
-	return renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown_content || ''}</ReactMarkdown>)
+	const normalized_content = normalizeLooseTaskCheckboxes(markdown_content || '')
+	return renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm]}>{normalized_content}</ReactMarkdown>)
 }
 
 const renderStyledMarkdownHtml = (title: string, markdown_content: string): string => {
@@ -64,6 +81,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helve
 h1,h2,h3,h4,h5,h6 { margin: 0 0 10px; line-height: 1.3; color: #0f1820; }
 p,ul,ol,blockquote,pre { margin: 0 0 10px; line-height: 1.55; }
 ul,ol { padding-left: 24px; }
+ul.contains-task-list, li.task-list-item { list-style: none; }
+ul.contains-task-list { padding-left: 0; }
+li.task-list-item { position: relative; padding-left: 24px; min-height: 20px; }
+li.task-list-item + li.task-list-item { margin-top: 4px; }
+li.task-list-item input[type='checkbox'] { position: absolute; left: 0; top: 0.25em; margin: 0; }
+li.task-list-item > p { margin: 0; }
 code { background: #eef1f4; border: 1px solid #d6dbe0; border-radius: 6px; padding: 0 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 pre code { display: block; padding: 10px; white-space: pre-wrap; }
 blockquote { border-left: 3px solid #d6dbe0; padding-left: 12px; color: #5a6670; }
@@ -207,6 +230,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const chatTypingIntervalRef = useRef<number | null>(null)
 	const findInputRef = useRef<HTMLInputElement>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
+	const pending_wrap_marker_ref = useRef<{ marker: string; start: number; end: number; expires_at: number } | null>(null)
 	const [editingTitle, setEditingTitle] = useState(false)
 	const [titleDraft, setTitleDraft] = useState('')
 	const titleInputRef = useRef<HTMLInputElement>(null)
@@ -406,15 +430,45 @@ export function EditorPane(props: EditorPaneProps) {
 			setShowFindReplace(true)
 		}
 
+		const toggleInlineFind = () => {
+			if (showInlineFind) {
+				setShowInlineFind(false)
+				setInlineFindQuery('')
+				return
+			}
+			const view = editorViewRef.current
+			if (view) {
+				const selection = view.state.selection.main
+				if (selection.from !== selection.to) {
+					setInlineFindQuery(view.state.sliceDoc(selection.from, selection.to))
+				}
+			}
+			setShowInlineFind(true)
+			window.setTimeout(() => {
+				const el = document.querySelector('.inline-find-input') as HTMLInputElement | null
+				el?.focus()
+				el?.select()
+			}, 10)
+		}
+
 		window.addEventListener('strata:open-find-replace', openFindReplace)
-		return () => window.removeEventListener('strata:open-find-replace', openFindReplace)
-	}, [])
+		window.addEventListener('strata:toggle-inline-find', toggleInlineFind)
+		return () => {
+			window.removeEventListener('strata:open-find-replace', openFindReplace)
+			window.removeEventListener('strata:toggle-inline-find', toggleInlineFind)
+		}
+	}, [showInlineFind])
 
 	// Inline find — Cmd/Ctrl+F
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && 'f' === event.key && !event.shiftKey) {
 				event.preventDefault()
+				if (showInlineFind) {
+					setShowInlineFind(false)
+					setInlineFindQuery('')
+					return
+				}
 				const view = editorViewRef.current
 				if (view) {
 					const selection = view.state.selection.main
@@ -422,10 +476,7 @@ export function EditorPane(props: EditorPaneProps) {
 						setInlineFindQuery(view.state.sliceDoc(selection.from, selection.to))
 					}
 				}
-				setShowInlineFind((v) => {
-					if (!v) return true
-					return true // already open, just refocus
-				})
+				setShowInlineFind(true)
 				// Focus the inline find input
 				window.setTimeout(() => {
 					const el = document.querySelector('.inline-find-input') as HTMLInputElement | null
@@ -613,7 +664,7 @@ export function EditorPane(props: EditorPaneProps) {
 		if (!editorBodyRef.current) return
 		const bounds = editorBodyRef.current.getBoundingClientRect()
 		const start_x = event.clientX
-		const start_width = null !== previewWidth ? previewWidth : Math.max(280, (bounds.width - 6) / 2)
+		const start_width = null !== previewWidth ? previewWidth : Math.max(280, (bounds.width - 3) / 2)
 
 		const onMouseMove = (move_event: MouseEvent) => {
 			const next_width = start_width - (move_event.clientX - start_x)
@@ -667,6 +718,63 @@ export function EditorPane(props: EditorPaneProps) {
 		},
 		[notes],
 	)
+
+	const selectionMarkdownWrapExtension = useMemo(() => {
+		return EditorView.inputHandler.of((view, from, to, text, insert) => {
+			void insert
+			if (from === to) {
+				const pending = pending_wrap_marker_ref.current
+				const selection = view.state.selection.main
+				if (pending && Date.now() < pending.expires_at && selection.empty && text === pending.marker && Math.abs(selection.from - pending.end) <= 1) {
+					view.dispatch({
+						changes: [
+							{ from: pending.start, insert: pending.marker },
+							{ from: pending.end, insert: text },
+						],
+						selection: { anchor: pending.end + 2 },
+					})
+					pending_wrap_marker_ref.current = null
+					return true
+				}
+				if (pending && (Date.now() >= pending.expires_at || selection.from !== pending.end || text !== pending.marker)) {
+					pending_wrap_marker_ref.current = null
+				}
+				return false
+			}
+
+			const wrappers: Record<string, string> = {
+				'*': '*',
+				'_': '_',
+				'~': '~',
+				'`': '`',
+			}
+
+			const wrapper = wrappers[text]
+			if (!wrapper) return false
+
+			const selected = view.state.sliceDoc(from, to)
+			const wrapped = `${wrapper}${selected}${wrapper}`
+			const cursor = from + wrapped.length
+
+			view.dispatch({
+				changes: { from, to, insert: wrapped },
+				selection: { anchor: cursor },
+			})
+
+			if ('*' === text || '_' === text || '~' === text) {
+				pending_wrap_marker_ref.current = {
+					marker: text,
+					start: from,
+					end: cursor,
+					expires_at: Date.now() + 2000,
+				}
+			} else {
+				pending_wrap_marker_ref.current = null
+			}
+
+			return true
+		})
+	}, [])
 
 	if (!note) {
 		return (
@@ -852,7 +960,7 @@ export function EditorPane(props: EditorPaneProps) {
 	}
 
 	// Preview content with wiki links converted
-	const previewContent = wikiLinkToMarkdown(content)
+	const previewContent = normalizeLooseTaskCheckboxes(wikiLinkToMarkdown(content))
 
 	return (
 		<section className="editor">
@@ -922,7 +1030,7 @@ export function EditorPane(props: EditorPaneProps) {
 				</div>
 				{copyToast && <span className="copy-toast">Copied!</span>}
 			</header>
-			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 6px minmax(0, 1fr)' : `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}
+			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 3px minmax(0, 1fr)' : `minmax(0, 1fr) 3px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}
 				onClick={(event) => {
 					// Handle wiki link clicks in the CodeMirror editor
 					const view = editorViewRef.current
@@ -953,7 +1061,7 @@ export function EditorPane(props: EditorPaneProps) {
 					<CodeMirror
 						value={editorContent}
 						height="100%"
-						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, autocompletion({ override: [wikiLinkCompletions] })]}
+						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, selectionMarkdownWrapExtension, autocompletion({ override: [wikiLinkCompletions] })]}
 						onCreateEditor={(view) => {
 							editorViewRef.current = view
 						}}

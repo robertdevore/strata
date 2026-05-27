@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
 import { TabBar } from '@renderer/src/components/TabBar'
-import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
 import { SettingsModal } from '@renderer/src/components/SettingsModal'
 import { CommandPalette, type PaletteMode } from '@renderer/src/components/CommandPalette'
 import { TagsModal } from '@renderer/src/components/TagsModal'
@@ -11,9 +10,83 @@ import { RelatedNotesModal } from '@renderer/src/components/RelatedNotesModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
-import { CircleChevronRightIcon, PlusIcon } from '@renderer/src/components/icons'
+import { CircleChevronRightIcon, CirclePlusIcon } from '@renderer/src/components/icons'
+import type { HotkeysSettings } from '@shared/hotkeys'
+import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
 
 const isMac = navigator.userAgent.includes('Mac')
+
+interface ParsedHotkey {
+	useCmd: boolean
+	useCtrl: boolean
+	useShift: boolean
+	useAlt: boolean
+	key: string
+}
+
+const normalize_hotkey_token = (token: string): string => token.trim().toLowerCase()
+
+const normalize_hotkey_key = (raw_key: string): string => {
+	const key = raw_key.trim().toLowerCase()
+	if ('backspace' === key || 'delete' === key || '⌫' === key || 'del' === key) return 'backspace'
+	if ('bracketleft' === key) return '['
+	if ('bracketright' === key) return ']'
+	if ('space' === key || ' ' === key) return 'space'
+	if (1 === key.length) return key
+	return key
+}
+
+const parse_hotkey = (hotkey: string): ParsedHotkey | null => {
+	const tokens = hotkey.split('+').map((token) => token.trim()).filter(Boolean)
+	if (0 === tokens.length) return null
+
+	const parsed: ParsedHotkey = {
+		useCmd: false,
+		useCtrl: false,
+		useShift: false,
+		useAlt: false,
+		key: '',
+	}
+
+	for (let i = 0; i < tokens.length; i++) {
+		const token = normalize_hotkey_token(tokens[i])
+		if ('cmd' === token || 'command' === token || 'meta' === token || '⌘' === token) {
+			parsed.useCmd = true
+			continue
+		}
+		if ('ctrl' === token || 'control' === token || '⌃' === token) {
+			parsed.useCtrl = true
+			continue
+		}
+		if ('shift' === token || '⇧' === token) {
+			parsed.useShift = true
+			continue
+		}
+		if ('alt' === token || 'option' === token || 'opt' === token || '⌥' === token) {
+			parsed.useAlt = true
+			continue
+		}
+		parsed.key = normalize_hotkey_key(token)
+	}
+
+	if (!parsed.key) return null
+	return parsed
+}
+
+const hotkey_matches = (event: KeyboardEvent, hotkey: string): boolean => {
+	const parsed = parse_hotkey(hotkey)
+	if (!parsed) return false
+
+	const expected_meta = isMac && parsed.useCmd
+	const expected_ctrl = parsed.useCtrl || (!isMac && parsed.useCmd)
+
+	if (event.metaKey !== expected_meta) return false
+	if (event.ctrlKey !== expected_ctrl) return false
+	if (event.shiftKey !== parsed.useShift) return false
+	if (event.altKey !== parsed.useAlt) return false
+
+	return normalize_hotkey_key(event.key) === parsed.key
+}
 
 const applyThemeClass = (theme: 'dark' | 'light' | 'system') => {
 	if ('system' === theme) {
@@ -26,15 +99,15 @@ const applyThemeClass = (theme: 'dark' | 'light' | 'system') => {
 export function App() {
 	const store = useAppStore()
 	const load = useAppStore((state) => state.load)
-	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 	const [undoDelete, setUndoDelete] = useState<{ id: string; title: string } | null>(null)
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
-	const [sidebarWidth, setSidebarWidth] = useState(270)
+	const [sidebarWidth, setSidebarWidth] = useState(245)
 	const [undoTimeoutId, setUndoTimeoutId] = useState<number | null>(null)
 	const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
 	const [showRelatedNotes, setShowRelatedNotes] = useState(false)
 	const [showTagsModal, setShowTagsModal] = useState(false)
 	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
+	const hotkeys: HotkeysSettings = useMemo(() => ({ ...DEFAULT_HOTKEYS, ...(store.settings.hotkeys ?? {}) }), [store.settings.hotkeys])
 	const clearUndoToast = useCallback(() => {
 		if (null !== undoTimeoutId) {
 			window.clearTimeout(undoTimeoutId)
@@ -73,10 +146,6 @@ export function App() {
 	const notes = store.filteredNotes()
 
 	const onDelete = useCallback(async (id: string) => {
-		if (store.settings.confirmDelete) {
-			setPendingDeleteId(id)
-			return
-		}
 		if (store.selectedNoteId !== id) store.selectNote(id)
 		const deleted = await store.deleteSelected()
 		if (!deleted) return
@@ -101,7 +170,7 @@ export function App() {
 		if (!target_note) return
 
 		if (store.selectedNoteId && store.selectedNoteId !== note_id) {
-			await store.flushDraft(store.selectedNoteId)
+			await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
 		}
 
 		if (new_tab) {
@@ -158,30 +227,38 @@ export function App() {
 	}, [load])
 
 	useEffect(() => {
-		const onKeyDown = (event: KeyboardEvent) => {
-			const meta = isMac ? event.metaKey : event.ctrlKey
-			if (!meta) {
+		const onKeyDown = async (event: KeyboardEvent) => {
+			if (!event.metaKey && !event.ctrlKey) {
 				if ('Escape' === event.key) {
 					if (paletteMode) {
 						setPaletteMode(null)
 						return
 					}
-					setPendingDeleteId(null)
 					store.setShowSettings(false)
 				}
 				return
 			}
-			const key = event.key.toLowerCase()
-			if ('p' === key && !event.shiftKey) {
-					event.preventDefault()
-					setPaletteMode('quick-open')
-					return
+
+			const pinned_tags = store.settings.pinnedTags ?? []
+			for (let i = 0; i < 9; i++) {
+				if (!hotkey_matches(event, `Cmd+${i + 1}`)) continue
+				event.preventDefault()
+				const tag = pinned_tags[i]
+				if (tag) store.setSelectedTag(tag)
+				return
 			}
-			if ('k' === key && !event.shiftKey) {
-					event.preventDefault()
-					setPaletteMode('commands')
-					return
-			}			if ('r' === key && !event.shiftKey) {
+
+			if (hotkey_matches(event, hotkeys.quickOpen)) {
+				event.preventDefault()
+				setPaletteMode('quick-open')
+				return
+			}
+			if (hotkey_matches(event, hotkeys.commandPalette)) {
+				event.preventDefault()
+				setPaletteMode('commands')
+				return
+			}
+			if (hotkey_matches(event, hotkeys.relatedNotes)) {
 				event.preventDefault()
 				if (store.selectedNoteId) {
 					window.strata.links.relatedNotes(store.selectedNoteId).then(setRelatedNotes).catch(() => setRelatedNotes([]))
@@ -189,70 +266,83 @@ export function App() {
 				}
 				return
 			}
-			if ('b' === key && event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.toggleSidebar)) {
 				event.preventDefault()
 				setSidebarCollapsed((v) => !v)
 				return
-			}			if ('[' === event.key) {
-					event.preventDefault()
-					store.navigateBack()
-					return
 			}
-			if (']' === event.key) {
-					event.preventDefault()
+			if (hotkey_matches(event, hotkeys.navigateBack)) {
+				event.preventDefault()
+				if (store.selectedNoteId) await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
+				store.navigateBack()
+				return
+			}
+			if (hotkey_matches(event, hotkeys.navigateForward)) {
+				event.preventDefault()
+					if (store.selectedNoteId) await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
 					store.navigateForward()
 					return
 			}
-			if ('n' === key) {
+			if (hotkey_matches(event, hotkeys.newNote)) {
 				event.preventDefault()
 				void runCommand('new-note')
+				return
 			}
-			if ('t' === key && !event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.allTagsModal)) {
 				event.preventDefault()
 				setShowTagsModal(true)
+				return
 			}
-			if ('f' === key && !event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.findOrSearch)) {
 				event.preventDefault()
 				const active_element = document.activeElement
 				const editor_focused = active_element instanceof HTMLElement && Boolean(active_element.closest('.cm-editor, .cm-content, .cm-scroller'))
 				if (editor_focused) {
-					window.dispatchEvent(new CustomEvent('strata:open-find-replace'))
+					window.dispatchEvent(new CustomEvent('strata:toggle-inline-find'))
 				} else {
 					void runCommand('focus-search')
 				}
+				return
 			}
-			if ('f' === key && event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.toggleFilters)) {
 				event.preventDefault()
 				void runCommand('toggle-filters')
+				return
 			}
-			if ('s' === key && !event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.saveNote)) {
 				event.preventDefault()
 				void runCommand('save-note')
+				return
 			}
-			if ('s' === key && event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.toggleStar)) {
 				event.preventDefault()
 				void runCommand('toggle-star')
+				return
 			}
-			if ('a' === key && event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.toggleArchive)) {
 				event.preventDefault()
 				void runCommand('toggle-archive')
+				return
 			}
-			if ('t' === key && !event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.editNoteTags)) {
 				event.preventDefault()
 				void runCommand('open-tags-editor')
+				return
 			}
-			if ('c' === key && event.shiftKey) {
+			if (hotkey_matches(event, hotkeys.copyRichText)) {
 				event.preventDefault()
 				void runCommand('copy-rich-text')
+				return
 			}
-			if ('Backspace' === event.key) {
+			if (hotkey_matches(event, hotkeys.deleteNote)) {
 				event.preventDefault()
 				void runCommand('delete-note')
+				return
 			}
 		}
 		window.addEventListener('keydown', onKeyDown)
 		return () => window.removeEventListener('keydown', onKeyDown)
-	}, [runCommand, store, paletteMode])
+	}, [runCommand, store, paletteMode, hotkeys])
 
 	useEffect(() => {
 		return () => {
@@ -280,12 +370,12 @@ export function App() {
 						title="New Note"
 						aria-label="New Note"
 					>
-						<PlusIcon size={15} />
+						<CirclePlusIcon size={18} />
 					</button>
 				</>,
 				document.body
 			)}
-			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>
+			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 3px minmax(0, 1fr)` }}>
 				<Sidebar
 					notes={notes}
 					selectedId={store.selectedNoteId}
@@ -298,7 +388,7 @@ export function App() {
 					pinnedTags={store.settings.pinnedTags ?? []}
 					onSearchChange={store.setSearchQuery}
 					onSelect={async (id) => {
-						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId)
+						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
 						store.openNoteInTab(id)
 					}}
 					onNewNote={() => void store.createNote()}
@@ -331,7 +421,12 @@ export function App() {
 						activeTabId={store.selectedNoteId}
 						notes={store.notes}
 						drafts={store.drafts}
-						onSelectTab={(id) => store.activateTab(id)}
+						onSelectTab={async (id) => {
+							if (store.selectedNoteId && store.selectedNoteId !== id) {
+								await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
+							}
+							store.activateTab(id)
+						}}
 						onCloseTab={(id) => store.closeTab(id)}
 					/>
 					<EditorPane
@@ -375,27 +470,6 @@ export function App() {
 					return await window.strata.backups.listRecent()
 				}}
 			/>
-			<ConfirmModal
-				open={Boolean(pendingDeleteId)}
-				title="Delete note"
-				message="This note will be removed. You can undo for a few seconds."
-				onCancel={() => setPendingDeleteId(null)}
-				onConfirm={async () => {
-					if (pendingDeleteId && store.selectedNoteId !== pendingDeleteId) store.selectNote(pendingDeleteId)
-					const deleted = await store.deleteSelected()
-					if (deleted) {
-						if (null !== undoTimeoutId) {
-							window.clearTimeout(undoTimeoutId)
-						}
-						setUndoDelete({ id: deleted.id, title: deriveNoteTitle(deleted.content) })
-						setUndoTimeoutId(window.setTimeout(() => {
-							setUndoDelete(null)
-							setUndoTimeoutId(null)
-						}, 5000))
-					}
-					setPendingDeleteId(null)
-				}}
-			/>
 			{paletteMode && (
 				<CommandPalette
 					mode={paletteMode}
@@ -403,7 +477,7 @@ export function App() {
 					selectedNoteId={store.selectedNoteId}
 					onClose={() => setPaletteMode(null)}
 					onOpenNote={async (id) => {
-						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId)
+						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
 						store.openNoteInTab(id)
 					}}
 					onRunCommand={(cmd) => void runCommand(cmd)}

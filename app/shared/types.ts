@@ -1,3 +1,5 @@
+import type { HotkeysSettings } from './hotkeys'
+
 export type ThemeMode = 'dark' | 'light' | 'system'
 
 export type ViewMode = 'all' | 'starred'
@@ -55,6 +57,7 @@ export interface Settings {
 	aiCheapConfidenceThreshold: number
 	aiPremiumFallbackThreshold: number
 	pinnedTags: string[]
+	hotkeys: HotkeysSettings
 }
 
 export interface NoteUpdatePatch {

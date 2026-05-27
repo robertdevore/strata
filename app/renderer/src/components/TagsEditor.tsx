@@ -51,7 +51,7 @@ export function TagsEditor({ open, currentTags, existingTags, onClose, onApply }
 				<div className="suggestions">
 					{suggestions.map((tag) => (
 						<button key={tag} onClick={() => setValue(value ? `${value}, ${tag}` : tag)}>
-							#{tag}
+							{tag}
 						</button>
 					))}
 				</div>

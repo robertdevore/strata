@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
 import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
-import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, MoonIcon, PinFilledIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
+import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, CirclePlusIcon, MoonIcon, PinFilledIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
 	notes: Note[]
@@ -54,7 +54,7 @@ export function Sidebar(props: SidebarProps) {
 	// Reset visible count when the note list changes (filter, search, tag, sort)
 	useEffect(() => {
 		setVisibleCount(50)
-	}, [props.notes])
+	}, [props.activeFilter, props.searchQuery, props.selectedTag, props.notes.length])
 
 	// Auto-load more notes on scroll
 	const onScrollNearBottom = useCallback(() => {
@@ -104,10 +104,12 @@ export function Sidebar(props: SidebarProps) {
 					{!props.sidebarCollapsed && <div className="app-title-left">
 						<p className="app-title">STRATA</p>
 					</div>}
-					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: -4 }}><PlusIcon size={15} /></button>
-					<button className="icon-button sidebar-collapse-button sidebar-toggle-btn" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
-						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
-					</button>
+					<div className="app-title-actions">
+						<button className="icon-button sidebar-collapse-button sidebar-new-note-btn" onClick={props.onNewNote} title="New Note"><CirclePlusIcon size={18} /></button>
+						<button className="icon-button sidebar-collapse-button sidebar-toggle-btn" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
+							{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
+						</button>
+					</div>
 				</div>
 			</div>
 			{!props.sidebarCollapsed && (
@@ -115,9 +117,11 @@ export function Sidebar(props: SidebarProps) {
 					{/* Tags — collapsible, pinned-only shortlist */}
 					<div className="tags-section">
 						<div className="tags-header-row">
-							<p className="tags-label">Tags</p>
-							<button className="icon-button tags-collapse-btn" onClick={() => setTagsCollapsed((v) => !v)} title={tagsCollapsed ? 'Show tags' : 'Hide tags'}>
-								{tagsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
+							<button className="tags-header-toggle" onClick={() => setTagsCollapsed((v) => !v)} title={tagsCollapsed ? 'Show tags' : 'Hide tags'} aria-expanded={!tagsCollapsed}>
+								<span className="tags-label">Tags</span>
+								<span className="tags-collapse-btn" aria-hidden="true">
+									{tagsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
+								</span>
 							</button>
 						</div>
 						{!tagsCollapsed && pinnedTags.length > 0 && (
@@ -141,7 +145,7 @@ export function Sidebar(props: SidebarProps) {
 										}}
 										onDragEnd={() => setDragIndex(null)}
 									>
-										<span>#{tag}</span>
+										<span className="tag-filter-label">{tag}</span>
 										<span className="tag-count-row">
 											<span className="tag-hotkey">⌘{idx + 1}</span>
 											<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag"><PinFilledIcon size={13} /></button>
@@ -149,6 +153,11 @@ export function Sidebar(props: SidebarProps) {
 									</button>
 								))}
 							</div>
+						)}
+						{!tagsCollapsed && 0 === pinnedTags.length && (
+							<button className="pinned-tags-empty-link" type="button" onClick={props.onOpenTagsModal}>
+								View tags
+							</button>
 						)}
 					</div>
 					<p className="tags-label sidebar-notes-heading">Notes</p>
@@ -212,7 +221,7 @@ export function Sidebar(props: SidebarProps) {
 			{!props.sidebarCollapsed && <div className="sidebar-bottom">
 				<div className="bottom-actions">
 					<button className="icon-button" onClick={props.onOpenSettings} title="Settings"><SettingsIcon /></button>
-					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
+					<button className="icon-button sidebar-theme-toggle" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
 				</div>
 			</div>}
 			{menu && (
