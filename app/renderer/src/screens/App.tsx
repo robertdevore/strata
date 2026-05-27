@@ -6,6 +6,7 @@ import { TabBar } from '@renderer/src/components/TabBar'
 import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
 import { SettingsModal } from '@renderer/src/components/SettingsModal'
 import { CommandPalette, type PaletteMode } from '@renderer/src/components/CommandPalette'
+import { TagsModal } from '@renderer/src/components/TagsModal'
 import { RelatedNotesModal } from '@renderer/src/components/RelatedNotesModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
@@ -32,6 +33,7 @@ export function App() {
 	const [undoTimeoutId, setUndoTimeoutId] = useState<number | null>(null)
 	const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
 	const [showRelatedNotes, setShowRelatedNotes] = useState(false)
+	const [showTagsModal, setShowTagsModal] = useState(false)
 	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
 	const clearUndoToast = useCallback(() => {
 		if (null !== undoTimeoutId) {
@@ -299,7 +301,7 @@ export function App() {
 					onOpenSettings={() => store.setShowSettings(true)}
 					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
 					onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
-					onToggleFiltersPanel={() => store.setShowFiltersPanel(!store.showFiltersPanel)}
+					onOpenTagsModal={() => setShowTagsModal(true)}
 					onFilterChange={store.setActiveFilter}
 					onTagFilter={store.setSelectedTag}
 					onStarToggle={(id) => void store.toggleStar(id)}
@@ -412,6 +414,22 @@ export function App() {
 				onOpenNote={(note_id, new_tab) => {
 					void openNoteFromChat(note_id, new_tab)
 					setShowRelatedNotes(false)
+				}}
+			/>
+			<TagsModal
+				open={showTagsModal}
+				tags={store.tags}
+				pinnedTags={store.settings.pinnedTags ?? []}
+				selectedTag={store.selectedTag}
+				onClose={() => setShowTagsModal(false)}
+				onSelectTag={(tag) => store.setSelectedTag(tag)}
+				onPinTag={(tag) => {
+					const current = store.settings.pinnedTags ?? []
+					if (!current.includes(tag)) store.updateSettings({ pinnedTags: [...current, tag] })
+				}}
+				onUnpinTag={(tag) => {
+					const current = store.settings.pinnedTags ?? []
+					store.updateSettings({ pinnedTags: current.filter((t) => t !== tag) })
 				}}
 			/>
 		</div>

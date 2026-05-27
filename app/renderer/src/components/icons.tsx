@@ -177,6 +177,24 @@ export function FileSearchIcon(props: IconProps) {
 		</BaseIcon>
 	)
 }
+
+export function ChevronDownIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M6 9l6 6l6 -6" />
+		</BaseIcon>
+	)
+}
+
+export function ChevronUpIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M6 15l6 -6l6 6" />
+		</BaseIcon>
+	)
+}
 export function CloseIcon(props: IconProps) {
 	return (
 		<BaseIcon {...props}>

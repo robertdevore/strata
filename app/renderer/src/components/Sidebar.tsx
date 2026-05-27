@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
 import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
-import { CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
+import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
 	notes: Note[]
@@ -21,7 +21,7 @@ interface SidebarProps {
 	onOpenSettings: () => void
 	onThemeToggle: () => void
 	onToggleSidebar: () => void
-	onToggleFiltersPanel: () => void
+	onOpenTagsModal: () => void
 	onFilterChange: (value: ActiveFilter) => void
 	onTagFilter: (tag: string | null) => void
 	onStarToggle: (id: string) => void
@@ -45,6 +45,7 @@ const filters: ActiveFilter[] = ['all', 'starred', 'archived', 'untagged']
 export function Sidebar(props: SidebarProps) {
 	const { pinnedTags, onPinTag, onUnpinTag } = props
 	const [menu, setMenu] = useState<MenuState | null>(null)
+	const [pinnedTagsCollapsed, setPinnedTagsCollapsed] = useState(false)
 	const [visibleCount, setVisibleCount] = useState(50)
 	const menuRef = useRef<HTMLDivElement>(null)
 	const scrollRef = useRef<HTMLDivElement>(null)
@@ -108,7 +109,7 @@ export function Sidebar(props: SidebarProps) {
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
 				</div>
-				{!props.sidebarCollapsed && props.showFiltersPanel && (
+				{!props.sidebarCollapsed && (
 					<>
 						<div className="chip-row">
 							{filters.map((chip) => (
@@ -122,10 +123,18 @@ export function Sidebar(props: SidebarProps) {
 			</div>
 			{!props.sidebarCollapsed && (
 				<div className="sidebar-scroll" ref={scrollRef} onScroll={onScrollNearBottom}>
-					{/* Pinned tags — always visible */}
-					{pinnedTags.length > 0 && (
-						<div className="tags-section">
-							<p className="tags-label">Pinned Tags</p>
+					{/* Tags — always visible */}
+					<div className="tags-section">
+						<div className="tags-header-row">
+							<p className="tags-label">Tags</p>
+							{pinnedTags.length > 0 && (
+								<button className="icon-button tags-collapse-btn" onClick={() => setPinnedTagsCollapsed((v) => !v)} title={pinnedTagsCollapsed ? 'Show pinned tags' : 'Hide pinned tags'}>
+									{pinnedTagsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
+								</button>
+							)}
+						</div>
+						{/* Pinned tags — collapsible */}
+						{pinnedTags.length > 0 && !pinnedTagsCollapsed && (
 							<div className="pinned-tags">
 								{pinnedTags.map((tag) => (
 									<button key={tag} className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag)}>
@@ -136,23 +145,18 @@ export function Sidebar(props: SidebarProps) {
 									</button>
 								))}
 							</div>
-						</div>
-					)}
-					{props.showFiltersPanel && (
-						<div className="tags-section">
-							<p className="tags-label">Tags</p>
-							{/* Top 5 unpinned tags */}
-							{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, 5).map((tag) => (
-								<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>
-									<span>#{tag.name}</span>
-									<span className="tag-count-row">
-										<span>{tag.count}</span>
-										<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin tag">📌</button>
-									</span>
-								</button>
-							))}
-						</div>
-					)}
+						)}
+						{/* Top 5 popular tags — always visible */}
+						{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, 5).map((tag) => (
+							<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>
+								<span>#{tag.name}</span>
+								<span className="tag-count-row">
+									<span>{tag.count}</span>
+									<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin tag">📌</button>
+								</span>
+							</button>
+						))}
+					</div>
 					<p className="tags-label sidebar-notes-heading">Notes</p>
 					<div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
 				{visibleNotes.map((note) => (
@@ -215,7 +219,7 @@ export function Sidebar(props: SidebarProps) {
 				<div className="bottom-actions">
 					<button className="icon-button" onClick={props.onOpenSettings} title="Settings"><SettingsIcon /></button>
 					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
-					<button className="icon-button" onClick={props.onToggleFiltersPanel} title="Toggle Tags"><MenuIcon /></button>
+					<button className="icon-button" onClick={props.onOpenTagsModal} title="All Tags"><MenuIcon /></button>
 				</div>
 			</div>}
 			{menu && (

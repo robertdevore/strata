@@ -253,7 +253,7 @@ body.platform-mac .standalone-sidebar-toggle {
 
 .standalone-new-note {
 	position: fixed;
-	left: 40px;
+	left: 8px;
 	top: 16px;
 	z-index: 99999;
 	display: inline-flex;
@@ -274,7 +274,7 @@ body.platform-mac .standalone-sidebar-toggle {
 }
 
 body.platform-mac .standalone-new-note {
-	left: 109px;
+	left: 45px;
 	top: 6px;
 }
 
@@ -412,6 +412,42 @@ button:focus-visible,
 	margin-bottom: 6px;
 	padding-bottom: 6px;
 	border-bottom: 1px solid var(--border);
+}
+
+.tags-header-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.tags-collapse-btn {
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	color: var(--text-3);
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.tags-collapse-btn:hover {
+	color: var(--text);
+}
+
+.tags-modal-list {
+	display: grid;
+	gap: 6px;
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+.tag-modal-item {
+	width: 100%;
+	justify-content: space-between;
 }
 
 .tag-pinned {
