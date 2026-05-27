@@ -122,20 +122,25 @@ export function Sidebar(props: SidebarProps) {
 			</div>
 			{!props.sidebarCollapsed && (
 				<div className="sidebar-scroll" ref={scrollRef} onScroll={onScrollNearBottom}>
+					{/* Pinned tags — always visible */}
+					{pinnedTags.length > 0 && (
+						<div className="tags-section">
+							<p className="tags-label">Pinned Tags</p>
+							<div className="pinned-tags">
+								{pinnedTags.map((tag) => (
+									<button key={tag} className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag)}>
+										<span>#{tag}</span>
+										<span className="tag-count-row">
+											<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag">📌</button>
+										</span>
+									</button>
+								))}
+							</div>
+						</div>
+					)}
 					{props.showFiltersPanel && (
 						<div className="tags-section">
 							<p className="tags-label">Tags</p>
-							{/* Pinned tags */}
-							{pinnedTags.length > 0 && (
-								<div className="pinned-tags">
-									{pinnedTags.map((tag) => (
-										<button key={tag} className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag)}>
-											<span>#{tag}</span>
-											<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag">📌</button>
-										</button>
-									))}
-								</div>
-							)}
 							{/* Top 5 unpinned tags */}
 							{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, 5).map((tag) => (
 								<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>

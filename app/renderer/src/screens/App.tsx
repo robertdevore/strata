@@ -10,7 +10,7 @@ import { RelatedNotesModal } from '@renderer/src/components/RelatedNotesModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
-import { CircleChevronRightIcon } from '@renderer/src/components/icons'
+import { CircleChevronRightIcon, PlusIcon } from '@renderer/src/components/icons'
 
 const isMac = navigator.userAgent.includes('Mac')
 
@@ -259,14 +259,24 @@ export function App() {
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
 			{sidebarCollapsed && createPortal(
-				<button
-					className="standalone-sidebar-toggle"
-					onClick={() => setSidebarCollapsed(false)}
-					title="Open Sidebar"
-					aria-label="Open Sidebar"
-				>
-					<CircleChevronRightIcon />
-				</button>,
+				<>
+					<button
+						className="standalone-sidebar-toggle"
+						onClick={() => setSidebarCollapsed(false)}
+						title="Open Sidebar"
+						aria-label="Open Sidebar"
+					>
+						<CircleChevronRightIcon />
+					</button>
+					<button
+						className="standalone-new-note"
+						onClick={() => void store.createNote()}
+						title="New Note"
+						aria-label="New Note"
+					>
+						<PlusIcon size={15} />
+					</button>
+				</>,
 				document.body
 			)}
 			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 6px minmax(0, 1fr)` }}>

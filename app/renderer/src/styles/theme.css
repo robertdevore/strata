@@ -251,6 +251,33 @@ body.platform-mac .standalone-sidebar-toggle {
 	top: 6px;
 }
 
+.standalone-new-note {
+	position: fixed;
+	left: 40px;
+	top: 16px;
+	z-index: 99999;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-2);
+	cursor: pointer;
+	-webkit-app-region: no-drag;
+}
+
+.standalone-new-note:hover {
+	color: var(--text);
+}
+
+body.platform-mac .standalone-new-note {
+	left: 109px;
+	top: 6px;
+}
+
 .search-input,
 .chip,
 .icon-button,
