@@ -137,7 +137,7 @@ const format_assistant_content = (value: string, note_titles_by_id: Record<strin
 			const note_links = note_ids
 				.map((note_id) => {
 					const label = note_titles_by_id[note_id] ? escape_markdown_label(note_titles_by_id[note_id]) : note_id
-					return `- [${label}](strata-note://${note_id})`
+					return `- [${label}](#strata-note:${note_id})`
 				})
 				.join('\n')
 
@@ -150,10 +150,10 @@ const format_assistant_content = (value: string, note_titles_by_id: Record<strin
 		const note_title = note_titles_by_id[normalized_note_id]
 		if (!note_title) return raw_note_id
 
-		const prefix = source.slice(Math.max(0, offset - 14), offset).toLowerCase()
-		if (prefix.endsWith('strata-note://')) return raw_note_id
+		const prefix = source.slice(Math.max(0, offset - 17), offset).toLowerCase()
+		if (prefix.includes('strata-note:')) return raw_note_id
 
-		return `[${escape_markdown_label(note_title)}](strata-note://${normalized_note_id})`
+		return `[${escape_markdown_label(note_title)}](#strata-note:${normalized_note_id})`
 	})
 }
 
@@ -525,11 +525,16 @@ export function ChatPanel(props: ChatPanelProps) {
 											components={{
 												a: ({ href, children }) => {
 													const target = href ?? ''
-													if (target.startsWith('strata-note://')) {
-														const note_id = normalize_note_id(target.replace('strata-note://', '').trim())
+													let note_id = ''
+													if (target.startsWith('#strata-note:')) {
+														note_id = normalize_note_id(target.replace('#strata-note:', '').trim())
+													} else if (target.startsWith('strata-note://')) {
+														note_id = normalize_note_id(target.replace('strata-note://', '').trim())
+													}
+													if (note_id) {
 														return (
 															<a
-																href={target}
+																href="#"
 																onClick={(event) => {
 																	event.preventDefault()
 																	onOpenNote(note_id)

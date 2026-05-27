@@ -12,6 +12,22 @@ const settings_patch_schema = z.object({
 	openAiModel: z.string().trim().min(1).max(120).optional(),
 	autoBackupFrequency: z.enum(['off', '12h', '24h', '168h']).optional(),
 	lastAutoBackupAt: z.string().datetime().nullable().optional(),
+	aiEditMode: z.enum(['read_only', 'confirm', 'auto_apply']).optional(),
+	// AI provider settings
+	aiRoutingMode: z.enum(['premium_only', 'cheap_only', 'auto', 'ask_each_time']).optional(),
+	aiCheapProvider: z.string().trim().min(1).max(60).optional(),
+	aiCheapModel: z.string().trim().max(120).optional(),
+	aiPremiumProvider: z.string().trim().min(1).max(60).optional(),
+	aiPremiumModel: z.string().trim().max(120).optional(),
+	aiDeepseekApiKey: z.string().max(2048).optional(),
+	aiKimiApiKey: z.string().max(2048).optional(),
+	aiOpenrouterApiKey: z.string().max(2048).optional(),
+	aiCustomApiKey: z.string().max(2048).optional(),
+	aiCustomBaseUrl: z.string().max(512).optional(),
+	aiShowRoutingDecisions: z.boolean().optional(),
+	aiEnableRouteLogs: z.boolean().optional(),
+	aiCheapConfidenceThreshold: z.number().min(0).max(1).optional(),
+	aiPremiumFallbackThreshold: z.number().min(0).max(1).optional(),
 })
 
 export const registerSettingsHandlers = (db: StrataDatabase) => {

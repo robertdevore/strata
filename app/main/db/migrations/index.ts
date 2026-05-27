@@ -103,4 +103,31 @@ export const migrations: Migration[] = [
 			CREATE INDEX IF NOT EXISTS idx_ai_edits_thread ON ai_note_edits (thread_id);
 		`,
 	},
+	{
+		version: 6,
+		description: 'ai route logs',
+		upSql: `
+			CREATE TABLE IF NOT EXISTS ai_route_logs (
+				id TEXT PRIMARY KEY,
+				thread_id TEXT,
+				user_message TEXT NOT NULL,
+				intent TEXT NOT NULL,
+				route TEXT NOT NULL,
+				provider_id TEXT NOT NULL,
+				model TEXT NOT NULL,
+				confidence REAL,
+				risk TEXT,
+				requires_confirmation INTEGER NOT NULL DEFAULT 0,
+				reason TEXT,
+				fallback_used INTEGER NOT NULL DEFAULT 0,
+				fallback_reason TEXT,
+				input_tokens INTEGER,
+				output_tokens INTEGER,
+				created_at TEXT NOT NULL
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_route_logs_thread ON ai_route_logs (thread_id, created_at DESC);
+			CREATE INDEX IF NOT EXISTS idx_route_logs_intent ON ai_route_logs (intent, created_at DESC);
+		`,
+	},
 ]

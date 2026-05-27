@@ -60,6 +60,20 @@ const defaultSettings: Settings = {
 	autoBackupFrequency: '24h',
 	lastAutoBackupAt: null,
 	aiEditMode: 'confirm',
+	aiRoutingMode: 'auto',
+	aiCheapProvider: 'deepseek-flash',
+	aiCheapModel: 'deepseek-v4-flash',
+	aiPremiumProvider: 'openai',
+	aiPremiumModel: 'gpt-4o',
+	aiDeepseekApiKey: '',
+	aiKimiApiKey: '',
+	aiOpenrouterApiKey: '',
+	aiCustomApiKey: '',
+	aiCustomBaseUrl: '',
+	aiShowRoutingDecisions: true,
+	aiEnableRouteLogs: true,
+	aiCheapConfidenceThreshold: 0.85,
+	aiPremiumFallbackThreshold: 0.65,
 }
 
 export const useAppStore = create<AppState>((set, get) => ({

@@ -29,4 +29,5 @@ export const IPC_CHANNELS = {
 	dialogSelectFolder: 'dialog:select-folder',
 	publishHtmlFile: 'publish:html-file',
 	shellRun: 'shell:run',
+	aiRouteLogsList: 'ai:route-logs:list',
 } as const

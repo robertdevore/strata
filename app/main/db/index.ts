@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
-import type { AiMessage, AiNoteEdit, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
+import type { AiMessage, AiNoteEdit, AiRouteLog, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
 import { migrations } from './migrations/index'
 
 interface DbNoteRow {
@@ -69,6 +69,20 @@ const DEFAULT_SETTINGS: Settings = {
 	autoBackupFrequency: '24h',
 	lastAutoBackupAt: null,
 	aiEditMode: 'confirm',
+	aiRoutingMode: 'auto',
+	aiCheapProvider: 'deepseek-flash',
+	aiCheapModel: 'deepseek-v4-flash',
+	aiPremiumProvider: 'openai',
+	aiPremiumModel: 'gpt-4o',
+	aiDeepseekApiKey: '',
+	aiKimiApiKey: '',
+	aiOpenrouterApiKey: '',
+	aiCustomApiKey: '',
+	aiCustomBaseUrl: '',
+	aiShowRoutingDecisions: true,
+	aiEnableRouteLogs: true,
+	aiCheapConfidenceThreshold: 0.85,
+	aiPremiumFallbackThreshold: 0.65,
 }
 
 export class StrataDatabase {
@@ -446,6 +460,49 @@ export class StrataDatabase {
 		return id
 	}
 
+	/** Record a routing decision log entry. Best-effort — failures are silent. */
+	recordRouteLog(log: {
+		threadId?: string | null
+		userMessage: string
+		intent: string
+		route: string
+		providerId: string
+		model: string
+		confidence?: number | null
+		risk?: string | null
+		requiresConfirmation?: boolean
+		reason?: string | null
+		fallbackUsed?: boolean
+		fallbackReason?: string | null
+		inputTokens?: number | null
+		outputTokens?: number | null
+	}): string {
+		const id = uuidv4()
+		const now = new Date().toISOString()
+		this.db.prepare(
+			`INSERT INTO ai_route_logs (id, thread_id, user_message, intent, route, provider_id, model, confidence, risk, requires_confirmation, reason, fallback_used, fallback_reason, input_tokens, output_tokens, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		).run(
+			id,
+			log.threadId ?? null,
+			log.userMessage,
+			log.intent,
+			log.route,
+			log.providerId,
+			log.model,
+			log.confidence ?? null,
+			log.risk ?? null,
+			log.requiresConfirmation ? 1 : 0,
+			log.reason ?? null,
+			log.fallbackUsed ? 1 : 0,
+			log.fallbackReason ?? null,
+			log.inputTokens ?? null,
+			log.outputTokens ?? null,
+			now,
+		)
+		return id
+	}
+
 	/** Get the most recent AI edit for a note (non-reverted). */
 	getLatestAiEdit(note_id: string): AiNoteEdit | null {
 		const row = this.db
@@ -487,6 +544,48 @@ export class StrataDatabase {
 			.prepare('SELECT * FROM ai_note_edits WHERE note_id = ? ORDER BY created_at DESC LIMIT ?')
 			.all(note_id, limit) as DbAiNoteEditRow[]
 		return rows.map((row) => this.mapAiNoteEdit(row))
+	}
+
+	/** List recent route logs. */
+	listAiRouteLogs(limit = 100): AiRouteLog[] {
+		const rows = this.db
+			.prepare('SELECT * FROM ai_route_logs ORDER BY created_at DESC LIMIT ?')
+			.all(limit) as Array<{
+				id: string
+				thread_id: string | null
+				user_message: string
+				intent: string
+				route: string
+				provider_id: string
+				model: string
+				confidence: number | null
+				risk: string | null
+				requires_confirmation: number
+				reason: string | null
+				fallback_used: number
+				fallback_reason: string | null
+				input_tokens: number | null
+				output_tokens: number | null
+				created_at: string
+			}>
+		return rows.map((row) => ({
+			id: row.id,
+			threadId: row.thread_id,
+			userMessage: row.user_message,
+			intent: row.intent,
+			route: row.route,
+			providerId: row.provider_id,
+			model: row.model,
+			confidence: row.confidence,
+			risk: row.risk,
+			requiresConfirmation: Boolean(row.requires_confirmation),
+			reason: row.reason,
+			fallbackUsed: Boolean(row.fallback_used),
+			fallbackReason: row.fallback_reason,
+			inputTokens: row.input_tokens,
+			outputTokens: row.output_tokens,
+			createdAt: row.created_at,
+		}))
 	}
 
 	private mapAiNoteEdit(row: DbAiNoteEditRow): AiNoteEdit {

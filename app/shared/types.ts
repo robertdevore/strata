@@ -8,6 +8,8 @@ export type AutoBackupFrequency = 'off' | '12h' | '24h' | '168h'
 
 export type AiEditMode = 'read_only' | 'confirm' | 'auto_apply'
 
+export type AiRoutingMode = 'premium_only' | 'cheap_only' | 'auto' | 'ask_each_time'
+
 export interface Note {
 	id: string
 	content: string
@@ -37,6 +39,21 @@ export interface Settings {
 	autoBackupFrequency: AutoBackupFrequency
 	lastAutoBackupAt: string | null
 	aiEditMode: AiEditMode
+	// AI provider settings
+	aiRoutingMode: AiRoutingMode
+	aiCheapProvider: string
+	aiCheapModel: string
+	aiPremiumProvider: string
+	aiPremiumModel: string
+	aiDeepseekApiKey: string
+	aiKimiApiKey: string
+	aiOpenrouterApiKey: string
+	aiCustomApiKey: string
+	aiCustomBaseUrl: string
+	aiShowRoutingDecisions: boolean
+	aiEnableRouteLogs: boolean
+	aiCheapConfidenceThreshold: number
+	aiPremiumFallbackThreshold: number
 }
 
 export interface NoteUpdatePatch {
@@ -110,6 +127,25 @@ export interface AiNoteEdit {
 
 export interface AiTranscriptionResult {
 	text: string
+}
+
+export interface AiRouteLog {
+	id: string
+	threadId: string | null
+	userMessage: string
+	intent: string
+	route: string
+	providerId: string
+	model: string
+	confidence: number | null
+	risk: string | null
+	requiresConfirmation: boolean
+	reason: string | null
+	fallbackUsed: boolean
+	fallbackReason: string | null
+	inputTokens: number | null
+	outputTokens: number | null
+	createdAt: string
 }
 
 export interface BackupResult {

@@ -37,6 +37,7 @@ const api: StrataApi = {
 		transcribeAudio: (payload) => ipcRenderer.invoke(IPC_CHANNELS.aiTranscribeAudio, payload),
 		listEdits: (noteId) => ipcRenderer.invoke(IPC_CHANNELS.aiEditsList, { noteId }),
 		revertEdit: (editId) => ipcRenderer.invoke(IPC_CHANNELS.aiEditsRevert, { editId }),
+		listRouteLogs: () => ipcRenderer.invoke(IPC_CHANNELS.aiRouteLogsList),
 	},
 	links: {
 		backlinks: (note_id) => ipcRenderer.invoke(IPC_CHANNELS.linksBacklinks, { id: note_id }),

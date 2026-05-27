@@ -11,22 +11,24 @@ interface SettingsModalProps {
 	onOpenBackupsFolder: () => Promise<void>
 }
 
-const openai_model_options = [
-	{ value: 'gpt-5.4', label: 'GPT-5.4' },
-	{ value: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
-	{ value: 'gpt-5.4-nano', label: 'GPT-5.4 nano' },
-	{ value: 'gpt-5.2', label: 'GPT-5.2' },
-	{ value: 'gpt-5.1', label: 'GPT-5.1' },
-	{ value: 'gpt-4o', label: 'GPT-4o' },
-	{ value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
-	{ value: 'gpt-5-codex', label: 'GPT-5 Codex' },
-	{ value: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
-] as const
+const CHEAP_PROVIDERS = [
+	{ value: 'deepseek-flash', label: 'DeepSeek V4 Flash' },
+	{ value: 'kimi', label: 'Kimi / Moonshot' },
+	{ value: 'openrouter', label: 'OpenRouter' },
+	{ value: 'custom', label: 'Custom OpenAI-compatible' },
+]
+
+const PREMIUM_PROVIDERS = [
+	{ value: 'openai', label: 'OpenAI (Responses API)' },
+	{ value: 'openrouter', label: 'OpenRouter' },
+	{ value: 'custom', label: 'Custom OpenAI-compatible' },
+]
 
 export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBackup, onOpenBackupsFolder }: SettingsModalProps) {
 	const [backup_status, set_backup_status] = useState('')
 	const [is_creating_backup, set_is_creating_backup] = useState(false)
 	const [is_opening_backup_folder, set_is_opening_backup_folder] = useState(false)
+	const [show_advanced, set_show_advanced] = useState(false)
 
 	const format_backup_time = (value: string | null): string => {
 		if (!value) return 'Never'
@@ -36,9 +38,11 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 	}
 
 	if (!open) return null
-	const selected_openai_model = openai_model_options.some((option) => option.value === settings.openAiModel)
-		? settings.openAiModel
-		: 'gpt-4o'
+
+	const ai_routing_mode = settings.aiRoutingMode || 'auto'
+	const ai_cheap_provider = settings.aiCheapProvider || 'deepseek-flash'
+	const ai_premium_provider = settings.aiPremiumProvider || 'openai'
+
 	return (
 		<div className="modal-overlay" onClick={onClose}>
 			<div className="modal-card" onClick={(event) => event.stopPropagation()}>
@@ -46,6 +50,8 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 					<CloseIcon />
 				</button>
 				<h3>Settings</h3>
+
+				{/* ---- General ---- */}
 				<label>
 					Theme
 					<select value={settings.theme} onChange={(event) => onUpdate({ theme: event.target.value as Settings['theme'] })}>
@@ -73,6 +79,65 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 					<input type="checkbox" checked={settings.confirmDelete} onChange={(event) => onUpdate({ confirmDelete: event.target.checked })} />
 					Confirm before delete
 				</label>
+
+				<hr />
+
+				{/* ---- AI Routing ---- */}
+				<h4>AI Provider</h4>
+
+				<label>
+					AI Mode
+					<select value={ai_routing_mode} onChange={(event) => onUpdate({ aiRoutingMode: event.target.value as Settings['aiRoutingMode'] })}>
+						<option value="premium_only">Premium only</option>
+						<option value="cheap_only">Cheap only</option>
+						<option value="auto">Auto (routing)</option>
+						<option value="ask_each_time">Ask each time</option>
+					</select>
+				</label>
+
+				<label>
+					Cheap Provider
+					<select value={ai_cheap_provider} onChange={(event) => onUpdate({ aiCheapProvider: event.target.value })}>
+						{CHEAP_PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+					</select>
+				</label>
+
+				<label>
+					Cheap Model
+					<input
+						type="text"
+						className="search-input"
+						value={settings.aiCheapModel || ''}
+						onChange={(event) => onUpdate({ aiCheapModel: event.target.value })}
+						placeholder="e.g. deepseek-v4-flash"
+						spellCheck={false}
+					/>
+				</label>
+
+				<label>
+					Premium Provider
+					<select value={ai_premium_provider} onChange={(event) => onUpdate({ aiPremiumProvider: event.target.value })}>
+						{PREMIUM_PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+					</select>
+				</label>
+
+				<label>
+					Premium Model
+					<input
+						type="text"
+						className="search-input"
+						value={settings.aiPremiumModel || ''}
+						onChange={(event) => onUpdate({ aiPremiumModel: event.target.value })}
+						placeholder="e.g. gpt-4o"
+						spellCheck={false}
+					/>
+				</label>
+
+				<hr />
+
+				{/* ---- API Keys ---- */}
+				<h4>API Keys</h4>
+
 				<label>
 					OpenAI API Key
 					<input
@@ -85,17 +150,62 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 						spellCheck={false}
 					/>
 				</label>
+
 				<label>
-					OpenAI Chat Model
-					<select
-						value={selected_openai_model}
-						onChange={(event) => onUpdate({ openAiModel: event.target.value })}
-					>
-						{openai_model_options.map((option) => (
-							<option key={option.value} value={option.value}>{option.label}</option>
-						))}
-					</select>
+					DeepSeek API Key
+					<input
+						type="password"
+						className="search-input"
+						value={settings.aiDeepseekApiKey || ''}
+						onChange={(event) => onUpdate({ aiDeepseekApiKey: event.target.value })}
+						placeholder="sk-..."
+						autoComplete="off"
+						spellCheck={false}
+					/>
 				</label>
+
+				<label>
+					Kimi / Moonshot API Key
+					<input
+						type="password"
+						className="search-input"
+						value={settings.aiKimiApiKey || ''}
+						onChange={(event) => onUpdate({ aiKimiApiKey: event.target.value })}
+						placeholder="sk-..."
+						autoComplete="off"
+						spellCheck={false}
+					/>
+				</label>
+
+				<label>
+					OpenRouter API Key
+					<input
+						type="password"
+						className="search-input"
+						value={settings.aiOpenrouterApiKey || ''}
+						onChange={(event) => onUpdate({ aiOpenrouterApiKey: event.target.value })}
+						placeholder="sk-or-..."
+						autoComplete="off"
+						spellCheck={false}
+					/>
+				</label>
+
+				<label>
+					Custom Provider API Key
+					<input
+						type="password"
+						className="search-input"
+						value={settings.aiCustomApiKey || ''}
+						onChange={(event) => onUpdate({ aiCustomApiKey: event.target.value })}
+						placeholder="sk-..."
+						autoComplete="off"
+						spellCheck={false}
+					/>
+				</label>
+
+				<hr />
+
+				{/* ---- AI Edit Mode ---- */}
 				<label>
 					AI Edit Mode
 					<select value={settings.aiEditMode ?? 'confirm'} onChange={(event) => onUpdate({ aiEditMode: event.target.value as Settings['aiEditMode'] })}>
@@ -104,6 +214,75 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 						<option value="auto_apply">Auto Apply — AI edits freely (history kept)</option>
 					</select>
 				</label>
+
+				<hr />
+
+				{/* ---- Advanced ---- */}
+				<button className="ghost-button" style={{ width: '100%', marginBottom: 12 }} onClick={() => set_show_advanced((v) => !v)}>
+					{show_advanced ? '\u25BE' : '\u25B8'} Advanced
+				</button>
+
+				{show_advanced && (
+					<>
+						<label>
+							Custom Provider Base URL
+							<input
+								type="text"
+								className="search-input"
+								value={settings.aiCustomBaseUrl || ''}
+								onChange={(event) => onUpdate({ aiCustomBaseUrl: event.target.value })}
+								placeholder="https://api.example.com/v1"
+								spellCheck={false}
+							/>
+						</label>
+
+						<label className="inline-toggle">
+							<input
+								type="checkbox"
+								checked={settings.aiShowRoutingDecisions !== false}
+								onChange={(event) => onUpdate({ aiShowRoutingDecisions: event.target.checked })}
+							/>
+							Show routing decisions in chat
+						</label>
+
+						<label className="inline-toggle">
+							<input
+								type="checkbox"
+								checked={settings.aiEnableRouteLogs !== false}
+								onChange={(event) => onUpdate({ aiEnableRouteLogs: event.target.checked })}
+							/>
+							Enable route logs
+						</label>
+
+						<label>
+							Cheap Confidence Threshold ({settings.aiCheapConfidenceThreshold ?? 0.85})
+							<input
+								type="range"
+								min="0.5"
+								max="1.0"
+								step="0.01"
+								value={settings.aiCheapConfidenceThreshold ?? 0.85}
+								onChange={(event) => onUpdate({ aiCheapConfidenceThreshold: parseFloat(event.target.value) })}
+							/>
+						</label>
+
+						<label>
+							Premium Fallback Threshold ({settings.aiPremiumFallbackThreshold ?? 0.65})
+							<input
+								type="range"
+								min="0.3"
+								max="0.9"
+								step="0.01"
+								value={settings.aiPremiumFallbackThreshold ?? 0.65}
+								onChange={(event) => onUpdate({ aiPremiumFallbackThreshold: parseFloat(event.target.value) })}
+							/>
+						</label>
+					</>
+				)}
+
+				<hr />
+
+				{/* ---- Backups ---- */}
 				<label>
 					Auto Backup Frequency
 					<select value={settings.autoBackupFrequency} onChange={(event) => onUpdate({ autoBackupFrequency: event.target.value as Settings['autoBackupFrequency'] })}>
@@ -131,7 +310,6 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 					}}>Open backups folder</button>
 				</div>
 				{backup_status && <p className="tags-label">{backup_status}</p>}
-				<div className="coming-soon">Integrations (Coming Soon)</div>
 			</div>
 		</div>
 	)

@@ -1,0 +1,452 @@
+[
+	{
+		"id": "simple-note-001",
+		"input": "Create a note that I need to test DeepSeek Flash for Strata routing.",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Simple note creation should use cheap provider."
+	},
+	{
+		"id": "simple-note-002",
+		"input": "make a note about the new provider architecture",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Casual note creation request."
+	},
+	{
+		"id": "simple-note-003",
+		"input": "jot down: remember to update the AI_PROVIDERS.md doc",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Jot down implies note creation."
+	},
+	{
+		"id": "simple-note-004",
+		"input": "add a note about the meeting with the team tomorrow",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Add a note = create."
+	},
+	{
+		"id": "simple-note-005",
+		"input": "draft a note summarizing the key points from the architecture review",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Draft = create."
+	},
+	{
+		"id": "tag-note-001",
+		"input": "tag my notes about routing with 'ai-providers'",
+		"expectedIntent": "tag_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Tagging is cheap."
+	},
+	{
+		"id": "tag-note-002",
+		"input": "categorize all the notes about DeepSeek as 'provider'",
+		"expectedIntent": "tag_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Categorize = tag."
+	},
+	{
+		"id": "tag-note-003",
+		"input": "label these notes as architecture decisions",
+		"expectedIntent": "tag_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Label = tag."
+	},
+	{
+		"id": "todo-extract-001",
+		"input": "extract todos from my notes",
+		"expectedIntent": "extract_tasks",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "TODO extraction is cheap."
+	},
+	{
+		"id": "todo-extract-002",
+		"input": "what do i need to do next?",
+		"expectedIntent": "extract_tasks",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Implicit TODO request."
+	},
+	{
+		"id": "todo-extract-003",
+		"input": "list all my action items from the sprint review",
+		"expectedIntent": "extract_tasks",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Action items = tasks."
+	},
+	{
+		"id": "search-001",
+		"input": "search for notes about provider routing",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Simple search."
+	},
+	{
+		"id": "search-002",
+		"input": "find me all notes related to Strata",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Find me = search."
+	},
+	{
+		"id": "search-003",
+		"input": "what notes do I have about DeepSeek?",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "What notes = search."
+	},
+	{
+		"id": "search-004",
+		"input": "show me notes on the AI refactor",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Show me notes = search."
+	},
+	{
+		"id": "summary-001",
+		"input": "summarize my meeting notes from yesterday",
+		"expectedIntent": "summarize_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Simple summarization."
+	},
+	{
+		"id": "summary-002",
+		"input": "give me a tldr of this note",
+		"expectedIntent": "summarize_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "TLDR = summarize."
+	},
+	{
+		"id": "summary-003",
+		"input": "what does this note say about the routing implementation?",
+		"expectedIntent": "summarize_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "What does note say = summarize."
+	},
+	{
+		"id": "rewrite-search-001",
+		"input": "rewrite this search to be more specific: routing",
+		"expectedIntent": "rewrite_search",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Rewrite search query."
+	},
+	{
+		"id": "rewrite-search-002",
+		"input": "improve this query for better results: providers",
+		"expectedIntent": "rewrite_search",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Improve query = rewrite search."
+	},
+	{
+		"id": "update-note-001",
+		"input": "update the note about the provider interface to include the new ChatCompletions fields",
+		"expectedIntent": "update_note",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": true,
+		"notes": "Existing note update requires explicit request and confirmation."
+	},
+	{
+		"id": "update-note-002",
+		"input": "edit the note to add the new routing thresholds",
+		"expectedIntent": "update_note",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": true,
+		"notes": "Edit existing note = premium with confirmation."
+	},
+	{
+		"id": "update-note-003",
+		"input": "modify the architecture decision record to reflect v2",
+		"expectedIntent": "update_note",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": true,
+		"notes": "Modify = update, requires confirmation."
+	},
+	{
+		"id": "update-note-004",
+		"input": "append to the changelog note: added DeepSeek support",
+		"expectedIntent": "update_note",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": true,
+		"notes": "Append to note = update."
+	},
+	{
+		"id": "code-arch-001",
+		"input": "review the codebase architecture for the AI provider system",
+		"expectedIntent": "code_architecture",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Code architecture review goes premium."
+	},
+	{
+		"id": "code-arch-002",
+		"input": "audit the code for security vulnerabilities in the routing system",
+		"expectedIntent": "code_architecture",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Code audit = code architecture."
+	},
+	{
+		"id": "code-arch-003",
+		"input": "analyze the codebase and suggest a refactor plan",
+		"expectedIntent": "code_architecture",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Refactor plan = code architecture."
+	},
+	{
+		"id": "code-arch-004",
+		"input": "what design patterns should we use for the provider routing?",
+		"expectedIntent": "code_architecture",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Design patterns = architectural."
+	},
+	{
+		"id": "code-arch-005",
+		"input": "create a product strategy for the next quarter based on our notes",
+		"expectedIntent": "code_architecture",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Product strategy goes premium."
+	},
+	{
+		"id": "code-arch-006",
+		"input": "repo-wide review of all TypeScript files for consistency",
+		"expectedIntent": "code_architecture",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Repo-wide review = premium."
+	},
+	{
+		"id": "complex-reasoning-001",
+		"input": "synthesize across all my notes about AI providers and create a comprehensive comparison",
+		"expectedIntent": "complex_reasoning",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Multi-note synthesis requires premium."
+	},
+	{
+		"id": "complex-reasoning-002",
+		"input": "analyze the relationships between all my architecture decisions",
+		"expectedIntent": "complex_reasoning",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Relationship analysis = complex reasoning."
+	},
+	{
+		"id": "complex-reasoning-003",
+		"input": "cross-reference my note about routing with the security requirements",
+		"expectedIntent": "complex_reasoning",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Cross-reference = complex."
+	},
+	{
+		"id": "complex-reasoning-004",
+		"input": "deep analysis of the trade-offs between OpenAI Responses API and Chat Completions API",
+		"expectedIntent": "complex_reasoning",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Deep analysis = complex reasoning."
+	},
+	{
+		"id": "complex-reasoning-005",
+		"input": "compare all my notes on different AI providers and recommend the best approach",
+		"expectedIntent": "complex_reasoning",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Compare all = multi-note synthesis."
+	},
+	{
+		"id": "blocked-delete-001",
+		"input": "delete the note about the old provider system",
+		"expectedIntent": "unknown",
+		"expectedRoute": "blocked",
+		"expectedRisk": "high",
+		"requiresConfirmation": true,
+		"notes": "Delete requests are blocked."
+	},
+	{
+		"id": "blocked-delete-002",
+		"input": "remove all my notes about DeepSeek",
+		"expectedIntent": "unknown",
+		"expectedRoute": "blocked",
+		"expectedRisk": "high",
+		"requiresConfirmation": true,
+		"notes": "Remove all notes = blocked."
+	},
+	{
+		"id": "blocked-delete-003",
+		"input": "permanently delete everything from yesterday",
+		"expectedIntent": "unknown",
+		"expectedRoute": "blocked",
+		"expectedRisk": "high",
+		"requiresConfirmation": true,
+		"notes": "Permanent deletion = blocked."
+	},
+	{
+		"id": "blocked-delete-004",
+		"input": "destroy the note about the failed experiment",
+		"expectedIntent": "unknown",
+		"expectedRoute": "blocked",
+		"expectedRisk": "high",
+		"requiresConfirmation": true,
+		"notes": "Destroy = blocked."
+	},
+	{
+		"id": "ambiguous-001",
+		"input": "can you help me with something?",
+		"expectedIntent": "unknown",
+		"expectedRoute": "premium",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Ambiguous request defaults to premium for safety."
+	},
+	{
+		"id": "ambiguous-002",
+		"input": "what do you think about AI?",
+		"expectedIntent": "unknown",
+		"expectedRoute": "premium",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Open-ended question, no clear intent."
+	},
+	{
+		"id": "ambiguous-003",
+		"input": "tell me about the project",
+		"expectedIntent": "unknown",
+		"expectedRoute": "premium",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Vague request defaults to premium."
+	},
+	{
+		"id": "chat-search-001",
+		"input": "search my previous chats about the provider routing discussion",
+		"expectedIntent": "unknown",
+		"expectedRoute": "premium",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Chat search — not matched by keyphrases, defaults to premium."
+	},
+	{
+		"id": "complex-context-001",
+		"input": "here is a 10-page document about our architecture. please reason about the best approach for integrating a new provider system given all these constraints and trade-offs that I've laid out",
+		"expectedIntent": "complex_reasoning",
+		"expectedRoute": "premium",
+		"expectedRisk": "medium",
+		"requiresConfirmation": false,
+		"notes": "Long-context reasoning should go premium."
+	},
+	{
+		"id": "create-note-urgent-001",
+		"input": "quick, save this as a note: Firewall rule 443 needs updating by Friday",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Quick note creation with save-this-as-note pattern."
+	},
+	{
+		"id": "create-note-format-001",
+		"input": "record this meeting decision: we will use DeepSeek as the default cheap provider",
+		"expectedIntent": "create_note",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Record this = create note."
+	},
+	{
+		"id": "search-find-001",
+		"input": "look up my notes about the settings modal changes",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Look up = search."
+	},
+	{
+		"id": "search-find-002",
+		"input": "which notes talk about the erasableSyntaxOnly issue?",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Which notes talk about = search."
+	},
+	{
+		"id": "search-find-003",
+		"input": "do i have any notes about TypeScript configuration?",
+		"expectedIntent": "search_notes",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Do I have notes = search."
+	},
+	{
+		"id": "todo-create-001",
+		"input": "create a todo list from the sprint planning notes",
+		"expectedIntent": "extract_tasks",
+		"expectedRoute": "cheap",
+		"expectedRisk": "low",
+		"requiresConfirmation": false,
+		"notes": "Create todo list = extract tasks."
+	}
+]

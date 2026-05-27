@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "backup:notes": "./scripts/backup-notes.sh",
     "notes:api": "./scripts/notes-api.sh",
+    "strata:ai": "node scripts/strata-ai.mjs",
     "clean:release": "rm -rf release",
     "dist": "npm run clean:release && npm run build && electron-builder",
     "test": "vitest run",

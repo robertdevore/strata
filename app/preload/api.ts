@@ -1,4 +1,4 @@
-import type { AiChatResponse, AiMessage, AiNoteEdit, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
+import type { AiChatResponse, AiMessage, AiNoteEdit, AiRouteLog, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
 
 export interface StrataApi {
 	notes: {
@@ -35,6 +35,7 @@ export interface StrataApi {
 		transcribeAudio: (payload: { base64Audio: string; mimeType: string; prompt?: string; language?: string }) => Promise<AiTranscriptionResult>
 		listEdits: (noteId: string) => Promise<AiNoteEdit[]>
 		revertEdit: (editId: string) => Promise<boolean>
+		listRouteLogs: () => Promise<AiRouteLog[]>
 	}
 	links: {
 		backlinks: (note_id: string) => Promise<Array<{ link: NoteLink; source: Note }>>
