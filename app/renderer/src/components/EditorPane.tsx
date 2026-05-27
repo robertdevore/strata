@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Children, useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { EditorSelection } from '@codemirror/state'
+import { autocompletion, type CompletionContext } from '@codemirror/autocomplete'
 import { oneDark } from '@codemirror/theme-one-dark'
 import ReactMarkdown from 'react-markdown'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -12,8 +13,9 @@ import type { AiMessage, AiSearchResult, AiThreadSummary, Note } from '@shared/t
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { aiService } from '@renderer/src/services/aiService'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, ChatbotIcon, CloseIcon, CopyIcon, ExportIcon, EyeIcon, PrinterIcon, SearchIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon } from './icons'
+import { ArchiveIcon, ChatbotIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EyeIcon, FileTextAiIcon, PrinterIcon, SearchIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
 import { ChatPanel } from './ChatPanel'
+import { PublishModal } from './PublishModal'
 
 interface EditorPaneProps {
 	note: Note | null
@@ -29,7 +31,8 @@ interface EditorPaneProps {
 	onToggleArchive: (id: string) => void
 	onDelete: (id: string) => void
 	onSetTags: (tags: string[]) => void
-	onOpenNoteFromChat: (note_id: string) => Promise<void>
+	onOpenNoteFromChat: (note_id: string, new_tab?: boolean) => Promise<void>
+	onShowRelatedNotes: () => void
 }
 
 const saveLabel = (state: string, last: string | null): string => {
@@ -42,17 +45,6 @@ const saveLabel = (state: string, last: string | null): string => {
 const sanitizeFileName = (value: string): string => {
 	const cleaned = value.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim()
 	return cleaned || 'untitled-note'
-}
-
-const triggerDownload = (blob: Blob, file_name: string) => {
-	const url = URL.createObjectURL(blob)
-	const link = document.createElement('a')
-	link.href = url
-	link.download = file_name
-	document.body.appendChild(link)
-	link.click()
-	link.remove()
-	URL.revokeObjectURL(url)
 }
 
 const renderMarkdownHtmlFragment = (markdown_content: string): string => {
@@ -84,21 +76,6 @@ th,td { border: 1px solid #d6dbe0; padding: 6px 8px; text-align: left; }
 ${html_content}
 </body>
 </html>`
-}
-
-const exportAsPdf = async (title: string, markdown_content: string) => {
-	const html = renderStyledMarkdownHtml(title, markdown_content)
-	const pdf_bytes = await window.strata.exports.pdf({ html })
-	const pdf_data = pdf_bytes instanceof Uint8Array ? pdf_bytes : new Uint8Array(pdf_bytes)
-	const pdf_array = Uint8Array.from(pdf_data)
-	const output_title = sanitizeFileName(title)
-	triggerDownload(new Blob([pdf_array.buffer], { type: 'application/pdf' }), `${output_title}.pdf`)
-}
-
-const exportAsDoc = (title: string, markdown_content: string) => {
-	const html = renderStyledMarkdownHtml(title, markdown_content)
-	const output_title = sanitizeFileName(title)
-	triggerDownload(new Blob([html], { type: 'application/msword;charset=utf-8' }), `${output_title}.doc`)
 }
 
 const copyRichTextToClipboard = async (markdown_content: string): Promise<void> => {
@@ -162,12 +139,10 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 })
 
 export function EditorPane(props: EditorPaneProps) {
-	const { note, notes, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat } = props
+	const { note, notes, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
 	const [showChatPanel, setShowChatPanel] = useState(false)
-	const [showExportMenu, setShowExportMenu] = useState(false)
-	const [exportStatus, setExportStatus] = useState('')
 	const [showSaveStatus, setShowSaveStatus] = useState(false)
 	const [showFindReplace, setShowFindReplace] = useState(false)
 	const [findQuery, setFindQuery] = useState('')
@@ -185,15 +160,20 @@ export function EditorPane(props: EditorPaneProps) {
 	const [chatAssistantTyping, setChatAssistantTyping] = useState(false)
 	const [chatDeleting, setChatDeleting] = useState(false)
 	const [chatErrorMessage, setChatErrorMessage] = useState('')
+	const [backlinks, setBacklinks] = useState<Array<{ link: import('@shared/types').NoteLink; source: import('@shared/types').Note }>>([])
+	const [showBacklinks, setShowBacklinks] = useState(false)
+	const [showRelatedPreview, setShowRelatedPreview] = useState(false)
+	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
+	const [showAiHistory, setShowAiHistory] = useState(false)
+	const [aiEdits, setAiEdits] = useState<Array<import('@shared/types').AiNoteEdit>>([])
+	const [showPublish, setShowPublish] = useState(false)
 	const debounceRef = useRef<number | null>(null)
-	const exportStatusRef = useRef<number | null>(null)
 	const saveStatusRef = useRef<number | null>(null)
 	const noteIdRef = useRef<string | null>(null)
 	const editorViewRef = useRef<EditorView | null>(null)
 	const chatTypingIntervalRef = useRef<number | null>(null)
 	const findInputRef = useRef<HTMLInputElement>(null)
 	const editorBodyRef = useRef<HTMLDivElement>(null)
-	const exportMenuRef = useRef<HTMLDivElement>(null)
 	const [editingTitle, setEditingTitle] = useState(false)
 	const [titleDraft, setTitleDraft] = useState('')
 	const titleInputRef = useRef<HTMLInputElement>(null)
@@ -201,19 +181,24 @@ export function EditorPane(props: EditorPaneProps) {
 	contentRef.current = content
 	const isLightTheme = document.body.classList.contains('theme-light')
 
-	const updateH1InContent = useCallback((current_content: string, new_title: string): string => {
-		const lines = current_content.split('\n')
-		// Find first H1 line and replace it
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i].startsWith('# ')) {
-				lines[i] = `# ${new_title}`
-				return lines.join('\n')
-			}
+	// Derive current title from full content (with H1)
+	const currentTitle = deriveNoteTitle(content)
+
+	// Strip leading H1 for editor display — editor shows body only
+	const stripLeadingH1 = (full: string): string => {
+		const lines = full.split('\n')
+		if (lines[0] && lines[0].startsWith('# ')) {
+			// Remove the H1 line and one following blank line if present
+			if (lines[1] === '') return lines.slice(2).join('\n')
+			return lines.slice(1).join('\n')
 		}
-		// No H1 found — prepend one
-		const trimmed = current_content.trimStart()
-		const leading = current_content.slice(0, current_content.length - trimmed.length)
-		return `${leading}# ${new_title}\n\n${trimmed}`
+		return full
+	}
+	const editorContent = stripLeadingH1(content)
+
+	// Wrap body content with H1 for storage
+	const fullContentWithTitle = useCallback((body: string, title: string): string => {
+		return `# ${title}\n\n${body}`
 	}, [])
 
 	const commitTitle = useCallback(() => {
@@ -221,11 +206,15 @@ export function EditorPane(props: EditorPaneProps) {
 			setEditingTitle(false)
 			return
 		}
-		const current_content = content
-		const new_content = updateH1InContent(current_content, titleDraft.trim())
+		const new_title = titleDraft.trim()
+		const body = stripLeadingH1(content)
+		const new_content = fullContentWithTitle(body, new_title)
 		onChangeDraft(note.id, new_content)
+		// Trigger the same debounced flush as the editor
+		if (debounceRef.current) window.clearTimeout(debounceRef.current)
+		debounceRef.current = window.setTimeout(() => void onFlush(note.id), 420)
 		setEditingTitle(false)
-	}, [note, titleDraft, content, updateH1InContent, onChangeDraft])
+	}, [note, titleDraft, content, fullContentWithTitle, onChangeDraft, onFlush])
 
 	useEffect(() => {
 		const openTags = () => setShowTagsEditor(true)
@@ -256,12 +245,24 @@ export function EditorPane(props: EditorPaneProps) {
 			void onFlush(noteIdRef.current)
 		}
 		noteIdRef.current = note?.id ?? null
+		// Load backlinks for the current note
+		if (note?.id) {
+			try {
+				window.strata.links.backlinks(note.id).then(setBacklinks).catch(() => setBacklinks([]))
+				window.strata.links.relatedNotes(note.id).then(setRelatedNotes).catch(() => setRelatedNotes([]))
+			} catch {
+				setBacklinks([])
+				setRelatedNotes([])
+			}
+		} else {
+			setBacklinks([])
+			setRelatedNotes([])
+		}
 	}, [note?.id, onFlush])
 
 	useEffect(() => {
 		return () => {
 			if (debounceRef.current) window.clearTimeout(debounceRef.current)
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
 			if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
 			if (chatTypingIntervalRef.current) window.clearInterval(chatTypingIntervalRef.current)
 		}
@@ -287,26 +288,12 @@ export function EditorPane(props: EditorPaneProps) {
 	}, [saveState, lastSavedAt])
 
 	useEffect(() => {
-		if (!showExportMenu) return
-
-		const onPointerDown = (event: MouseEvent) => {
-			if (!exportMenuRef.current) return
-			if (event.target instanceof Node && !exportMenuRef.current.contains(event.target)) {
-				setShowExportMenu(false)
-			}
-		}
-
-		window.addEventListener('mousedown', onPointerDown)
-		return () => window.removeEventListener('mousedown', onPointerDown)
-	}, [showExportMenu])
-
-	useEffect(() => {
-		if (!note || '# Untitled\n\n' !== content) return
+		if (!note || '' !== content.trim()) return
+		// New empty note — focus the editor at position 0
 		window.setTimeout(() => {
 			if (!editorViewRef.current) return
-			const cursor_position = content.length
 			editorViewRef.current.dispatch({
-				selection: { anchor: cursor_position },
+				selection: { anchor: 0 },
 				scrollIntoView: true,
 			})
 			editorViewRef.current.focus()
@@ -529,6 +516,44 @@ export function EditorPane(props: EditorPaneProps) {
 		window.addEventListener('mouseup', onMouseUp)
 	}
 
+	// Wiki link autocomplete source for CodeMirror — must be before any early return
+	const wikiLinkCompletions = useCallback(
+		(context: CompletionContext) => {
+			const pos = context.pos
+			const line = context.state.doc.lineAt(pos)
+			const text_before = line.text.slice(0, pos - line.from)
+			// Find the start of [[... pattern
+			const bracket_idx = text_before.lastIndexOf('[[')
+			if (-1 === bracket_idx) return null
+			const after_brackets = text_before.slice(bracket_idx + 2)
+			// Only activate if no closing ]] between [[ and cursor
+			if (after_brackets.includes(']]')) return null
+			const partial = after_brackets.trim().toLowerCase()
+			// from = position of [[ in document
+			const from = line.from + bracket_idx
+
+			const matching = notes
+				.filter((n) => {
+					const title = deriveNoteTitle(n.content)
+					return title.toLowerCase().includes(partial)
+				})
+				.slice(0, 8)
+				.map((n) => {
+					const title = deriveNoteTitle(n.content)
+					return {
+						label: title,
+						type: 'text' as const,
+						apply: `[[${title}]]`,
+						detail: 'note',
+					}
+				})
+
+			if (matching.length === 0) return null
+			return { from, options: matching, filter: false }
+		},
+		[notes],
+	)
+
 	if (!note) {
 		return (
 			<section className="editor empty-editor">
@@ -537,57 +562,14 @@ export function EditorPane(props: EditorPaneProps) {
 		)
 	}
 
-	const exportNote = async (format: 'md' | 'pdf' | 'doc') => {
-		const title = sanitizeFileName(deriveNoteTitle(content))
-		try {
-			if ('md' === format) {
-				triggerDownload(new Blob([content], { type: 'text/markdown;charset=utf-8' }), `${title}.md`)
-			}
-			if ('doc' === format) {
-				exportAsDoc(title, content)
-			}
-			if ('pdf' === format) {
-				await exportAsPdf(title, content)
-			}
-
-			setExportStatus(`Exported as .${format}`)
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
-			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
-		} catch {
-			setExportStatus(`Export failed (.${format})`)
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
-			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
-		}
-
-		setShowExportMenu(false)
-	}
-
-	const copyRichText = async () => {
-		try {
-			await copyRichTextToClipboard(content)
-			setExportStatus('Rich text copied')
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
-			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
-		} catch {
-			setExportStatus('Rich text copy failed')
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
-			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
-		}
-	}
-
 	const printNote = async () => {
 		const title = sanitizeFileName(deriveNoteTitle(content))
 		const html = renderStyledMarkdownHtml(title, content)
 
 		try {
 			await window.strata.exports.print({ html })
-			setExportStatus('Print dialog opened')
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
-			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
 		} catch {
-			setExportStatus('Print failed')
-			if (exportStatusRef.current) window.clearTimeout(exportStatusRef.current)
-			exportStatusRef.current = window.setTimeout(() => setExportStatus(''), 3000)
+			// Print dialog was cancelled or failed — nothing to do
 		}
 	}
 
@@ -692,7 +674,71 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}
 
-	const toolbar_status = exportStatus || (showSaveStatus ? saveLabel(saveState, lastSavedAt) : '')
+	const toolbar_status = showSaveStatus ? saveLabel(saveState, lastSavedAt) : ''
+
+	// Convert [[wiki links]] to standard markdown links for preview rendering
+	const wikiLinkToMarkdown = (md: string): string => {
+		// Protect inline code spans and fenced code blocks from wiki link conversion
+		const code_spans: string[] = []
+		const protected_md = md
+			// Protect fenced code blocks
+			.replace(/```[\s\S]*?```/g, (match) => {
+				code_spans.push(match)
+				return `\x00CODE${code_spans.length - 1}\x00`
+			})
+			// Protect inline code spans
+			.replace(/`[^`]+`/g, (match) => {
+				code_spans.push(match)
+				return `\x00CODE${code_spans.length - 1}\x00`
+			})
+
+		// Convert [[wiki links]] to standard markdown links (only outside code)
+		const converted = protected_md.replace(/(?<!!)\[\[([^\]|#\n]{1,120})(?:#([^\]|\n]{1,80}))?(?:\|([^\]\n]{1,120}))?\]\]/g, (_full, target: string, heading: string | undefined, label: string | undefined) => {
+			const display = (label ?? target).trim()
+			const encoded = encodeURIComponent(target.trim())
+			const fragment = heading ? `#${encodeURIComponent(heading.trim())}` : ''
+			return `[${display}](#strata-note:${encoded}${fragment})`
+		})
+
+		// Restore code spans
+		return converted.replace(/\x00CODE(\d+)\x00/g, (_m, idx) => code_spans[Number(idx)] ?? '')
+	}
+
+	// Handle clicks on wiki links in the preview panel
+	const handleWikiLinkClick = async (href: string, new_tab = false) => {
+		// Support both #strata-note: and strata-note:// formats
+		const raw = href.startsWith('#strata-note:') ? href.slice('#strata-note:'.length) : href.startsWith('strata-note://') ? href.slice('strata-note://'.length) : ''
+		if (!raw) return false
+		const [target] = raw.split('#')
+		const raw_target = decodeURIComponent(target)
+		// Resolve and open; heading anchors are not yet implemented
+
+		// Resolve target on the renderer side using available notes
+		const normalized = raw_target.trim().toLowerCase().replace(/\s+/g, ' ')
+		const resolved = notes.find((candidate) => {
+			const title = deriveNoteTitle(candidate.content)
+			return title.trim().toLowerCase().replace(/\s+/g, ' ') === normalized
+		})
+
+		if (resolved) {
+			await onOpenNoteFromChat(resolved.id, new_tab)
+		} else {
+			const create = window.confirm(`Note "${raw_target}" does not exist. Create it?`)
+			if (create) {
+				try {
+					const newNote = await window.strata.notes.create()
+					await window.strata.notes.update(newNote.id, { content: `# ${raw_target}\n\n` })
+					await onOpenNoteFromChat(newNote.id, new_tab)
+				} catch {
+					// Silently fail — note creation may not be available
+				}
+			}
+		}
+		return true
+	}
+
+	// Preview content with wiki links converted
+	const previewContent = wikiLinkToMarkdown(content)
 
 	return (
 		<section className="editor">
@@ -719,17 +765,17 @@ export function EditorPane(props: EditorPaneProps) {
 					<h2
 						className="editor-title-text"
 						onClick={() => {
-							setTitleDraft(deriveNoteTitle(content))
+							setTitleDraft(currentTitle)
 							setEditingTitle(true)
 						}}
 						title="Click to edit title"
 					>
-						{deriveNoteTitle(content)}
+						{currentTitle}
 					</h2>
 				)}
 				<div className="editor-actions">
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
-					<button className="icon-button" onClick={() => void copyRichText()} title="Copy Rich Text"><CopyIcon /></button>
+					<button className="icon-button" onClick={() => void copyRichTextToClipboard(content).catch(() => {})} title="Copy Rich Text"><CopyIcon /></button>
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
 					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
 					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => {
@@ -755,12 +801,38 @@ export function EditorPane(props: EditorPaneProps) {
 					}} title="Open AI Chat"><ChatbotIcon /></button>
 				</div>
 			</header>
-			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 6px minmax(0, 1fr)' : `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}>
+			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 6px minmax(0, 1fr)' : `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}
+				onClick={(event) => {
+					// Handle wiki link clicks in the CodeMirror editor
+					const view = editorViewRef.current
+					if (!view) return
+					const target = event.target as HTMLElement
+					// Only handle clicks on the CodeMirror content area, not on buttons etc
+					if (!target.closest('.cm-editor')) return
+					const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
+					if (null === pos) return
+					// Check if the clicked position is inside [[...]]
+					const line = view.state.doc.lineAt(pos)
+					const line_text = line.text
+					const col = pos - line.from
+					// Find [[...]] surrounding the click position
+					const wiki_re = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g
+					let match: RegExpExecArray | null
+					while ((match = wiki_re.exec(line_text)) !== null) {
+						if (col >= match.index && col <= match.index + match[0].length) {
+							const raw_target = (match[1] ?? '').trim()
+							if (!raw_target) return
+							// User clicked a wiki link in the editor
+							void handleWikiLinkClick(`#strata-note:${encodeURIComponent(raw_target)}`, event.metaKey || event.ctrlKey)
+							return
+						}
+					}
+				}}>
 				<div className={`editor-input ${showSidePanel ? 'editor-input-split' : ''}`}>
 					<CodeMirror
-						value={content}
+						value={editorContent}
 						height="100%"
-						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension]}
+						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, autocompletion({ override: [wikiLinkCompletions] })]}
 						onCreateEditor={(view) => {
 							editorViewRef.current = view
 						}}
@@ -770,7 +842,8 @@ export function EditorPane(props: EditorPaneProps) {
 							foldGutter: false,
 						}}
 						onChange={(value) => {
-							onChangeDraft(note.id, value)
+							const full = fullContentWithTitle(value, currentTitle)
+							onChangeDraft(note.id, full)
 							if (debounceRef.current) window.clearTimeout(debounceRef.current)
 							debounceRef.current = window.setTimeout(() => void onFlush(note.id), 420)
 						}}
@@ -825,7 +898,149 @@ export function EditorPane(props: EditorPaneProps) {
 							/>
 						) : (
 							<article className="preview-panel preview-markdown">
-								<ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+								<ReactMarkdown
+									remarkPlugins={[remarkGfm]}
+									components={{
+										a: ({ href, children, ...props }) => {
+											const is_wiki = href && (href.startsWith('#strata-note:') || href.startsWith('strata-note://'))
+											if (is_wiki) {
+												return (
+													<a
+														href={href}
+														className="wiki-link"
+														onClick={(event) => {
+															event.preventDefault()
+															void handleWikiLinkClick(href, event.metaKey || event.ctrlKey)
+														}}
+														{...props}
+													>
+														{children}
+													</a>
+												)
+											}
+											return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
+										},
+										code: ({ className, children, ...props }) => {
+											const match = /language-(\w+)/.exec(className || '')
+											const lang = match ? match[1] : null
+											if (lang) {
+												return (
+													<div className="code-block-wrapper">
+														<span className="code-block-lang">{lang}</span>
+														<code className={className} {...props}>{children}</code>
+													</div>
+												)
+											}
+											return <code className={className} {...props}>{children}</code>
+										},
+										blockquote: ({ children, ...props }) => {
+											// Detect GitHub-style callouts: check if any text starts with [!TYPE]
+											const extractAllText = (node: unknown): string => {
+												if (typeof node === 'string') return node
+												if (typeof node === 'number') return String(node)
+												if (Array.isArray(node)) return node.map(extractAllText).join('')
+												if (node && typeof node === 'object' && 'props' in node)
+													return extractAllText((node as { props: Record<string, unknown> }).props.children)
+												return ''
+											}
+											const full_text = extractAllText(children)
+											const callout_match = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i.exec(full_text.trim())
+
+											if (callout_match) {
+												const type = callout_match[1].toUpperCase()
+												const marker_re = /^\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i
+												let stripped = false
+
+												// Recursively strip [!TYPE] from the first text-bearing node
+												const stripMarker = (node: React.ReactNode): React.ReactNode => {
+													if (stripped) return node
+													if (typeof node === 'string') {
+														const replaced = node.replace(marker_re, '')
+														if (replaced !== node) stripped = true
+														return replaced.trim() ? replaced : null
+													}
+													if (Array.isArray(node)) {
+														return (node as React.ReactNode[])
+															.map(stripMarker)
+															.filter((c): c is NonNullable<typeof c> => c !== null)
+													}
+													if (node && typeof node === 'object' && 'props' in node) {
+														const el = node as React.ReactElement & { props: { children?: React.ReactNode } }
+														if (el.props.children !== undefined) {
+															const new_children = stripMarker(el.props.children)
+															if (new_children !== el.props.children) {
+																return { ...el, props: { ...el.props, children: new_children } } as React.ReactNode
+															}
+														}
+													}
+													return node
+												}
+
+												const body = Children.map(children, (child) => stripMarker(child))?.filter((c): c is NonNullable<typeof c> => c !== null)
+
+												return (
+													<div className={`callout callout-${type.toLowerCase()}`}>
+														<span className="callout-label">{type}</span>
+														<div className="callout-body">{body}</div>
+													</div>
+												)
+											}
+											return <blockquote {...props}>{children}</blockquote>
+										},
+									}}
+								>
+									{previewContent}
+								</ReactMarkdown>
+								{backlinks.length > 0 && (
+									<div className="backlinks-section">
+										<button
+											className="backlinks-toggle"
+											onClick={() => setShowBacklinks((v) => !v)}
+										>
+											{showBacklinks ? '▾' : '▸'} {backlinks.length} Backlink{backlinks.length !== 1 ? 's' : ''}
+										</button>
+										{showBacklinks && (
+											<ul className="backlinks-list">
+												{backlinks.map((entry) => (
+													<li key={entry.link.id} className="backlink-item">
+														<button
+															className="backlink-title"
+															onClick={(event) => void onOpenNoteFromChat(entry.source.id, event.metaKey || event.ctrlKey)}
+														>
+															{deriveNoteTitle(entry.source.content)}
+														</button>
+														<span className="backlink-label">{entry.link.label ?? entry.link.rawTarget}</span>
+													</li>
+												))}
+											</ul>
+										)}
+									</div>
+								)}
+								{relatedNotes.length > 0 && (
+									<div className="related-section">
+										<button
+											className="backlinks-toggle"
+											onClick={() => setShowRelatedPreview((v) => !v)}
+										>
+											{showRelatedPreview ? '▾' : '▸'} {relatedNotes.length} Related Note{relatedNotes.length !== 1 ? 's' : ''}
+										</button>
+										{showRelatedPreview && (
+											<ul className="backlinks-list">
+												{relatedNotes.map((entry) => (
+													<li key={entry.note.id} className="backlink-item">
+														<button
+															className="backlink-title"
+															onClick={(event) => void onOpenNoteFromChat(entry.note.id, event.metaKey || event.ctrlKey)}
+														>
+															{deriveNoteTitle(entry.note.content)}
+														</button>
+														<span className="backlink-label">{entry.reason}</span>
+													</li>
+												))}
+											</ul>
+										)}
+									</div>
+								)}
 							</article>
 						)}
 					</>
@@ -838,19 +1053,19 @@ export function EditorPane(props: EditorPaneProps) {
 						setFindReplaceStatus('')
 						setShowFindReplace(true)
 					}} title="Find and Replace"><SearchIcon /></button>
-					<div className="toolbar-menu toolbar-menu-footer" ref={exportMenuRef}>
-						<button className={`icon-button ${showExportMenu ? 'chip-active' : ''}`} onClick={() => setShowExportMenu((value) => !value)} title="Export Note"><ExportIcon /></button>
-						{showExportMenu && (
-							<div className="editor-export-menu">
-								<button onClick={() => void exportNote('md')}>.md</button>
-								<button onClick={() => void exportNote('pdf')}>.pdf</button>
-								<button onClick={() => void exportNote('doc')}>.doc</button>
-							</div>
-						)}
-					</div>
+					<button className="icon-button" onClick={() => setShowPublish(true)} title="Export / Publish Note"><UploadIcon /></button>
+					<button className="icon-button" onClick={onShowRelatedNotes} title="Related Notes"><CirclesRelationIcon /></button>
 					<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
 					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
+					<button className="icon-button" onClick={async () => {
+						if (!note) return
+						try {
+							const edits = await window.strata.ai.listEdits(note.id)
+							setAiEdits(edits)
+							setShowAiHistory(true)
+						} catch { setAiEdits([]); setShowAiHistory(true) }
+					}} title="AI Edit History"><FileTextAiIcon /></button>
 				</div>
 			</footer>
 			{showFindReplace && (
@@ -889,6 +1104,45 @@ export function EditorPane(props: EditorPaneProps) {
 				</div>
 			)}
 			<TagsEditor open={showTagsEditor} currentTags={note.tags} existingTags={existingTags} onClose={() => setShowTagsEditor(false)} onApply={onSetTags} />
+			<PublishModal
+				open={showPublish}
+				noteTitle={deriveNoteTitle(content)}
+				noteContent={content}
+				onClose={() => setShowPublish(false)}
+			/>
+			{showAiHistory && (
+				<div className="modal-overlay" onClick={() => setShowAiHistory(false)}>
+					<div className="modal-card related-notes-modal" onClick={(event) => event.stopPropagation()}>
+						<h3 className="related-notes-heading">AI Edit History</h3>
+						<button className="icon-button modal-close-button" onClick={() => setShowAiHistory(false)} aria-label="Close"><CloseIcon /></button>
+						<div className="related-notes-body">
+							{aiEdits.length === 0 && <p className="related-notes-empty">No AI edits recorded for this note.</p>}
+							{aiEdits.map((edit) => (
+								<div key={edit.id} className="related-note-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+									<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+										<span style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase' }}>{edit.action} • {new Date(edit.createdAt).toLocaleString()}</span>
+										{!edit.revertedAt && (
+											<button className="ghost-button" style={{ fontSize: 10, padding: '2px 8px' }} onClick={async () => {
+												const ok = await window.strata.ai.revertEdit(edit.id)
+												if (ok) {
+													setAiEdits((prev) => prev.map((e) => e.id === edit.id ? { ...e, revertedAt: new Date().toISOString() } : e))
+												}
+											}}>Revert</button>
+										)}
+										{edit.revertedAt && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Reverted</span>}
+									</div>
+									{edit.beforeContent !== null && edit.afterContent !== null && (
+										<div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+											{edit.beforeContent !== edit.afterContent ? 'Content changed.' : 'Content unchanged.'}
+										</div>
+									)}
+									{edit.promptExcerpt && <div style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Prompt: {edit.promptExcerpt}</div>}
+								</div>
+							))}
+						</div>
+					</div>
+				</div>
+			)}
 		</section>
 	)
 }

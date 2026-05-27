@@ -285,7 +285,7 @@ const parse_tool_args = (raw: string): Record<string, unknown> => {
 	}
 }
 
-const execute_tool_call = (db: StrataDatabase, tool_name: string, raw_args: string): ToolExecutionResult => {
+const execute_tool_call = (db: StrataDatabase, tool_name: string, raw_args: string, ctx?: { threadId?: string; messageId?: string; model?: string }): ToolExecutionResult => {
 	const args = parse_tool_args(raw_args)
 	const normalize_tags = (value: unknown): string[] => {
 		if (!Array.isArray(value)) return []
@@ -326,6 +326,10 @@ const execute_tool_call = (db: StrataDatabase, tool_name: string, raw_args: stri
 	}
 
 	if ('create_note' === tool_name) {
+		const settings = db.getSettings()
+		if ('read_only' === settings.aiEditMode) {
+			return { output: JSON.stringify({ error: 'AI note editing is disabled (aiEditMode: read_only)' }), notesChanged: false }
+		}
 		const created = db.createNote()
 		const patch: Record<string, unknown> = {}
 		if ('string' === typeof args.content) patch.content = args.content
@@ -334,13 +338,31 @@ const execute_tool_call = (db: StrataDatabase, tool_name: string, raw_args: stri
 		const tags = normalize_tags(args.tags)
 		if (tags.length) patch.tags = tags
 		const updated = Object.keys(patch).length ? db.updateNote(created.id, patch) : created
+		const final_note = updated ?? created
+
+		// Record AI edit
+		db.recordAiEdit({
+			noteId: final_note.id,
+			threadId: ctx?.threadId ?? null,
+			messageId: ctx?.messageId ?? null,
+			action: 'create',
+			afterContent: final_note.content,
+			afterTags: final_note.tags,
+			model: ctx?.model ?? null,
+			promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
+		})
+
 		return {
-			output: JSON.stringify({ note: updated ?? created }),
+			output: JSON.stringify({ note: final_note }),
 			notesChanged: true,
 		}
 	}
 
 	if ('update_note' === tool_name) {
+		const settings = db.getSettings()
+		if ('read_only' === settings.aiEditMode) {
+			return { output: JSON.stringify({ error: 'AI note editing is disabled (aiEditMode: read_only)' }), notesChanged: false }
+		}
 		const note_id = 'string' === typeof args.note_id ? args.note_id : ''
 		if (!note_id) return { output: JSON.stringify({ error: 'note_id is required' }), notesChanged: false }
 		const current = db.aiGetNoteById(note_id)
@@ -361,7 +383,28 @@ const execute_tool_call = (db: StrataDatabase, tool_name: string, raw_args: stri
 			return { output: JSON.stringify({ note: current, unchanged: true }), notesChanged: false }
 		}
 
+		// Record before state
+		const before_content = current.content
+		const before_tags = current.tags
+
 		const updated = db.updateNote(note_id, patch)
+
+		// Record AI edit
+		if (updated) {
+			db.recordAiEdit({
+				noteId: note_id,
+				threadId: ctx?.threadId ?? null,
+				messageId: ctx?.messageId ?? null,
+				action: 'update',
+				beforeContent: before_content,
+				afterContent: updated.content,
+				beforeTags: before_tags,
+				afterTags: updated.tags,
+				model: ctx?.model ?? null,
+				promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
+			})
+		}
+
 		return {
 			output: JSON.stringify({ note: updated }),
 			notesChanged: Boolean(updated),
@@ -485,7 +528,7 @@ const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise<AiTurn
 		input_items.push(...output_items)
 
 		for (const tool_call of tool_calls) {
-			const tool_execution = execute_tool_call(db, tool_call.name || '', tool_call.arguments || '{}')
+			const tool_execution = execute_tool_call(db, tool_call.name || '', tool_call.arguments || '{}', { threadId: thread.id, model })
 			if (tool_execution.notesChanged) notes_changed = true
 			input_items.push({
 				type: 'function_call_output',
@@ -591,5 +634,17 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 		return {
 			text: sanitize_transcription_text(extract_transcription_text(parsed)),
 		}
+	})
+
+	ipcMain.handle(IPC_CHANNELS.aiEditsList, (_event, payload) => {
+		const schema = z.object({ noteId: z.string().uuid() })
+		const { noteId } = schema.parse(payload)
+		return db.listAiEdits(noteId)
+	})
+
+	ipcMain.handle(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
+		const schema = z.object({ editId: z.string().uuid() })
+		const { editId } = schema.parse(payload)
+		return db.revertAiEdit(editId)
 	})
 }

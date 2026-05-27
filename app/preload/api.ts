@@ -1,4 +1,4 @@
-import type { AiChatResponse, AiMessage, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
+import type { AiChatResponse, AiMessage, AiNoteEdit, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
 
 export interface StrataApi {
 	notes: {
@@ -33,6 +33,21 @@ export interface StrataApi {
 		sendMessage: (payload: { threadId?: string; message: string }) => Promise<AiChatResponse>
 		searchChats: (query: string) => Promise<AiSearchResult[]>
 		transcribeAudio: (payload: { base64Audio: string; mimeType: string; prompt?: string; language?: string }) => Promise<AiTranscriptionResult>
+		listEdits: (noteId: string) => Promise<AiNoteEdit[]>
+		revertEdit: (editId: string) => Promise<boolean>
+	}
+	links: {
+		backlinks: (note_id: string) => Promise<Array<{ link: NoteLink; source: Note }>>
+		resolveTarget: (raw_target: string) => Promise<Note | null>
+		createMissingNote: (title: string) => Promise<Note | null>
+		relatedNotes: (note_id: string) => Promise<Array<{ note: Note; reason: string; score: number }>>
+	}
+	publish: {
+		selectFolder: () => Promise<string | null>
+		htmlFile: (payload: { destination: string; title: string; html: string }) => Promise<{ success: boolean; path?: string; error?: string }>
+	}
+	shell: {
+		run: (payload: { command: string; cwd?: string }) => Promise<{ success: boolean; stdout: string; stderr: string }>
 	}
 	onCommand: (listener: (command: string) => void) => () => void
 	onNotesChanged: (listener: () => void) => () => void

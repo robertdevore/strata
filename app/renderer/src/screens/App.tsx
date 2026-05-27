@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
+import { TabBar } from '@renderer/src/components/TabBar'
 import { ConfirmModal } from '@renderer/src/components/ConfirmModal'
 import { SettingsModal } from '@renderer/src/components/SettingsModal'
 import { CommandPalette, type PaletteMode } from '@renderer/src/components/CommandPalette'
+import { RelatedNotesModal } from '@renderer/src/components/RelatedNotesModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
@@ -25,10 +27,12 @@ export function App() {
 	const load = useAppStore((state) => state.load)
 	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 	const [undoDelete, setUndoDelete] = useState<{ id: string; title: string } | null>(null)
-	const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-	const [sidebarWidth, setSidebarWidth] = useState(320)
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+	const [sidebarWidth, setSidebarWidth] = useState(270)
 	const [undoTimeoutId, setUndoTimeoutId] = useState<number | null>(null)
 	const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
+	const [showRelatedNotes, setShowRelatedNotes] = useState(false)
+	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
 	const clearUndoToast = useCallback(() => {
 		if (null !== undoTimeoutId) {
 			window.clearTimeout(undoTimeoutId)
@@ -40,6 +44,20 @@ export function App() {
 	useEffect(() => {
 		void load()
 	}, [load])
+
+	useEffect(() => {
+		// After initial load, start with a fresh blank note — but only if the
+		// newest note isn't already an empty untitled one (avoid duplicates).
+		if (store.notes.length > 0 && !store.selectedNoteId && store.openTabs.length === 0) {
+			const newest = store.notes[0]
+			const is_empty_untitled = !newest.content.trim() || '# Untitled\n\n' === newest.content
+			if (!is_empty_untitled) {
+				void store.createNote()
+			} else {
+				store.openNoteInTab(newest.id)
+			}
+		}
+	}, [store.notes, store.selectedNoteId, store.openTabs])
 
 	useEffect(() => {
 		document.body.classList.toggle('platform-mac', isMac)
@@ -76,7 +94,7 @@ export function App() {
 		clearUndoToast()
 	}, [clearUndoToast, store, undoDelete])
 
-	const openNoteFromChat = useCallback(async (note_id: string) => {
+	const openNoteFromChat = useCallback(async (note_id: string, new_tab = false) => {
 		const target_note = store.notes.find((candidate) => candidate.id === note_id)
 		if (!target_note) return
 
@@ -84,7 +102,11 @@ export function App() {
 			await store.flushDraft(store.selectedNoteId)
 		}
 
-		store.selectNote(note_id)
+		if (new_tab) {
+			store.openNoteInTab(note_id)
+		} else {
+			store.selectNote(note_id)
+		}
 	}, [store])
 
 	const runCommand = useCallback(async (command: UiCommand) => {
@@ -156,6 +178,27 @@ export function App() {
 			if ('k' === key && !event.shiftKey) {
 					event.preventDefault()
 					setPaletteMode('commands')
+					return
+			}			if ('r' === key && !event.shiftKey) {
+				event.preventDefault()
+				if (store.selectedNoteId) {
+					window.strata.links.relatedNotes(store.selectedNoteId).then(setRelatedNotes).catch(() => setRelatedNotes([]))
+					setShowRelatedNotes(true)
+				}
+				return
+			}
+			if ('b' === key && event.shiftKey) {
+				event.preventDefault()
+				setSidebarCollapsed((v) => !v)
+				return
+			}			if ('[' === event.key) {
+					event.preventDefault()
+					store.navigateBack()
+					return
+			}
+			if (']' === event.key) {
+					event.preventDefault()
+					store.navigateForward()
 					return
 			}
 			if ('n' === key) {
@@ -239,7 +282,7 @@ export function App() {
 					onSearchChange={store.setSearchQuery}
 					onSelect={async (id) => {
 						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId)
-						store.selectNote(id)
+						store.openNoteInTab(id)
 					}}
 					onNewNote={() => void store.createNote()}
 					onOpenSettings={() => store.setShowSettings(true)}
@@ -256,7 +299,16 @@ export function App() {
 					theme={store.settings.theme}
 				/>
 				{!sidebarCollapsed && <div className="panel-resizer panel-resizer-sidebar" onMouseDown={startSidebarResize} role="separator" aria-orientation="vertical" aria-label="Resize sidebar" />}
-				<EditorPane
+				<div className={`editor-column${store.openTabs.length > 1 ? ' has-tabs' : ''}`}>
+					<TabBar
+						tabs={store.openTabs}
+						activeTabId={store.selectedNoteId}
+						notes={store.notes}
+						drafts={store.drafts}
+						onSelectTab={(id) => store.activateTab(id)}
+						onCloseTab={(id) => store.closeTab(id)}
+					/>
+					<EditorPane
 					note={store.selectedNote()}
 					notes={store.notes}
 					openAiModel={store.settings.openAiModel}
@@ -271,7 +323,14 @@ export function App() {
 					onDelete={(id) => void onDelete(id)}
 					onSetTags={(tags) => void store.setTagsForSelected(tags)}
 					onOpenNoteFromChat={openNoteFromChat}
+					onShowRelatedNotes={() => {
+						if (store.selectedNoteId) {
+							window.strata.links.relatedNotes(store.selectedNoteId).then(setRelatedNotes).catch(() => setRelatedNotes([]))
+							setShowRelatedNotes(true)
+						}
+					}}
 				/>
+				</div>
 			</div>
 			<SettingsModal
 				open={store.showSettings}
@@ -316,7 +375,7 @@ export function App() {
 					onClose={() => setPaletteMode(null)}
 					onOpenNote={async (id) => {
 						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId)
-						store.selectNote(id)
+						store.openNoteInTab(id)
 					}}
 					onRunCommand={(cmd) => void runCommand(cmd)}
 					onTogglePreview={() => window.dispatchEvent(new CustomEvent('strata:toggle-preview'))}
@@ -324,6 +383,15 @@ export function App() {
 					onOpenSettings={() => store.setShowSettings(true)}
 				/>
 			)}
+			<RelatedNotesModal
+				open={showRelatedNotes}
+				relatedNotes={relatedNotes}
+				onClose={() => setShowRelatedNotes(false)}
+				onOpenNote={(note_id, new_tab) => {
+					void openNoteFromChat(note_id, new_tab)
+					setShowRelatedNotes(false)
+				}}
+			/>
 		</div>
 	)
 }

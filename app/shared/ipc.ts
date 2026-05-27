@@ -20,4 +20,13 @@ export const IPC_CHANNELS = {
 	aiSendMessage: 'ai:send',
 	aiSearchChats: 'ai:search',
 	aiTranscribeAudio: 'ai:transcribe',
+	linksBacklinks: 'links:backlinks',
+	linksResolveTarget: 'links:resolve-target',
+	linksCreateMissingNote: 'links:create-missing',
+	linksRelatedNotes: 'links:related-notes',
+	aiEditsList: 'ai:edits:list',
+	aiEditsRevert: 'ai:edits:revert',
+	dialogSelectFolder: 'dialog:select-folder',
+	publishHtmlFile: 'publish:html-file',
+	shellRun: 'shell:run',
 } as const

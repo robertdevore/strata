@@ -8,6 +8,8 @@ import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerExportHandlers } from './ipc/exportHandlers'
 import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerBackupHandlers } from './ipc/backupHandlers'
+import { registerLinksHandlers } from './ipc/linksHandlers'
+import { registerPublishHandlers } from './ipc/publishHandlers'
 import { startNotesApiServer } from './api/notesApiServer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -200,6 +202,8 @@ app.whenReady().then(async () => {
 	registerExportHandlers()
 	registerAiHandlers(db, () => main_window?.webContents.send('notes:changed'))
 	registerBackupHandlers(backup_manager)
+	registerLinksHandlers(db)
+	registerPublishHandlers()
 	backup_manager.start()
 
 	try {

@@ -20,12 +20,20 @@ interface AppState {
 	showFiltersPanel: boolean
 	saveState: SaveState
 	lastSavedAt: string | null
+	openTabs: string[]
+	navigationBackStack: string[]
+	navigationForwardStack: string[]
 	load: () => Promise<void>
 	refreshTags: () => Promise<void>
 	setSearchQuery: (value: string) => void
 	setActiveFilter: (value: ActiveFilter) => void
 	setSelectedTag: (value: string | null) => void
 	selectNote: (id: string | null) => void
+	openNoteInTab: (id: string) => void
+	closeTab: (id: string) => void
+	activateTab: (id: string) => void
+	navigateBack: () => void
+	navigateForward: () => void
 	createNote: () => Promise<void>
 	setDraft: (id: string, content: string) => void
 	flushDraft: (id: string) => Promise<void>
@@ -51,6 +59,7 @@ const defaultSettings: Settings = {
 	openAiModel: 'gpt-4o',
 	autoBackupFrequency: '24h',
 	lastAutoBackupAt: null,
+	aiEditMode: 'confirm',
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -66,17 +75,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 	showFiltersPanel: false,
 	saveState: 'idle',
 	lastSavedAt: null,
+	openTabs: [],
+	navigationBackStack: [],
+	navigationForwardStack: [],
 
 	async load() {
 		const [notes, tags, settings] = await Promise.all([notesService.list(), notesService.listTags(), settingsService.get()])
 		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
-		const sorted = applyFiltersAndSort(notes, {
-			activeFilter,
-			selectedTag: null,
-			searchQuery: '',
-			sortMode: settings.sortMode,
-		})
-		set({ notes, tags, settings, activeFilter, selectedNoteId: sorted[0]?.id ?? null })
+		set({ notes, tags, settings, activeFilter, selectedNoteId: null, openTabs: [] })
 	},
 
 	async refreshTags() {
@@ -99,11 +105,67 @@ export const useAppStore = create<AppState>((set, get) => ({
 		set({ selectedNoteId })
 	},
 
+	openNoteInTab(id) {
+		const state = get()
+		if (state.selectedNoteId && state.selectedNoteId !== id) {
+			const back = [...state.navigationBackStack, state.selectedNoteId]
+			if (back.length > 80) back.shift()
+			set({ navigationBackStack: back, navigationForwardStack: [] })
+		}
+		const already = state.openTabs.includes(id)
+		const tabs = already ? state.openTabs : [...state.openTabs, id]
+		set({ openTabs: tabs, selectedNoteId: id })
+	},
+
+	closeTab(id) {
+		const state = get()
+		const tabs = state.openTabs.filter((t) => t !== id)
+		const drafts = { ...state.drafts }
+		delete drafts[id]
+		let next = state.selectedNoteId
+		if (next === id) {
+			const idx = state.openTabs.indexOf(id)
+			next = tabs[Math.min(idx, tabs.length - 1)] ?? null
+		}
+		set({ openTabs: tabs, selectedNoteId: next, drafts })
+	},
+
+	activateTab(id) {
+		const state = get()
+		if (state.selectedNoteId && state.selectedNoteId !== id) {
+			const back = [...state.navigationBackStack, state.selectedNoteId]
+			if (back.length > 80) back.shift()
+			set({ selectedNoteId: id, navigationBackStack: back, navigationForwardStack: [] })
+		} else {
+			set({ selectedNoteId: id })
+		}
+	},
+
+	navigateBack() {
+		const state = get()
+		const back = [...state.navigationBackStack]
+		if (0 === back.length) return
+		const prev = back.pop()!
+		const forward = [...state.navigationForwardStack, state.selectedNoteId!]
+		if (forward.length > 80) forward.shift()
+		set({ selectedNoteId: prev, navigationBackStack: back, navigationForwardStack: forward })
+	},
+
+	navigateForward() {
+		const state = get()
+		const forward = [...state.navigationForwardStack]
+		if (0 === forward.length) return
+		const next = forward.pop()!
+		const back = [...state.navigationBackStack, state.selectedNoteId!]
+		if (back.length > 80) back.shift()
+		set({ selectedNoteId: next, navigationBackStack: back, navigationForwardStack: forward })
+	},
+
 	async createNote() {
 		const note = await notesService.create()
 		set((state) => ({
 			notes: [note, ...state.notes],
-			selectedNoteId: note.id,
+			selectedNoteId: note.id, openTabs: [...state.openTabs, note.id],
 			drafts: { ...state.drafts, [note.id]: note.content },
 			saveState: 'saved',
 			lastSavedAt: note.updatedAt,
@@ -163,7 +225,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 			return {
 				notes,
 				drafts,
-				selectedNoteId: notes[0]?.id ?? null,
+				selectedNoteId: notes[0]?.id ?? null, openTabs: state.openTabs.filter((t) => t !== id), navigationBackStack: state.navigationBackStack.filter((t) => t !== id), navigationForwardStack: state.navigationForwardStack.filter((t) => t !== id),
 			}
 		})
 		await get().refreshTags()

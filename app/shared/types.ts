@@ -6,6 +6,8 @@ export type SortMode = 'updated_desc' | 'created_desc' | 'title_asc'
 
 export type AutoBackupFrequency = 'off' | '12h' | '24h' | '168h'
 
+export type AiEditMode = 'read_only' | 'confirm' | 'auto_apply'
+
 export interface Note {
 	id: string
 	content: string
@@ -34,6 +36,7 @@ export interface Settings {
 	openAiModel: string
 	autoBackupFrequency: AutoBackupFrequency
 	lastAutoBackupAt: string | null
+	aiEditMode: AiEditMode
 }
 
 export interface NoteUpdatePatch {
@@ -76,6 +79,33 @@ export interface AiChatResponse {
 export interface AiSearchResult {
 	message: AiMessage
 	thread: AiThread
+}
+
+export interface NoteLink {
+	id: string
+	sourceNoteId: string
+	targetNoteId: string | null
+	rawTarget: string
+	label: string | null
+	heading: string | null
+	linkType: 'wiki'
+	createdAt: string
+}
+
+export interface AiNoteEdit {
+	id: string
+	noteId: string
+	threadId: string | null
+	messageId: string | null
+	action: 'create' | 'update'
+	beforeContent: string | null
+	afterContent: string | null
+	beforeTags: string[] | null
+	afterTags: string[] | null
+	model: string | null
+	promptExcerpt: string | null
+	createdAt: string
+	revertedAt: string | null
 }
 
 export interface AiTranscriptionResult {

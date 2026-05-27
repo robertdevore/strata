@@ -57,4 +57,50 @@ export const migrations: Migration[] = [
 			ALTER TABLE ai_threads ADD COLUMN model TEXT NULL;
 		`,
 	},
+	{
+		version: 4,
+		description: 'note wiki links',
+		upSql: `
+			CREATE TABLE IF NOT EXISTS note_links (
+				id TEXT PRIMARY KEY,
+				source_note_id TEXT NOT NULL,
+				target_note_id TEXT,
+				raw_target TEXT NOT NULL,
+				label TEXT,
+				heading TEXT,
+				link_type TEXT NOT NULL DEFAULT 'wiki',
+				created_at TEXT NOT NULL,
+				FOREIGN KEY (source_note_id) REFERENCES notes (id) ON DELETE CASCADE
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_note_links_source ON note_links (source_note_id);
+			CREATE INDEX IF NOT EXISTS idx_note_links_target ON note_links (target_note_id);
+			CREATE INDEX IF NOT EXISTS idx_note_links_raw_target ON note_links (raw_target);
+		`,
+	},
+	{
+		version: 5,
+		description: 'ai edit history',
+		upSql: `
+			CREATE TABLE IF NOT EXISTS ai_note_edits (
+				id TEXT PRIMARY KEY,
+				note_id TEXT NOT NULL,
+				thread_id TEXT,
+				message_id TEXT,
+				action TEXT NOT NULL,
+				before_content TEXT,
+				after_content TEXT,
+				before_tags TEXT,
+				after_tags TEXT,
+				model TEXT,
+				prompt_excerpt TEXT,
+				created_at TEXT NOT NULL,
+				reverted_at TEXT,
+				FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_ai_edits_note ON ai_note_edits (note_id, created_at DESC);
+			CREATE INDEX IF NOT EXISTS idx_ai_edits_thread ON ai_note_edits (thread_id);
+		`,
+	},
 ]

@@ -264,3 +264,50 @@ export function CircleChevronRightIcon(props: IconProps) {
 		</BaseIcon>
 	)
 }
+
+export function CirclesRelationIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M9.183 6.117a6 6 0 1 0 4.511 3.986" />
+			<path d="M14.813 17.883a6 6 0 1 0 -4.496 -3.954" />
+		</BaseIcon>
+	)
+}
+
+export function PlusIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M12 5l0 14" />
+			<path d="M5 12l14 0" />
+		</BaseIcon>
+	)
+}
+
+export function UploadIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+			<path d="M7 9l5 -5l5 5" />
+			<path d="M12 4l0 12" />
+		</BaseIcon>
+	)
+}
+
+export function FileTextAiIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M14 3v4a1 1 0 0 0 1 1h4" />
+			<path d="M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5" />
+			<path d="M9 9h1" />
+			<path d="M9 13h2.5" />
+			<path d="M9 17h1" />
+			<path d="M14 21v-4a2 2 0 1 1 4 0v4" />
+			<path d="M14 19h4" />
+			<path d="M21 15v6" />
+		</BaseIcon>
+	)
+}

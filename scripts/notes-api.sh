@@ -14,6 +14,12 @@ Usage:
 	./scripts/notes-api.sh create [json_body]
 	./scripts/notes-api.sh update <note_id> <json_body>
 	./scripts/notes-api.sh delete <note_id>
+	./scripts/notes-api.sh tags
+	./scripts/notes-api.sh search <query>
+	./scripts/notes-api.sh backlinks <note_id>
+	./scripts/notes-api.sh related <note_id>
+	./scripts/notes-api.sh ai-edits <note_id>
+	./scripts/notes-api.sh revert-edit <edit_id>
 
 Environment:
 	STRATA_API_BASE_URL   API base URL (default: http://127.0.0.1:3939)
@@ -85,6 +91,55 @@ case "$command" in
 		fi
 		note_id="$1"
 		curl -sS -X DELETE "${auth_header_args[@]}" "$BASE_URL/notes/$note_id"
+		;;
+
+	tags)
+		curl -sS "${auth_header_args[@]}" "$BASE_URL/tags"
+		;;
+
+	search)
+		if [[ $# -ne 1 ]]; then
+			usage
+			exit 1
+		fi
+		encoded_query=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))")
+		curl -sS "${auth_header_args[@]}" "$BASE_URL/search?q=$encoded_query"
+		;;
+
+	backlinks)
+		if [[ $# -ne 1 ]]; then
+			usage
+			exit 1
+		fi
+		note_id="$1"
+		curl -sS "${auth_header_args[@]}" "$BASE_URL/notes/$note_id/backlinks"
+		;;
+
+	related)
+		if [[ $# -ne 1 ]]; then
+			usage
+			exit 1
+		fi
+		note_id="$1"
+		curl -sS "${auth_header_args[@]}" "$BASE_URL/notes/$note_id/related"
+		;;
+
+	ai-edits)
+		if [[ $# -ne 1 ]]; then
+			usage
+			exit 1
+		fi
+		note_id="$1"
+		curl -sS "${auth_header_args[@]}" "$BASE_URL/notes/$note_id/ai-edits"
+		;;
+
+	revert-edit)
+		if [[ $# -ne 1 ]]; then
+			usage
+			exit 1
+		fi
+		edit_id="$1"
+		curl -sS -X POST "${auth_header_args[@]}" "$BASE_URL/ai-edits/$edit_id/revert"
 		;;
 
 	*)

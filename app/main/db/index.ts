@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
-import type { AiMessage, AiThread, AiThreadSummary, Note, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
+import type { AiMessage, AiNoteEdit, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
 import { migrations } from './migrations/index'
 
 interface DbNoteRow {
@@ -32,6 +32,33 @@ interface DbAiMessageRow {
 	created_at: string
 }
 
+interface DbNoteLinkRow {
+	id: string
+	source_note_id: string
+	target_note_id: string | null
+	raw_target: string
+	label: string | null
+	heading: string | null
+	link_type: 'wiki'
+	created_at: string
+}
+
+interface DbAiNoteEditRow {
+	id: string
+	note_id: string
+	thread_id: string | null
+	message_id: string | null
+	action: 'create' | 'update'
+	before_content: string | null
+	after_content: string | null
+	before_tags: string | null
+	after_tags: string | null
+	model: string | null
+	prompt_excerpt: string | null
+	created_at: string
+	reverted_at: string | null
+}
+
 const DEFAULT_SETTINGS: Settings = {
 	theme: 'dark',
 	defaultView: 'all',
@@ -41,6 +68,7 @@ const DEFAULT_SETTINGS: Settings = {
 	openAiModel: 'gpt-4o',
 	autoBackupFrequency: '24h',
 	lastAutoBackupAt: null,
+	aiEditMode: 'confirm',
 }
 
 export class StrataDatabase {
@@ -159,7 +187,7 @@ export class StrataDatabase {
 			.prepare(
 				'INSERT INTO notes (id, content, created_at, updated_at, starred, archived, tags, deleted_at) VALUES (?, ?, ?, ?, 0, 0, ?, NULL)',
 			)
-			.run(id, '# Untitled\n\n', now, now, JSON.stringify([]))
+			.run(id, '', now, now, JSON.stringify([]))
 		const note = this.getNote(id)
 		if (!note) throw new Error('Failed to create note')
 		return note
@@ -187,7 +215,29 @@ export class StrataDatabase {
 			)
 			.run(next_content, next_starred ? 1 : 0, next_archived ? 1 : 0, JSON.stringify(next_tags), next_updated, id)
 
+		// Rebuild wiki links when content changes
+		if (typeof patch.content === 'string' && patch.content !== current.content) {
+			this.rebuildLinksForContent(id, next_content)
+		}
+
 		return this.getNote(id)
+	}
+
+	/** Extract wiki links from content and rebuild the link index for a note. */
+	private rebuildLinksForContent(note_id: string, content: string): void {
+		const link_re = /(?<!!)\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g
+		const links: Array<{ rawTarget: string; label: string | null; heading: string | null }> = []
+		let match: RegExpExecArray | null
+		while ((match = link_re.exec(content)) !== null) {
+			const rawTarget = (match[1] ?? '').trim()
+			if (!rawTarget) continue
+			links.push({
+				rawTarget,
+				label: match[3]?.trim() ?? null,
+				heading: match[2]?.trim() ?? null,
+			})
+		}
+		this.rebuildLinks(note_id, links)
 	}
 
 	deleteNote(id: string): boolean {
@@ -361,6 +411,102 @@ export class StrataDatabase {
 		return this.mapNote(row)
 	}
 
+	/** Record an AI edit in the history table. */
+	recordAiEdit(edit: {
+		noteId: string
+		threadId?: string | null
+		messageId?: string | null
+		action: 'create' | 'update'
+		beforeContent?: string | null
+		afterContent?: string | null
+		beforeTags?: string[] | null
+		afterTags?: string[] | null
+		model?: string | null
+		promptExcerpt?: string | null
+	}): string {
+		const id = uuidv4()
+		const now = new Date().toISOString()
+		this.db.prepare(
+			`INSERT INTO ai_note_edits (id, note_id, thread_id, message_id, action, before_content, after_content, before_tags, after_tags, model, prompt_excerpt, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		).run(
+			id,
+			edit.noteId,
+			edit.threadId ?? null,
+			edit.messageId ?? null,
+			edit.action,
+			edit.beforeContent ?? null,
+			edit.afterContent ?? null,
+			edit.beforeTags ? JSON.stringify(edit.beforeTags) : null,
+			edit.afterTags ? JSON.stringify(edit.afterTags) : null,
+			edit.model ?? null,
+			edit.promptExcerpt ?? null,
+			now,
+		)
+		return id
+	}
+
+	/** Get the most recent AI edit for a note (non-reverted). */
+	getLatestAiEdit(note_id: string): AiNoteEdit | null {
+		const row = this.db
+			.prepare('SELECT * FROM ai_note_edits WHERE note_id = ? AND reverted_at IS NULL ORDER BY created_at DESC LIMIT 1')
+			.get(note_id) as DbAiNoteEditRow | undefined
+		if (!row) return null
+		return this.mapAiNoteEdit(row)
+	}
+
+	/** Mark an AI edit as reverted and restore the previous content/tags. */
+	revertAiEdit(edit_id: string): boolean {
+		const edit = this.db.prepare('SELECT * FROM ai_note_edits WHERE id = ? AND reverted_at IS NULL').get(edit_id) as DbAiNoteEditRow | undefined
+		if (!edit) return false
+
+		const note = this.getNote(edit.note_id)
+		if (!note) return false
+
+		const now = new Date().toISOString()
+
+		// Restore previous content and tags
+		if ('update' === edit.action && edit.before_content !== null) {
+			this.updateNote(edit.note_id, {
+				content: edit.before_content,
+				tags: edit.before_tags ? (JSON.parse(edit.before_tags) as string[]) : undefined,
+			})
+		} else if ('create' === edit.action) {
+			// Soft-delete the created note
+			this.deleteNote(edit.note_id)
+		}
+
+		// Mark edit as reverted
+		this.db.prepare('UPDATE ai_note_edits SET reverted_at = ? WHERE id = ?').run(now, edit_id)
+		return true
+	}
+
+	/** List recent AI edits for a note. */
+	listAiEdits(note_id: string, limit = 20): AiNoteEdit[] {
+		const rows = this.db
+			.prepare('SELECT * FROM ai_note_edits WHERE note_id = ? ORDER BY created_at DESC LIMIT ?')
+			.all(note_id, limit) as DbAiNoteEditRow[]
+		return rows.map((row) => this.mapAiNoteEdit(row))
+	}
+
+	private mapAiNoteEdit(row: DbAiNoteEditRow): AiNoteEdit {
+		return {
+			id: row.id,
+			noteId: row.note_id,
+			threadId: row.thread_id,
+			messageId: row.message_id,
+			action: row.action,
+			beforeContent: row.before_content,
+			afterContent: row.after_content,
+			beforeTags: row.before_tags ? (JSON.parse(row.before_tags) as string[]) : null,
+			afterTags: row.after_tags ? (JSON.parse(row.after_tags) as string[]) : null,
+			model: row.model,
+			promptExcerpt: row.prompt_excerpt,
+			createdAt: row.created_at,
+			revertedAt: row.reverted_at,
+		}
+	}
+
 	getSettings(): Settings {
 		const rows = this.db.prepare('SELECT key, value FROM settings').all() as Array<{ key: string; value: string }>
 		const merged = { ...DEFAULT_SETTINGS }
@@ -371,6 +517,111 @@ export class StrataDatabase {
 			}
 		}
 		return merged
+	}
+
+	private mapNoteLink(row: DbNoteLinkRow): NoteLink {
+		return {
+			id: row.id,
+			sourceNoteId: row.source_note_id,
+			targetNoteId: row.target_note_id,
+			rawTarget: row.raw_target,
+			label: row.label,
+			heading: row.heading,
+			linkType: row.link_type,
+			createdAt: row.created_at,
+		}
+	}
+
+	/** Rebuild all wiki links for a note. Call after content changes. */
+	rebuildLinks(source_note_id: string, links: Array<{ rawTarget: string; label: string | null; heading: string | null }>): void {
+		const tx = this.db.transaction(() => {
+			// Remove old links for this source
+			this.db.prepare('DELETE FROM note_links WHERE source_note_id = ?').run(source_note_id)
+
+			const insert = this.db.prepare(
+				'INSERT INTO note_links (id, source_note_id, target_note_id, raw_target, label, heading, link_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+			)
+			const now = new Date().toISOString()
+
+			for (const link of links) {
+				const target_note = this.resolveLinkTarget(link.rawTarget)
+				insert.run(
+					uuidv4(),
+					source_note_id,
+					target_note?.id ?? null,
+					link.rawTarget,
+					link.label,
+					link.heading,
+					'wiki',
+					now,
+				)
+			}
+		})
+		tx()
+	}
+
+	/** Find the best-matching note for a wiki link target. Returns most-recently-updated match. */
+	private resolveLinkTarget(raw_target: string): Note | null {
+		const normalized = raw_target.trim().toLowerCase().replace(/\s+/g, ' ')
+		// Find notes whose title (derived from first line) matches the target
+		const all_notes = this.listNotes({ includeDeleted: false })
+		const matches = all_notes.filter((note) => {
+			const title = this.deriveTitleFromContent(note.content)
+			return title.trim().toLowerCase().replace(/\s+/g, ' ') === normalized
+		})
+		if (matches.length === 0) return null
+		// Return most recently updated
+		matches.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+		return matches[0]
+	}
+
+	private deriveTitleFromContent(content: string): string {
+		const lines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+		if (lines.length === 0) return 'Untitled'
+		const heading = lines.find((line) => line.startsWith('# '))
+		if (heading) {
+			const normalized = heading.replace(/^#\s*/, '').trim()
+			return normalized || 'Untitled'
+		}
+		return lines[0].slice(0, 80)
+	}
+
+	/** Get all notes that link TO the given note (backlinks). */
+	getBacklinks(target_note_id: string): Array<{ link: NoteLink; source: Note }> {
+		const rows = this.db
+			.prepare('SELECT * FROM note_links WHERE target_note_id = ? ORDER BY created_at DESC')
+			.all(target_note_id) as DbNoteLinkRow[]
+
+		return rows
+			.map((row) => {
+				const source = this.getNote(row.source_note_id)
+				if (!source) return null
+				return { link: this.mapNoteLink(row), source }
+			})
+			.filter((entry): entry is { link: NoteLink; source: Note } => entry !== null)
+	}
+
+	/** Get the excerpt around a wiki link in a source note's content (for backlink previews). */
+	/** Get the excerpt around a wiki link in a source note's content (for backlink previews). */
+	getLinkExcerpt(source_note_id: string, raw_target: string, context_chars = 60): string | null {
+		const note = this.getNote(source_note_id)
+		if (!note) return null
+		const content = note.content
+		const pattern = new RegExp(`\\[\\[${raw_target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:#[^\\]|]+)?(?:\\|[^\\]]+)?\\]\\]`, 'i')
+		const match = pattern.exec(content)
+		if (!match) return null
+		const start = Math.max(0, match.index - context_chars)
+		const end = Math.min(content.length, match.index + match[0].length + context_chars)
+		let excerpt = content.slice(start, end)
+		if (start > 0) excerpt = '…' + excerpt
+		if (end < content.length) excerpt = excerpt + '…'
+		return excerpt
+	}
+
+	/** Get all note links as a flat index (for related-note computation). */
+	getAllLinks(): Array<{ sourceNoteId: string; targetNoteId: string | null; rawTarget: string }> {
+		const rows = this.db.prepare('SELECT source_note_id, target_note_id, raw_target FROM note_links ORDER BY created_at DESC').all() as Array<{ source_note_id: string; target_note_id: string | null; raw_target: string }>
+		return rows.map((r) => ({ sourceNoteId: r.source_note_id, targetNoteId: r.target_note_id, rawTarget: r.raw_target }))
 	}
 
 	setSettings(patch: Partial<Settings>): Settings {

@@ -97,6 +97,14 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 					</select>
 				</label>
 				<label>
+					AI Edit Mode
+					<select value={settings.aiEditMode ?? 'confirm'} onChange={(event) => onUpdate({ aiEditMode: event.target.value as Settings['aiEditMode'] })}>
+						<option value="read_only">Read Only — AI cannot edit notes</option>
+						<option value="confirm">Confirm — changes saved, revert available</option>
+						<option value="auto_apply">Auto Apply — AI edits freely (history kept)</option>
+					</select>
+				</label>
+				<label>
 					Auto Backup Frequency
 					<select value={settings.autoBackupFrequency} onChange={(event) => onUpdate({ autoBackupFrequency: event.target.value as Settings['autoBackupFrequency'] })}>
 						<option value="off">Off</option>

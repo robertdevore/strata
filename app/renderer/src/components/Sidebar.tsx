@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
 import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
-import { CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
+import { CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
 	notes: Note[]
@@ -42,7 +42,6 @@ const filters: ActiveFilter[] = ['all', 'starred', 'archived', 'untagged']
 export function Sidebar(props: SidebarProps) {
 	const [menu, setMenu] = useState<MenuState | null>(null)
 	const [visibleCount, setVisibleCount] = useState(50)
-	const searchRef = useRef<HTMLInputElement>(null)
 	const menuRef = useRef<HTMLDivElement>(null)
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const selectedIndex = useMemo(() => props.notes.findIndex((note) => note.id === props.selectedId), [props.notes, props.selectedId])
@@ -64,12 +63,6 @@ export function Sidebar(props: SidebarProps) {
 
 	const visibleNotes = props.notes.slice(0, visibleCount)
 	const hasMore = visibleCount < props.notes.length
-
-	useEffect(() => {
-		const focus = () => searchRef.current?.focus()
-		window.addEventListener('strata:focus-search', focus)
-		return () => window.removeEventListener('strata:focus-search', focus)
-	}, [])
 
 	useEffect(() => {
 		if (!menu) return
@@ -113,10 +106,7 @@ export function Sidebar(props: SidebarProps) {
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
 				</div>
-				{!props.sidebarCollapsed && (
-				<input ref={searchRef} className="search-input" placeholder={`Search ${props.notes.length} notes`} value={props.searchQuery} onChange={(event) => props.onSearchChange(event.target.value)} />
-				)}
-			{!props.sidebarCollapsed && props.showFiltersPanel && (
+				{!props.sidebarCollapsed && props.showFiltersPanel && (
 					<>
 						<div className="chip-row">
 							{filters.map((chip) => (
@@ -203,7 +193,7 @@ export function Sidebar(props: SidebarProps) {
 			)}
 			{!props.sidebarCollapsed && <div className="sidebar-bottom">
 				<div className="bottom-actions">
-					<button className="primary-button new-note-button" onClick={props.onNewNote}>New Note</button>
+					<button className="icon-button new-note-button" onClick={props.onNewNote} title="New Note"><PlusIcon /></button>
 					<button className="icon-button" onClick={props.onToggleFiltersPanel} title="Toggle Filters"><MenuIcon /></button>
 					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
 					<button className="icon-button" onClick={props.onOpenSettings} title="Settings"><SettingsIcon /></button>

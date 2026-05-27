@@ -252,6 +252,127 @@ Validation error shape:
 }
 ```
 
+### Tags
+
+`GET /tags`
+
+Returns all tags with counts.
+
+```bash
+curl http://127.0.0.1:3939/tags
+```
+
+Response:
+
+```json
+{
+  "tags": [
+    { "name": "demo", "count": 3 },
+    { "name": "features", "count": 1 }
+  ]
+}
+```
+
+---
+
+### Search Notes
+
+`GET /search?q=...&limit=25`
+
+Full-text search across note content and tags.
+
+| Param | Description | Default |
+|-------|-------------|---------|
+| `q` | Search query (required) | — |
+| `limit` | Max results (1-100) | 25 |
+
+```bash
+curl "http://127.0.0.1:3939/search?q=wiki+links&limit=5"
+```
+
+Response:
+
+```json
+{ "notes": [{ "id": "uuid", "content": "...", ... }] }
+```
+
+---
+
+### Backlinks
+
+`GET /notes/:id/backlinks`
+
+```bash
+curl http://127.0.0.1:3939/notes/<NOTE_ID>/backlinks
+```
+
+Response:
+
+```json
+{
+  "backlinks": [
+    {
+      "link": { "id": "link-id", "sourceNoteId": "uuid", "rawTarget": "My Note", "label": null },
+      "source": { "id": "uuid", "content": "# Source\n\n[[My Note]]", ... }
+    }
+  ]
+}
+```
+
+---
+
+### Related Notes
+
+`GET /notes/:id/related`
+
+```bash
+curl http://127.0.0.1:3939/notes/<NOTE_ID>/related
+```
+
+Response:
+
+```json
+{
+  "related": [
+    { "note": { "id": "uuid", ... }, "reason": "Links here, Shared tags", "score": 60 }
+  ]
+}
+```
+
+---
+
+### AI Edit History
+
+`GET /notes/:id/ai-edits`
+
+```bash
+curl http://127.0.0.1:3939/notes/<NOTE_ID>/ai-edits
+```
+
+Response:
+
+```json
+{
+  "edits": [
+    { "id": "edit-id", "noteId": "uuid", "action": "update", "beforeContent": "...", "afterContent": "...", "revertedAt": null }
+  ]
+}
+```
+
+---
+
+### Revert AI Edit
+
+`POST /ai-edits/:id/revert`
+
+```bash
+curl -X POST http://127.0.0.1:3939/ai-edits/<EDIT_ID>/revert
+```
+
+Response: `{ "reverted": true }`
+
+---
+
 ## Using the Included CLI Helper
 
 Strata ships with a wrapper script:
@@ -263,6 +384,12 @@ npm run notes:api -- get <NOTE_ID>
 npm run notes:api -- create '{"content":"# Via helper"}'
 npm run notes:api -- update <NOTE_ID> '{"starred":true}'
 npm run notes:api -- delete <NOTE_ID>
+npm run notes:api -- tags
+npm run notes:api -- search "wiki links"
+npm run notes:api -- backlinks <NOTE_ID>
+npm run notes:api -- related <NOTE_ID>
+npm run notes:api -- ai-edits <NOTE_ID>
+npm run notes:api -- revert-edit <EDIT_ID>
 ```
 
 Helper env vars:
@@ -275,3 +402,5 @@ Helper env vars:
 - Keep Strata running while your agent uses the API.
 - External API writes trigger automatic UI refresh in the app.
 - If auth is required, launch Strata with `STRATA_API_TOKEN` set in the environment.
+- This API intentionally does not expose shell command execution endpoints.
+- Publisher shell execution is available only through preload IPC (`window.strata.shell.run`) inside the app context.
