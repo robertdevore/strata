@@ -28,6 +28,7 @@ const settings_patch_schema = z.object({
 	aiEnableRouteLogs: z.boolean().optional(),
 	aiCheapConfidenceThreshold: z.number().min(0).max(1).optional(),
 	aiPremiumFallbackThreshold: z.number().min(0).max(1).optional(),
+	pinnedTags: z.array(z.string()).optional(),
 })
 
 export const registerSettingsHandlers = (db: StrataDatabase) => {

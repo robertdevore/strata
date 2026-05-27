@@ -83,6 +83,7 @@ const DEFAULT_SETTINGS: Settings = {
 	aiEnableRouteLogs: true,
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
+	pinnedTags: [],
 }
 
 export class StrataDatabase {

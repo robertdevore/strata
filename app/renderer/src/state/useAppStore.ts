@@ -74,6 +74,7 @@ const defaultSettings: Settings = {
 	aiEnableRouteLogs: true,
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
+	pinnedTags: [],
 }
 
 export const useAppStore = create<AppState>((set, get) => ({

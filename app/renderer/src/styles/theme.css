@@ -218,7 +218,7 @@ body.platform-mac .sidebar-collapse-button {
 .app-shell.sidebar-collapsed .sidebar .notes-list,
 .app-shell.sidebar-collapsed .sidebar .sidebar-bottom,
 .app-shell.sidebar-collapsed .sidebar .sidebar-undo-toast,
-.app-shell.sidebar-collapsed .sidebar .sidebar-collapse-button {
+.app-shell.sidebar-collapsed .sidebar .sidebar-toggle-btn {
 	display: none;
 }
 
@@ -377,6 +377,48 @@ button:focus-visible,
 .tag-filter {
 	display: flex;
 	justify-content: space-between;
+}
+
+.pinned-tags {
+	display: grid;
+	gap: 4px;
+	margin-bottom: 6px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--border);
+}
+
+.tag-pinned {
+	background: var(--accent-subtle);
+}
+
+.tag-pin-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 12px;
+	padding: 0 2px;
+	opacity: 0.4;
+	transition: opacity 0.15s;
+	line-height: 1;
+}
+
+.tag-pin-btn:hover {
+	opacity: 1;
+}
+
+.tag-pin-btn.pin-active {
+	opacity: 1;
+}
+
+.tag-count-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.sidebar-notes-heading {
+	margin-top: 6px;
+	padding-top: 4px;
 }
 
 .notes-list {

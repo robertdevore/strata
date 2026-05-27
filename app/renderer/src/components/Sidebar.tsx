@@ -14,6 +14,7 @@ interface SidebarProps {
 	tags: Array<{ name: string; count: number }>
 	showFiltersPanel: boolean
 	sidebarCollapsed: boolean
+	pinnedTags: string[]
 	onSearchChange: (value: string) => void
 	onSelect: (id: string) => void
 	onNewNote: () => void
@@ -26,6 +27,8 @@ interface SidebarProps {
 	onStarToggle: (id: string) => void
 	onArchiveToggle: (id: string) => void
 	onDelete: (id: string) => void
+	onPinTag: (tag: string) => void
+	onUnpinTag: (tag: string) => void
 	undoDeleteTitle: string | null
 	onUndoDelete: () => void
 	theme: ThemeMode
@@ -40,6 +43,7 @@ interface MenuState {
 const filters: ActiveFilter[] = ['all', 'starred', 'archived', 'untagged']
 
 export function Sidebar(props: SidebarProps) {
+	const { pinnedTags, onPinTag, onUnpinTag } = props
 	const [menu, setMenu] = useState<MenuState | null>(null)
 	const [visibleCount, setVisibleCount] = useState(50)
 	const menuRef = useRef<HTMLDivElement>(null)
@@ -100,7 +104,7 @@ export function Sidebar(props: SidebarProps) {
 						<p className="app-title">STRATA</p>
 					</div>}
 					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note"><PlusIcon size={15} /></button>
-					<button className="icon-button sidebar-collapse-button" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
+					<button className="icon-button sidebar-collapse-button sidebar-toggle-btn" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
 				</div>
@@ -121,17 +125,30 @@ export function Sidebar(props: SidebarProps) {
 					{props.showFiltersPanel && (
 						<div className="tags-section">
 							<p className="tags-label">Tags</p>
-							<button className={`tag-filter ${null === props.selectedTag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(null)}>
-								<span>All tags</span>
-							</button>
-							{props.tags.map((tag) => (
+							{/* Pinned tags */}
+							{pinnedTags.length > 0 && (
+								<div className="pinned-tags">
+									{pinnedTags.map((tag) => (
+										<button key={tag} className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag)}>
+											<span>#{tag}</span>
+											<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag">📌</button>
+										</button>
+									))}
+								</div>
+							)}
+							{/* Top 5 unpinned tags */}
+							{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, 5).map((tag) => (
 								<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>
 									<span>#{tag.name}</span>
-									<span>{tag.count}</span>
+									<span className="tag-count-row">
+										<span>{tag.count}</span>
+										<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin tag">📌</button>
+									</span>
 								</button>
 							))}
 						</div>
 					)}
+					<p className="tags-label sidebar-notes-heading">Notes</p>
 					<div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
 				{visibleNotes.map((note) => (
 					<div

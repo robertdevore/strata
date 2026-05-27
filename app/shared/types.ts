@@ -54,6 +54,7 @@ export interface Settings {
 	aiEnableRouteLogs: boolean
 	aiCheapConfidenceThreshold: number
 	aiPremiumFallbackThreshold: number
+	pinnedTags: string[]
 }
 
 export interface NoteUpdatePatch {

@@ -279,6 +279,7 @@ export function App() {
 					tags={store.tags}
 					showFiltersPanel={store.showFiltersPanel}
 					sidebarCollapsed={sidebarCollapsed}
+					pinnedTags={store.settings.pinnedTags ?? []}
 					onSearchChange={store.setSearchQuery}
 					onSelect={async (id) => {
 						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId)
@@ -294,6 +295,14 @@ export function App() {
 					onStarToggle={(id) => void store.toggleStar(id)}
 					onArchiveToggle={(id) => void store.toggleArchive(id)}
 					onDelete={(id) => void onDelete(id)}
+					onPinTag={(tag) => {
+						const current = store.settings.pinnedTags ?? []
+						if (!current.includes(tag)) store.updateSettings({ pinnedTags: [...current, tag] })
+					}}
+					onUnpinTag={(tag) => {
+						const current = store.settings.pinnedTags ?? []
+						store.updateSettings({ pinnedTags: current.filter((t) => t !== tag) })
+					}}
 					undoDeleteTitle={undoDelete?.title ?? null}
 					onUndoDelete={() => void undoLastDelete()}
 					theme={store.settings.theme}
