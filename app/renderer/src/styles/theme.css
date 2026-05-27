@@ -247,13 +247,13 @@ body.platform-mac .sidebar-collapse-button {
 }
 
 body.platform-mac .standalone-sidebar-toggle {
-	left: 109px;
+	left: 99px;
 	top: 6px;
 }
 
 .standalone-new-note {
 	position: fixed;
-	left: 45px;
+	left: 36px;
 	top: 16px;
 	z-index: 99999;
 	display: inline-flex;
@@ -274,7 +274,7 @@ body.platform-mac .standalone-sidebar-toggle {
 }
 
 body.platform-mac .standalone-new-note {
-	left: 77px;
+	left: 67px;
 	top: 6px;
 }
 
@@ -843,7 +843,7 @@ button:focus-visible,
 
 body.platform-mac .app-shell.sidebar-collapsed .editor-header,
 body.platform-mac .app-shell.sidebar-collapsed .tab-bar {
-	padding-left: 144px;
+	padding-left: 136px;
 }
 
 /* When tabs are visible and sidebar collapsed, title should align left with content, not with tabs/stoplights */

@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
 import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
-import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, MoonIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
+import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, MoonIcon, PinFilledIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
 	notes: Note[]
@@ -42,7 +42,7 @@ interface MenuState {
 }
 
 export function Sidebar(props: SidebarProps) {
-	const { pinnedTags, onPinTag, onUnpinTag, onReorderPinned } = props
+	const { pinnedTags, onUnpinTag, onReorderPinned } = props
 	const [menu, setMenu] = useState<MenuState | null>(null)
 	const [tagsCollapsed, setTagsCollapsed] = useState(false)
 	const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -104,7 +104,7 @@ export function Sidebar(props: SidebarProps) {
 					{!props.sidebarCollapsed && <div className="app-title-left">
 						<p className="app-title">STRATA</p>
 					</div>}
-					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: 2 }}><PlusIcon size={15} /></button>
+					<button className="icon-button sidebar-collapse-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: -4 }}><PlusIcon size={15} /></button>
 					<button className="icon-button sidebar-collapse-button sidebar-toggle-btn" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
@@ -112,7 +112,7 @@ export function Sidebar(props: SidebarProps) {
 			</div>
 			{!props.sidebarCollapsed && (
 				<div className="sidebar-scroll" ref={scrollRef} onScroll={onScrollNearBottom}>
-					{/* Tags — collapsible */}
+					{/* Tags — collapsible, pinned-only shortlist */}
 					<div className="tags-section">
 						<div className="tags-header-row">
 							<p className="tags-label">Tags</p>
@@ -120,50 +120,35 @@ export function Sidebar(props: SidebarProps) {
 								{tagsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
 							</button>
 						</div>
-						{!tagsCollapsed && (
-							<>
-								{/* Pinned tags — drag-and-drop reorderable */}
-								{pinnedTags.length > 0 && (
-									<div className="pinned-tags">
-										{pinnedTags.map((tag, idx) => (
-											<button
-												key={tag}
-												draggable
-												className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`}
-												onClick={() => props.onTagFilter(tag)}
-												onDragStart={() => setDragIndex(idx)}
-												onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-												onDrop={() => {
-													if (null !== dragIndex && dragIndex !== idx) {
-														const reordered = [...pinnedTags]
-														const [moved] = reordered.splice(dragIndex, 1)
-														reordered.splice(idx, 0, moved)
-														onReorderPinned(reordered)
-													}
-													setDragIndex(null)
-												}}
-												onDragEnd={() => setDragIndex(null)}
-											>
-												<span className="tag-hotkey">⌘{idx + 1}</span>
-												<span>#{tag}</span>
-												<span className="tag-count-row">
-													<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag">📌</button>
-												</span>
-											</button>
-										))}
-									</div>
-								)}
-								{/* Top 5 popular tags — with hotkeys continuing from pinned */}
-								{props.tags.filter((t) => !pinnedTags.includes(t.name)).slice(0, Math.max(0, 5 - pinnedTags.length)).map((tag, idx) => (
-									<button key={tag.name} className={`tag-filter ${props.selectedTag === tag.name ? 'tag-filter-active' : ''}`} onClick={() => props.onTagFilter(tag.name)}>
-										<span className="tag-hotkey">⌘{pinnedTags.length + idx + 1}</span>
-										<span>#{tag.name}</span>
+						{!tagsCollapsed && pinnedTags.length > 0 && (
+							<div className="pinned-tags">
+								{pinnedTags.map((tag, idx) => (
+									<button
+										key={tag}
+										draggable
+										className={`tag-filter tag-pinned ${props.selectedTag === tag ? 'tag-filter-active' : ''}`}
+										onClick={() => props.onTagFilter(tag)}
+										onDragStart={() => setDragIndex(idx)}
+										onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+										onDrop={() => {
+											if (null !== dragIndex && dragIndex !== idx) {
+												const reordered = [...pinnedTags]
+												const [moved] = reordered.splice(dragIndex, 1)
+												reordered.splice(idx, 0, moved)
+												onReorderPinned(reordered)
+											}
+											setDragIndex(null)
+										}}
+										onDragEnd={() => setDragIndex(null)}
+									>
+										<span>#{tag}</span>
 										<span className="tag-count-row">
-											<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin tag">📌</button>
+											<span className="tag-hotkey">⌘{idx + 1}</span>
+											<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin tag"><PinFilledIcon size={13} /></button>
 										</span>
 									</button>
 								))}
-							</>
+							</div>
 						)}
 					</div>
 					<p className="tags-label sidebar-notes-heading">Notes</p>

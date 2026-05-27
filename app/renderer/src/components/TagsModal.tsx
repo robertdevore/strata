@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CloseIcon } from './icons'
+import { CloseIcon, PinFilledIcon, PinIcon } from './icons'
 
 interface TagsModalProps {
 	open: boolean
@@ -68,7 +68,7 @@ export function TagsModal({ open, tags, pinnedTags, selectedTag, onClose, onSele
 								<button key={tag} className={`palette-item ${selectedTag === tag ? 'palette-item-active' : ''}`} onClick={() => { onSelectTag(tag); onClose() }}>
 									<span className="palette-item-label">#{tag}</span>
 									<span className="palette-item-hint">
-										<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin">📌</button>
+										<button className="tag-pin-btn pin-active" onClick={(e) => { e.stopPropagation(); onUnpinTag(tag) }} title="Unpin"><PinFilledIcon size={13} /></button>
 									</span>
 								</button>
 							))}
@@ -80,7 +80,7 @@ export function TagsModal({ open, tags, pinnedTags, selectedTag, onClose, onSele
 							<span className="palette-item-label">#{tag.name}</span>
 							<span className="palette-item-hint">
 								<span>{tag.count}</span>
-								<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin">📌</button>
+								<button className="tag-pin-btn" onClick={(e) => { e.stopPropagation(); onPinTag(tag.name) }} title="Pin"><PinIcon size={13} /></button>
 							</span>
 						</button>
 					))}
