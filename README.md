@@ -11,7 +11,7 @@ It is designed for focused writing with fast note capture, keyboard-first workfl
 - Fast filtering and search across notes
 - Markdown editing with autosave and save-state feedback
 - Tagging, starring, archiving, and keyboard shortcuts for daily flow
-- Built-in AI chat panel for note analysis and chat-history search (read-only tools in v1)
+- Built-in AI chat panel for note analysis, chat-history search, and controlled note editing
 
 ## Features
 
@@ -119,6 +119,8 @@ Strata includes an in-app AI panel (chatbot icon in the editor header) that can:
 - Retrieve chat threads for context
 
 The assistant can also create new notes and edit existing notes when requested.
+
+AI write access is controlled by `aiEditMode` (`read_only`, `confirm`, `auto_apply`) with edit history + revert support. See `docs/ai-edit-permissions.md`.
 
 The assistant does not delete notes.
 
@@ -261,6 +263,12 @@ Endpoints:
 - `POST /notes` (optional JSON body: `content`, `starred`, `archived`, `tags`)
 - `PUT /notes/:id` or `PATCH /notes/:id` (JSON body: any of `content`, `starred`, `archived`, `tags`)
 - `DELETE /notes/:id`
+- `GET /tags`
+- `GET /search?q=...&limit=25`
+- `GET /notes/:id/backlinks`
+- `GET /notes/:id/related`
+- `GET /notes/:id/ai-edits`
+- `POST /ai-edits/:id/revert`
 
 Example calls:
 
@@ -299,6 +307,8 @@ Set these when needed:
 - `STRATA_API_BASE_URL` (default: `http://127.0.0.1:3939`)
 - `STRATA_API_TOKEN` (for protected API)
 
+Note: shell command execution used by publish providers is exposed through preload IPC (`window.strata.shell.run`), not through the local HTTP API.
+
 ## Troubleshooting
 
 ### Native module issues (`better-sqlite3`)
@@ -324,3 +334,14 @@ Strata already includes a publish-provider abstraction for future integrations:
 - `integrations/publish/providers/DummyProvider.ts`
 
 This keeps external publishing features decoupled from core note storage and UI flows.
+
+## Enterprise Docs
+
+- `API.md`
+- `SECURITY.md`
+- `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
+- `LICENSE`
+- `docs/ai-edit-permissions.md`
+- `docs/publish-providers.md`
+- `docs/enterprise-readiness-checklist.md`
