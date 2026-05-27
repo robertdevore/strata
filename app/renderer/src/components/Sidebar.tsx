@@ -102,6 +102,7 @@ export function Sidebar(props: SidebarProps) {
 								<p className="app-version">v0.4.0</p>
 						</div>
 					</div>}
+					{!props.sidebarCollapsed && <button className="icon-button" onClick={props.onNewNote} title="New Note" style={{ marginRight: 4 }}><PlusIcon /></button>}
 					<button className="icon-button sidebar-collapse-button" onClick={props.onToggleSidebar} title={props.sidebarCollapsed ? 'Open Sidebar' : 'Close Sidebar'}>
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
@@ -193,10 +194,9 @@ export function Sidebar(props: SidebarProps) {
 			)}
 			{!props.sidebarCollapsed && <div className="sidebar-bottom">
 				<div className="bottom-actions">
-					<button className="icon-button new-note-button" onClick={props.onNewNote} title="New Note"><PlusIcon /></button>
-					<button className="icon-button" onClick={props.onToggleFiltersPanel} title="Toggle Filters"><MenuIcon /></button>
-					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
 					<button className="icon-button" onClick={props.onOpenSettings} title="Settings"><SettingsIcon /></button>
+					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
+					<button className="icon-button" onClick={props.onToggleFiltersPanel} title="Toggle Tags"><MenuIcon /></button>
 				</div>
 			</div>}
 			{menu && (

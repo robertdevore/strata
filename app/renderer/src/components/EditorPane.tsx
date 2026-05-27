@@ -13,7 +13,7 @@ import type { AiMessage, AiSearchResult, AiThreadSummary, Note } from '@shared/t
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { aiService } from '@renderer/src/services/aiService'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, ChatbotIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EyeIcon, FileTextAiIcon, PrinterIcon, SearchIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
+import { ArchiveIcon, ChatbotIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EyeIcon, FileSearchIcon, FileTextAiIcon, PrinterIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
 import { ChatPanel } from './ChatPanel'
 import { PublishModal } from './PublishModal'
 
@@ -138,6 +138,39 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 	},
 })
 
+// Auto-strip leading H1 when pasting into an empty note — the H1 becomes the title
+const h1AutoStripExtension = EditorView.domEventHandlers({
+	paste: (event, view) => {
+		const plain_text = event.clipboardData?.getData('text/plain') ?? ''
+		if (!plain_text.trim()) return false
+
+		// Check if the note is currently empty (just the auto-generated H1 or blank)
+		const current_doc = view.state.doc.toString()
+		const doc_is_empty = !current_doc.trim() || /^#\s[^\n]*\n?\n?$/.test(current_doc.trim())
+
+		// Check if the pasted text starts with an H1
+		const lines = plain_text.split('\n')
+		const first_line = lines[0]?.trim() ?? ''
+		if (!doc_is_empty || !first_line.startsWith('# ')) return false
+
+		// Strip the H1 and any blank line after it
+		let new_body = plain_text
+		if (lines[1] === '') {
+			new_body = lines.slice(2).join('\n')
+		} else {
+			new_body = lines.slice(1).join('\n')
+		}
+
+		// Replace the entire document with the body only
+		view.dispatch({
+			changes: { from: 0, to: view.state.doc.length, insert: new_body },
+			selection: { anchor: 0 },
+		})
+		event.preventDefault()
+		return true
+	},
+})
+
 export function EditorPane(props: EditorPaneProps) {
 	const { note, notes, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
@@ -167,6 +200,11 @@ export function EditorPane(props: EditorPaneProps) {
 	const [showAiHistory, setShowAiHistory] = useState(false)
 	const [aiEdits, setAiEdits] = useState<Array<import('@shared/types').AiNoteEdit>>([])
 	const [showPublish, setShowPublish] = useState(false)
+	const [copyToast, setCopyToast] = useState(false)
+	const [inlineFindQuery, setInlineFindQuery] = useState('')
+	const [showInlineFind, setShowInlineFind] = useState(false)
+	const [inlineFindCount, setInlineFindCount] = useState(0)
+	const [inlineFindIndex, setInlineFindIndex] = useState(0)
 	const debounceRef = useRef<number | null>(null)
 	const saveStatusRef = useRef<number | null>(null)
 	const noteIdRef = useRef<string | null>(null)
@@ -376,6 +414,87 @@ export function EditorPane(props: EditorPaneProps) {
 		window.addEventListener('strata:open-find-replace', openFindReplace)
 		return () => window.removeEventListener('strata:open-find-replace', openFindReplace)
 	}, [])
+
+	// Inline find — Cmd/Ctrl+F
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			if ((event.metaKey || event.ctrlKey) && 'f' === event.key && !event.shiftKey) {
+				event.preventDefault()
+				const view = editorViewRef.current
+				if (view) {
+					const selection = view.state.selection.main
+					if (selection.from !== selection.to) {
+						setInlineFindQuery(view.state.sliceDoc(selection.from, selection.to))
+					}
+				}
+				setShowInlineFind((v) => {
+					if (!v) return true
+					return true // already open, just refocus
+				})
+				// Focus the inline find input
+				window.setTimeout(() => {
+					const el = document.querySelector('.inline-find-input') as HTMLInputElement | null
+					el?.focus()
+					el?.select()
+				}, 10)
+			}
+			if ('Escape' === event.key && showInlineFind) {
+				event.preventDefault()
+				setShowInlineFind(false)
+				setInlineFindQuery('')
+			}
+		}
+		window.addEventListener('keydown', onKeyDown)
+		return () => window.removeEventListener('keydown', onKeyDown)
+	}, [showInlineFind])
+
+	// Inline find match counting
+	useEffect(() => {
+		if (!inlineFindQuery || !showInlineFind) {
+			setInlineFindCount(0)
+			setInlineFindIndex(0)
+			return
+		}
+		const escaped = inlineFindQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+		const regex = new RegExp(escaped, 'gi')
+		const matches = content.match(regex)
+		setInlineFindCount(matches ? matches.length : 0)
+		setInlineFindIndex(0)
+	}, [inlineFindQuery, content, showInlineFind])
+
+	const handleInlineFindNext = () => {
+		if (!inlineFindQuery || !editorViewRef.current) return
+		const view = editorViewRef.current
+		const doc = view.state.doc.toString()
+		const escaped = inlineFindQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+		const regex = new RegExp(escaped, 'gi')
+		const matches = [...doc.matchAll(regex)]
+		if (!matches.length) return
+		const nextIdx = (inlineFindIndex + 1) % matches.length
+		setInlineFindIndex(nextIdx)
+		const match = matches[nextIdx]
+		view.dispatch({
+			selection: { anchor: match.index, head: match.index + match[0].length },
+			scrollIntoView: true,
+		})
+	}
+
+	const handleInlineFindPrev = () => {
+		if (!inlineFindQuery || !editorViewRef.current) return
+		const view = editorViewRef.current
+		const doc = view.state.doc.toString()
+		const escaped = inlineFindQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+		const regex = new RegExp(escaped, 'gi')
+		const matches = [...doc.matchAll(regex)]
+		if (!matches.length) return
+		const prevIdx = (inlineFindIndex - 1 + matches.length) % matches.length
+		setInlineFindIndex(prevIdx)
+		const match = matches[prevIdx]
+		view.dispatch({
+			selection: { anchor: match.index, head: match.index + match[0].length },
+			scrollIntoView: true,
+		})
+	}
 
 	const existingTags = tags.map((item) => item.name)
 	const note_titles_by_id = notes.reduce<Record<string, string>>((carry, item) => {
@@ -775,7 +894,13 @@ export function EditorPane(props: EditorPaneProps) {
 				)}
 				<div className="editor-actions">
 					{toolbar_status && <span className="save-status">{toolbar_status}</span>}
-					<button className="icon-button" onClick={() => void copyRichTextToClipboard(content).catch(() => {})} title="Copy Rich Text"><CopyIcon /></button>
+					<button className="icon-button" onClick={async () => {
+						try {
+							await copyRichTextToClipboard(content)
+							setCopyToast(true)
+							window.setTimeout(() => setCopyToast(false), 1800)
+						} catch { /* silent */ }
+					}} title="Copy Rich Text"><CopyIcon /></button>
 					<button className="icon-button" onClick={() => onToggleStar(note.id)} title="Toggle Star">{note.starred ? <StarFilledIcon /> : <StarOutlineIcon />}</button>
 					<button className="icon-button" onClick={() => setShowTagsEditor(true)} title="Tags"><TagIcon /></button>
 					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => {
@@ -800,6 +925,7 @@ export function EditorPane(props: EditorPaneProps) {
 						})
 					}} title="Open AI Chat"><ChatbotIcon /></button>
 				</div>
+				{copyToast && <span className="copy-toast">Copied!</span>}
 			</header>
 			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 6px minmax(0, 1fr)' : `minmax(0, 1fr) 6px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}
 				onClick={(event) => {
@@ -832,7 +958,7 @@ export function EditorPane(props: EditorPaneProps) {
 					<CodeMirror
 						value={editorContent}
 						height="100%"
-						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, autocompletion({ override: [wikiLinkCompletions] })]}
+						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, h1AutoStripExtension, autocompletion({ override: [wikiLinkCompletions] })]}
 						onCreateEditor={(view) => {
 							editorViewRef.current = view
 						}}
@@ -1046,13 +1172,46 @@ export function EditorPane(props: EditorPaneProps) {
 					</>
 				)}
 			</div>
+			{showInlineFind && (
+				<div className="inline-find-bar">
+					<input
+						className="inline-find-input"
+						type="text"
+						value={inlineFindQuery}
+						onChange={(event) => setInlineFindQuery(event.target.value)}
+						onKeyDown={(event) => {
+							if ('Enter' === event.key) {
+								event.shiftKey ? handleInlineFindPrev() : handleInlineFindNext()
+							}
+							if ('Escape' === event.key) {
+								setShowInlineFind(false)
+								setInlineFindQuery('')
+							}
+						}}
+						placeholder="Find..."
+						autoFocus
+					/>
+					<span className="inline-find-count">
+						{inlineFindQuery ? `${inlineFindIndex + 1} / ${inlineFindCount}` : '0 / 0'}
+					</span>
+					<button className="icon-button" onClick={handleInlineFindPrev} title="Previous match" aria-label="Previous match">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12l14 0" /><path d="M5 12l4 4" /><path d="M5 12l4 -4" /></svg>
+					</button>
+					<button className="icon-button" onClick={handleInlineFindNext} title="Next match" aria-label="Next match">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12l-14 0" /><path d="M19 12l-4 4" /><path d="M19 12l-4 -4" /></svg>
+					</button>
+					<button className="icon-button" onClick={() => { setShowInlineFind(false); setInlineFindQuery('') }} title="Close find" aria-label="Close find">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+					</button>
+				</div>
+			)}
 			<footer className="editor-footer">
 				<span>{countWords(content)} words</span>
 				<div className="editor-footer-actions">
 					<button className={`icon-button ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
 						setFindReplaceStatus('')
 						setShowFindReplace(true)
-					}} title="Find and Replace"><SearchIcon /></button>
+					}} title="Find and Replace"><FileSearchIcon /></button>
 					<button className="icon-button" onClick={() => setShowPublish(true)} title="Export / Publish Note"><UploadIcon /></button>
 					<button className="icon-button" onClick={onShowRelatedNotes} title="Related Notes"><CirclesRelationIcon /></button>
 					<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
