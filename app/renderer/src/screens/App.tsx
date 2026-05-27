@@ -244,7 +244,13 @@ export function App() {
 				if (!hotkey_matches(event, `Cmd+${i + 1}`)) continue
 				event.preventDefault()
 				const tag = pinned_tags[i]
-				if (tag) store.setSelectedTag(tag)
+				if (tag) store.setSelectedTag(store.selectedTag === tag ? null : tag)
+				return
+			}
+
+			if (hotkey_matches(event, hotkeys.togglePreview)) {
+				event.preventDefault()
+				window.dispatchEvent(new CustomEvent('strata:toggle-preview'))
 				return
 			}
 

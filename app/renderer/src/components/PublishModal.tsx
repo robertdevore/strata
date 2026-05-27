@@ -9,7 +9,7 @@ interface PublishModalProps {
 	onClose: () => void
 }
 
-type ExportFormat = 'html' | 'pdf' | 'doc'
+type ExportFormat = 'html' | 'pdf' | 'doc' | 'md'
 
 export function PublishModal({ open, noteTitle, noteContent, onClose }: PublishModalProps) {
 	const [status, setStatus] = useState<'idle' | 'selecting' | 'publishing' | 'done' | 'error'>('idle')
@@ -70,6 +70,13 @@ export function PublishModal({ open, noteTitle, noteContent, onClose }: PublishM
 				setStatus('done')
 				setPublishedPath(sanitizeFileName(noteTitle) + '.doc')
 				setMessage('DOC downloaded.')
+			} else if ('md' === format) {
+				const markdown_content = noteContent.replace(/\r\n/g, '\n')
+				const blob = new Blob([markdown_content], { type: 'text/markdown;charset=utf-8' })
+				triggerDownload(blob, sanitizeFileName(noteTitle) + '.md')
+				setStatus('done')
+				setPublishedPath(sanitizeFileName(noteTitle) + '.md')
+				setMessage('MD downloaded.')
 			}
 		} catch (err) {
 			setStatus('error')
@@ -90,6 +97,7 @@ export function PublishModal({ open, noteTitle, noteContent, onClose }: PublishM
 								['html', 'HTML File', 'Self-contained webpage with light/dark theme'],
 								['pdf', 'PDF', 'Print-ready PDF document'],
 								['doc', 'DOC', 'Microsoft Word compatible document'],
+								['md', 'MD', 'Plain markdown file (.md)'],
 							] as [ExportFormat, string, string][]).map(([fmt, label, desc]) => (
 								<label key={fmt} className={`publish-format-option ${format === fmt ? 'publish-format-active' : ''}`}>
 									<input type="radio" name="format" value={fmt} checked={format === fmt} onChange={() => setFormat(fmt)} />

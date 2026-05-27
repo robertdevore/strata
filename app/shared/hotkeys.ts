@@ -4,6 +4,7 @@ export type HotkeyAction =
 	| 'newNote'
 	| 'editNoteTags'
 	| 'allTagsModal'
+	| 'togglePreview'
 	| 'findOrSearch'
 	| 'toggleFilters'
 	| 'saveNote'
@@ -19,11 +20,12 @@ export type HotkeyAction =
 export type HotkeysSettings = Record<HotkeyAction, string>
 
 export const DEFAULT_HOTKEYS: HotkeysSettings = {
-	quickOpen: 'Cmd+P',
+	quickOpen: 'Cmd+O',
 	commandPalette: 'Cmd+K',
 	newNote: 'Cmd+N',
 	editNoteTags: 'Cmd+T',
 	allTagsModal: 'Cmd+Shift+T',
+	togglePreview: 'Cmd+P',
 	findOrSearch: 'Cmd+F',
 	toggleFilters: 'Cmd+Shift+F',
 	saveNote: 'Cmd+S',

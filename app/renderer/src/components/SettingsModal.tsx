@@ -43,6 +43,7 @@ const HOTKEY_FIELDS: Array<{ id: HotkeyAction; label: string }> = [
 	{ id: 'newNote', label: 'New Note' },
 	{ id: 'editNoteTags', label: 'Edit Note Tags' },
 	{ id: 'allTagsModal', label: 'All Tags' },
+	{ id: 'togglePreview', label: 'Toggle Preview Panel' },
 	{ id: 'findOrSearch', label: 'Find in Note / Focus Search' },
 	{ id: 'toggleFilters', label: 'Toggle Filters Panel' },
 	{ id: 'saveNote', label: 'Save Note' },
@@ -405,7 +406,7 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 								</label>
 							))}
 							<p className="tags-label" style={{ marginTop: 4, lineHeight: 1.4 }}>
-								Pinned tags use <code>Cmd/Ctrl + 1-9</code> based on your pinned order in the sidebar.
+								Pinned tags use <code>Cmd/Ctrl + 1-9</code> based on your pinned order.
 							</p>
 						</>
 					)}

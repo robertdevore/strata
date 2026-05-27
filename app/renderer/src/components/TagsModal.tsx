@@ -75,7 +75,7 @@ export function TagsModal({ open, tags, pinnedTags, selectedTag, onClose, onSele
 						placeholder="Search tags..."
 						autoFocus
 					/>
-					<button className="icon-button" onClick={onClose} aria-label="Close"><CloseIcon size={16} /></button>
+					<button className="icon-button palette-search-close-btn" onClick={onClose} aria-label="Close"><CloseIcon size={16} /></button>
 				</div>
 				<div className="palette-results">
 					{pinned_filtered.length > 0 && (
@@ -95,21 +95,24 @@ export function TagsModal({ open, tags, pinnedTags, selectedTag, onClose, onSele
 							})}
 						</>
 					)}
-					<div className="palette-sort-row" role="group" aria-label="Tag sorting options">
-						<label className="palette-sort-field">
-							<span>Sort by</span>
-							<select value={sort_by} onChange={(event) => set_sort_by(event.target.value as 'alphabet' | 'count')}>
-								<option value="alphabet">Alphabet</option>
-								<option value="count">Count</option>
-							</select>
-						</label>
-						<label className="palette-sort-field">
-							<span>Order</span>
-							<select value={sort_order} onChange={(event) => set_sort_order(event.target.value as 'asc' | 'desc')}>
-								<option value="asc">Ascending</option>
-								<option value="desc">Descending</option>
-							</select>
-						</label>
+					<div className={`palette-all-tags-controls ${pinned_filtered.length > 0 ? 'palette-all-tags-controls-separated' : ''}`}>
+						<div className="palette-controls-label">Filters for all tags</div>
+						<div className="palette-sort-row" role="group" aria-label="Tag sorting options">
+							<label className="palette-sort-field">
+								<span>Sort by</span>
+								<select value={sort_by} onChange={(event) => set_sort_by(event.target.value as 'alphabet' | 'count')}>
+									<option value="alphabet">Alphabet</option>
+									<option value="count">Count</option>
+								</select>
+							</label>
+							<label className="palette-sort-field">
+								<span>Order</span>
+								<select value={sort_order} onChange={(event) => set_sort_order(event.target.value as 'asc' | 'desc')}>
+									<option value="asc">Ascending</option>
+									<option value="desc">Descending</option>
+								</select>
+							</label>
+						</div>
 					</div>
 					<div className="palette-section-header">All tags</div>
 					{sorted_tags.map((tag) => (

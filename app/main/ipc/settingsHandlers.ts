@@ -11,6 +11,7 @@ const hotkeys_schema: z.ZodType<HotkeysSettings> = z.object({
 	newNote: z.string().max(40),
 	editNoteTags: z.string().max(40),
 	allTagsModal: z.string().max(40),
+	togglePreview: z.string().max(40),
 	findOrSearch: z.string().max(40),
 	toggleFilters: z.string().max(40),
 	saveNote: z.string().max(40),
