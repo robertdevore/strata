@@ -207,6 +207,10 @@ export function App() {
 				event.preventDefault()
 				void runCommand('new-note')
 			}
+			if ('t' === key && !event.shiftKey) {
+				event.preventDefault()
+				setShowTagsModal(true)
+			}
 			if ('f' === key && !event.shiftKey) {
 				event.preventDefault()
 				const active_element = document.activeElement

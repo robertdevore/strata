@@ -12,12 +12,13 @@ interface SettingsModalProps {
 	onListBackups: () => Promise<Array<{ name: string; createdAt: string; sizeBytes: number }>>
 }
 
-type SettingsTab = 'general' | 'ai' | 'backups'
+type SettingsTab = 'general' | 'ai' | 'backups' | 'hotkeys'
 
 const TABS: { id: SettingsTab; label: string }[] = [
 	{ id: 'general', label: 'General' },
 	{ id: 'ai', label: 'AI' },
 	{ id: 'backups', label: 'Backups' },
+	{ id: 'hotkeys', label: 'Hotkeys' },
 ]
 
 const CHEAP_PROVIDERS = [
@@ -359,6 +360,52 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 									))}
 								</div>
 							)}
+						</>
+					)}
+
+					{/* ---- Hotkeys Tab ---- */}
+					{'hotkeys' === tab && (
+						<>
+							<p className="tags-label" style={{ marginBottom: 10, lineHeight: 1.4 }}>
+								Enter your preferred keyboard shortcuts. Use modifier keys like <code>Cmd</code>, <code>Ctrl</code>, <code>Shift</code>, <code>Alt</code>.
+								Changes take effect after restart.
+							</p>
+							<label>
+								Quick Open (Cmd+P)
+								<input type="text" className="search-input" defaultValue="Cmd+P" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								Command Palette (Cmd+K)
+								<input type="text" className="search-input" defaultValue="Cmd+K" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								New Note (Cmd+N)
+								<input type="text" className="search-input" defaultValue="Cmd+N" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								Find in Note (Cmd+F)
+								<input type="text" className="search-input" defaultValue="Cmd+F" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								Toggle Sidebar (Cmd+Shift+B)
+								<input type="text" className="search-input" defaultValue="Cmd+Shift+B" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								All Tags (Cmd+T)
+								<input type="text" className="search-input" defaultValue="Cmd+T" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								Related Notes (Cmd+R)
+								<input type="text" className="search-input" defaultValue="Cmd+R" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								Navigate Back (Cmd+[)
+								<input type="text" className="search-input" defaultValue="Cmd+[" readOnly disabled spellCheck={false} />
+							</label>
+							<label>
+								Navigate Forward (Cmd+])
+								<input type="text" className="search-input" defaultValue="Cmd+]" readOnly disabled spellCheck={false} />
+							</label>
 						</>
 					)}
 				</div>

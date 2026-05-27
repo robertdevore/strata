@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Note, ThemeMode } from '@shared/types'
 import type { ActiveFilter } from '@renderer/src/domain/filtering'
 import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
-import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
+import { ChevronDownIcon, ChevronUpIcon, CircleChevronLeftIcon, CircleChevronRightIcon, MoonIcon, PlusIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TrashIcon } from './icons'
 
 interface SidebarProps {
 	notes: Note[]
@@ -39,8 +39,6 @@ interface MenuState {
 	x: number
 	y: number
 }
-
-const filters: ActiveFilter[] = ['all', 'starred', 'archived', 'untagged']
 
 export function Sidebar(props: SidebarProps) {
 	const { pinnedTags, onPinTag, onUnpinTag } = props
@@ -109,17 +107,6 @@ export function Sidebar(props: SidebarProps) {
 						{props.sidebarCollapsed ? <CircleChevronRightIcon /> : <CircleChevronLeftIcon />}
 					</button>
 				</div>
-				{!props.sidebarCollapsed && (
-					<>
-						<div className="chip-row">
-							{filters.map((chip) => (
-								<button key={chip} className={`chip ${props.activeFilter === chip ? 'chip-active' : ''}`} onClick={() => props.onFilterChange(chip)}>
-									{chip[0].toUpperCase() + chip.slice(1)}
-								</button>
-							))}
-						</div>
-					</>
-				)}
 			</div>
 			{!props.sidebarCollapsed && (
 				<div className="sidebar-scroll" ref={scrollRef} onScroll={onScrollNearBottom}>
@@ -219,7 +206,6 @@ export function Sidebar(props: SidebarProps) {
 				<div className="bottom-actions">
 					<button className="icon-button" onClick={props.onOpenSettings} title="Settings"><SettingsIcon /></button>
 					<button className="icon-button" onClick={props.onThemeToggle} title="Toggle Theme">{'dark' === props.theme ? <MoonIcon /> : <SunIcon />}</button>
-					<button className="icon-button" onClick={props.onOpenTagsModal} title="All Tags"><MenuIcon /></button>
 				</div>
 			</div>}
 			{menu && (

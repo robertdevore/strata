@@ -247,13 +247,13 @@ body.platform-mac .sidebar-collapse-button {
 }
 
 body.platform-mac .standalone-sidebar-toggle {
-	left: 77px;
+	left: 109px;
 	top: 6px;
 }
 
 .standalone-new-note {
 	position: fixed;
-	left: 8px;
+	left: 45px;
 	top: 16px;
 	z-index: 99999;
 	display: inline-flex;
@@ -274,7 +274,7 @@ body.platform-mac .standalone-sidebar-toggle {
 }
 
 body.platform-mac .standalone-new-note {
-	left: 45px;
+	left: 77px;
 	top: 6px;
 }
 
