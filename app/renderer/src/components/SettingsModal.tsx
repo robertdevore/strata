@@ -316,7 +316,7 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 							</label>
 							<p className="tags-label">Last auto backup: {format_backup_time(settings.lastAutoBackupAt)}</p>
 							<div className="modal-actions backup-actions">
-								<button className="ghost-button" disabled={is_creating_backup} onClick={() => {
+								<button className="primary-button" disabled={is_creating_backup} onClick={() => {
 									set_is_creating_backup(true)
 									set_backup_status('')
 									void onCreateBackup()

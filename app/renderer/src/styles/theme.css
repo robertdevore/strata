@@ -1466,6 +1466,25 @@ body.theme-light .cm-gutters {
 	max-height: 60vh;
 	overflow-y: auto;
 	padding-right: 4px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.settings-tab-content::-webkit-scrollbar {
+	width: 6px;
+}
+
+.settings-tab-content::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.settings-tab-content::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+	border-radius: 3px;
+}
+
+.settings-tab-content::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
 }
 
 .settings-section-title {
@@ -1475,6 +1494,20 @@ body.theme-light .cm-gutters {
 	margin: 16px 0 8px;
 	padding-bottom: 4px;
 	border-bottom: 1px solid var(--border);
+}
+
+/* range sliders in settings need breathing room */
+.settings-tab-content label input[type="range"] {
+	margin-top: 6px;
+}
+
+.settings-tab-content label:has(input[type="range"]) {
+	margin-bottom: 10px;
+}
+
+/* backup actions spacing */
+.backup-actions {
+	margin-top: 16px;
 }
 
 .coming-soon {
