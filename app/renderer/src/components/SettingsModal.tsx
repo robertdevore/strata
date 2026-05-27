@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Settings } from '@shared/types'
 import { CloseIcon } from './icons'
 
@@ -9,6 +9,7 @@ interface SettingsModalProps {
 	onUpdate: (patch: Partial<Settings>) => void
 	onCreateBackup: () => Promise<{ directory: string; createdAt: string }>
 	onOpenBackupsFolder: () => Promise<void>
+	onListBackups: () => Promise<Array<{ name: string; createdAt: string; sizeBytes: number }>>
 }
 
 type SettingsTab = 'general' | 'ai' | 'backups'
@@ -33,12 +34,13 @@ const PREMIUM_PROVIDERS = [
 	{ value: 'custom', label: 'Custom OpenAI-compatible' },
 ]
 
-export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBackup, onOpenBackupsFolder }: SettingsModalProps) {
+export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBackup, onOpenBackupsFolder, onListBackups }: SettingsModalProps) {
 	const [tab, setTab] = useState<SettingsTab>('general')
 	const [backup_status, set_backup_status] = useState('')
 	const [is_creating_backup, set_is_creating_backup] = useState(false)
 	const [is_opening_backup_folder, set_is_opening_backup_folder] = useState(false)
 	const [show_advanced, set_show_advanced] = useState(false)
+	const [backup_list, set_backup_list] = useState<Array<{ name: string; createdAt: string; sizeBytes: number }>>([])
 
 	const format_backup_time = (value: string | null): string => {
 		if (!value) return 'Never'
@@ -46,6 +48,18 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 		if (Number.isNaN(parsed.getTime())) return value
 		return parsed.toLocaleString()
 	}
+
+	const format_backup_size = (bytes: number): string => {
+		if (bytes < 1024) return `${bytes} B`
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+	}
+
+	useEffect(() => {
+		if (open && 'backups' === tab) {
+			void onListBackups().then(set_backup_list).catch(() => set_backup_list([]))
+		}
+	}, [open, tab, onListBackups])
 
 	if (!open) return null
 
@@ -332,6 +346,19 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 								}}>Open backups folder</button>
 							</div>
 							{backup_status && <p className="tags-label">{backup_status}</p>}
+							{backup_list.length > 0 && (
+								<div className="backup-list">
+									<p className="backup-list-title">Recent backups</p>
+									{backup_list.map((item) => (
+										<div key={item.name} className="backup-list-item">
+											<span className="backup-list-item-name">{item.name}</span>
+											<span className="backup-list-item-meta">
+												{new Date(item.createdAt).toLocaleDateString()} · {format_backup_size(item.sizeBytes)}
+											</span>
+										</div>
+									))}
+								</div>
+							)}
 						</>
 					)}
 				</div>

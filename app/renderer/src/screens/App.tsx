@@ -345,6 +345,9 @@ export function App() {
 				onOpenBackupsFolder={async () => {
 					await window.strata.backups.openFolder()
 				}}
+				onListBackups={async () => {
+					return await window.strata.backups.listRecent()
+				}}
 			/>
 			<ConfirmModal
 				open={Boolean(pendingDeleteId)}

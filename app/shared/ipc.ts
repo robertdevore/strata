@@ -14,6 +14,7 @@ export const IPC_CHANNELS = {
 	printHtml: 'print:html',
 	backupCreateNow: 'backup:create-now',
 	backupOpenFolder: 'backup:open-folder',
+	backupListRecent: 'backup:list-recent',
 	aiThreadsList: 'ai:threads:list',
 	aiThreadDelete: 'ai:thread:delete',
 	aiMessagesList: 'ai:messages:list',

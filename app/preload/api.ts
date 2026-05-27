@@ -1,5 +1,11 @@
 import type { AiChatResponse, AiMessage, AiNoteEdit, AiRouteLog, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
 
+export interface BackupListing {
+	name: string
+	createdAt: string
+	sizeBytes: number
+}
+
 export interface StrataApi {
 	notes: {
 		list: (filters?: NotesFilter) => Promise<Note[]>
@@ -25,6 +31,7 @@ export interface StrataApi {
 	backups: {
 		createNow: () => Promise<BackupResult>
 		openFolder: () => Promise<boolean>
+		listRecent: () => Promise<BackupListing[]>
 	}
 	ai: {
 		listThreads: () => Promise<AiThreadSummary[]>

@@ -1510,6 +1510,81 @@ body.theme-light .cm-gutters {
 	margin-top: 16px;
 }
 
+.backup-actions .primary-button,
+.backup-actions .ghost-button {
+	width: auto;
+	flex: 0 1 auto;
+	padding: 6px 16px;
+	font-size: 13px;
+}
+
+/* form field spacing in settings tabs */
+.settings-tab-content label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-2);
+	margin-bottom: 3px;
+}
+
+.settings-tab-content label input,
+.settings-tab-content label select {
+	font-size: 13px;
+	font-weight: 400;
+	margin-bottom: 10px;
+}
+
+.settings-tab-content label input[type="checkbox"] {
+	margin-bottom: 0;
+}
+
+.settings-tab-content .inline-toggle {
+	font-weight: 400;
+	margin-bottom: 6px;
+}
+
+/* backup list */
+.backup-list {
+	margin-top: 12px;
+	border-top: 1px solid var(--border);
+	padding-top: 10px;
+}
+
+.backup-list-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-2);
+	margin: 0 0 8px;
+}
+
+.backup-list-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--border);
+	font-size: 12px;
+	color: var(--text);
+}
+
+.backup-list-item:last-child {
+	border-bottom: none;
+}
+
+.backup-list-item-name {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-right: 8px;
+}
+
+.backup-list-item-meta {
+	flex-shrink: 0;
+	color: var(--text-3);
+	font-size: 11px;
+	text-align: right;
+}
+
 .coming-soon {
 	background: var(--accent-subtle);
 	color: var(--text-2);

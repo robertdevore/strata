@@ -22,6 +22,12 @@ export interface BackupResult {
 	files: string[]
 }
 
+export interface BackupListing {
+	name: string
+	createdAt: string
+	sizeBytes: number
+}
+
 const ensure_dir = (directory: string): void => {
 	if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true })
 }
@@ -59,6 +65,41 @@ export class BackupManager {
 
 	getBackupDirectory(): string {
 		return this.backup_dir
+	}
+
+	/** List recent backups from the backup directory. */
+	listRecentBackups(limit = 3): BackupListing[] {
+		if (!fs.existsSync(this.backup_dir)) return []
+
+		const entries = fs.readdirSync(this.backup_dir, { withFileTypes: true })
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => {
+				const full_path = path.join(this.backup_dir, entry.name)
+				let size_bytes = 0
+				try {
+					const files = fs.readdirSync(full_path, { withFileTypes: true })
+					for (const file of files) {
+						if (file.isFile()) {
+							try {
+								size_bytes += fs.statSync(path.join(full_path, file.name)).size
+							} catch { /* skip unreadable files */ }
+						}
+					}
+				} catch { /* skip unreadable dirs */ }
+
+				let created_at = ''
+				try {
+					created_at = fs.statSync(full_path).birthtime.toISOString()
+				} catch {
+					created_at = new Date(0).toISOString()
+				}
+
+				return { name: entry.name, createdAt: created_at, sizeBytes: size_bytes }
+			})
+			.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+			.slice(0, limit)
+
+		return entries
 	}
 
 	createBackupNow(reason: 'manual' | 'auto' = 'manual'): BackupResult {
