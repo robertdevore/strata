@@ -1,4 +1,4 @@
-import type { AiChatResponse, AiMessage, AiNoteEdit, AiRouteLog, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
+import type { AiChatResponse, AiMessage, AiNoteEdit, AiOpenNoteContext, AiRouteLog, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
 
 export interface BackupListing {
 	name: string
@@ -36,13 +36,14 @@ export interface StrataApi {
 	ai: {
 		listThreads: () => Promise<AiThreadSummary[]>
 		deleteThread: (thread_id: string) => Promise<boolean>
+		renameThread: (thread_id: string, title: string) => Promise<boolean>
 		listMessages: (thread_id: string) => Promise<AiMessage[]>
-		sendMessage: (payload: { threadId?: string; message: string }) => Promise<AiChatResponse>
+		sendMessage: (payload: { threadId?: string; message: string; openNotes?: AiOpenNoteContext[] }) => Promise<AiChatResponse>
 		searchChats: (query: string) => Promise<AiSearchResult[]>
 		transcribeAudio: (payload: { base64Audio: string; mimeType: string; prompt?: string; language?: string }) => Promise<AiTranscriptionResult>
 		listEdits: (noteId: string) => Promise<AiNoteEdit[]>
 		revertEdit: (editId: string) => Promise<boolean>
-		listRouteLogs: () => Promise<AiRouteLog[]>
+		listRouteLogs: (thread_id?: string) => Promise<AiRouteLog[]>
 	}
 	links: {
 		backlinks: (note_id: string) => Promise<Array<{ link: NoteLink; source: Note }>>

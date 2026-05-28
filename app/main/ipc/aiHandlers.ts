@@ -6,11 +6,19 @@ import type { StrataDatabase } from '../db/index'
 import { run_ai_turn, derive_chat_title, resolve_ai_settings } from '../ai/aiRunner'
 
 const thread_id_schema = z.object({ threadId: z.string().uuid() })
+const rename_thread_schema = z.object({ threadId: z.string().uuid(), title: z.string().trim().min(1).max(120) })
 const search_schema = z.object({ query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(100).optional() })
+const open_note_context_schema = z.object({
+	id: z.string().uuid(),
+	title: z.string().trim().min(1).max(160),
+	content: z.string().max(12000),
+})
 const send_schema = z.object({
 	threadId: z.string().uuid().optional(),
 	message: z.string().trim().min(1).max(12000),
+	openNotes: z.array(open_note_context_schema).max(12).optional(),
 })
+const route_logs_schema = z.object({ threadId: z.string().uuid().optional(), limit: z.number().int().min(1).max(5000).optional() }).optional()
 const transcribe_schema = z.object({
 	base64Audio: z.string().trim().min(1),
 	mimeType: z.string().trim().min(1).max(120),
@@ -62,6 +70,25 @@ const sanitize_transcription_text = (value: string): string => {
 	return normalized
 }
 
+const build_open_notes_context = (open_notes: Array<{ id: string; title: string; content: string }> | undefined): string => {
+	if (!open_notes || 0 === open_notes.length) return ''
+
+	const sections = open_notes.map((note, index) => {
+		const compact_content = note.content.replace(/\s+/g, ' ').trim().slice(0, 2600)
+		return [
+			`Open tab ${index + 1}:`,
+			`- Note ID: ${note.id}`,
+			`- Title: ${note.title}`,
+			`- Content excerpt: ${compact_content || '(empty)'}`,
+		].join('\n')
+	})
+
+	return [
+		'The user currently has these notes open in tabs. Use them as immediate context before broader note search:',
+		sections.join('\n\n'),
+	].join('\n\n')
+}
+
 const resolve_chat_model = (db: StrataDatabase): string => {
 	const ai_settings = resolve_ai_settings(db)
 	const mode = ai_settings.aiRoutingMode
@@ -79,6 +106,11 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 		return db.deleteAiThread(threadId)
 	})
 
+	ipcMain.handle(IPC_CHANNELS.aiThreadRename, (_event, payload) => {
+		const { threadId, title } = rename_thread_schema.parse(payload)
+		return Boolean(db.setAiThreadTitle(threadId, title))
+	})
+
 	ipcMain.handle(IPC_CHANNELS.aiMessagesList, (_event, payload) => {
 		const { threadId } = thread_id_schema.parse(payload)
 		return db.listAiMessages(threadId)
@@ -90,7 +122,7 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 	})
 
 	ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
-		const { threadId, message } = send_schema.parse(payload)
+		const { threadId, message, openNotes } = send_schema.parse(payload)
 		const configured_model = resolve_chat_model(db)
 		let thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), configured_model)
 		if (!thread) {
@@ -101,7 +133,12 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 		}
 
 		db.createAiMessage(thread.id, 'user', message)
-		const ai_turn = await run_ai_turn(db, thread)
+		const ai_turn = await run_ai_turn(db, thread, {
+			openNotesContext: build_open_notes_context(openNotes),
+		})
+		if (ai_turn.routeLog?.model) {
+			thread = db.setAiThreadModel(thread.id, ai_turn.routeLog.model) || thread
+		}
 		if (ai_turn.notesChanged) {
 			on_notes_changed?.()
 		}
@@ -154,8 +191,12 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 	})
 
 	// Route logs listing
-	ipcMain.handle(IPC_CHANNELS.aiRouteLogsList, () => {
-		return db.listAiRouteLogs()
+	ipcMain.handle(IPC_CHANNELS.aiRouteLogsList, (_event, payload) => {
+		const parsed = route_logs_schema.parse(payload)
+		if (parsed?.threadId) {
+			return db.listAiRouteLogsForThread(parsed.threadId, parsed.limit ?? 500)
+		}
+		return db.listAiRouteLogs(parsed?.limit ?? 100)
 	})
 
 	// AI edits list (unchanged)

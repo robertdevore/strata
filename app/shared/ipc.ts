@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
 	backupListRecent: 'backup:list-recent',
 	aiThreadsList: 'ai:threads:list',
 	aiThreadDelete: 'ai:thread:delete',
+	aiThreadRename: 'ai:thread:rename',
 	aiMessagesList: 'ai:messages:list',
 	aiSendMessage: 'ai:send',
 	aiSearchChats: 'ai:search',

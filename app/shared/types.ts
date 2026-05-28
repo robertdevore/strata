@@ -97,6 +97,12 @@ export interface AiChatResponse {
 	message: AiMessage
 }
 
+export interface AiOpenNoteContext {
+	id: string
+	title: string
+	content: string
+}
+
 export interface AiSearchResult {
 	message: AiMessage
 	thread: AiThread

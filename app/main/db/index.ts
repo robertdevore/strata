@@ -322,6 +322,12 @@ export class StrataDatabase {
 		return this.getAiThread(id)
 	}
 
+	setAiThreadTitle(id: string, title: string): AiThread | null {
+		const result = this.db.prepare('UPDATE ai_threads SET title = ?, updated_at = ? WHERE id = ?').run(title, new Date().toISOString(), id)
+		if (0 === result.changes) return null
+		return this.getAiThread(id)
+	}
+
 	deleteAiThread(id: string): boolean {
 		const transaction = this.db.transaction((thread_id: string) => {
 			this.db.prepare('DELETE FROM ai_messages WHERE thread_id = ?').run(thread_id)
@@ -571,6 +577,49 @@ export class StrataDatabase {
 				output_tokens: number | null
 				created_at: string
 			}>
+		return rows.map((row) => ({
+			id: row.id,
+			threadId: row.thread_id,
+			userMessage: row.user_message,
+			intent: row.intent,
+			route: row.route,
+			providerId: row.provider_id,
+			model: row.model,
+			confidence: row.confidence,
+			risk: row.risk,
+			requiresConfirmation: Boolean(row.requires_confirmation),
+			reason: row.reason,
+			fallbackUsed: Boolean(row.fallback_used),
+			fallbackReason: row.fallback_reason,
+			inputTokens: row.input_tokens,
+			outputTokens: row.output_tokens,
+			createdAt: row.created_at,
+		}))
+	}
+
+	/** List recent route logs for a specific thread. */
+	listAiRouteLogsForThread(thread_id: string, limit = 500): AiRouteLog[] {
+		const rows = this.db
+			.prepare('SELECT * FROM ai_route_logs WHERE thread_id = ? ORDER BY created_at DESC LIMIT ?')
+			.all(thread_id, Math.max(1, Math.min(5000, limit))) as Array<{
+				id: string
+				thread_id: string | null
+				user_message: string
+				intent: string
+				route: string
+				provider_id: string
+				model: string
+				confidence: number | null
+				risk: string | null
+				requires_confirmation: number
+				reason: string | null
+				fallback_used: number
+				fallback_reason: string | null
+				input_tokens: number | null
+				output_tokens: number | null
+				created_at: string
+			}>
+
 		return rows.map((row) => ({
 			id: row.id,
 			threadId: row.thread_id,
