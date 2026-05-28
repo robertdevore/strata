@@ -46,6 +46,17 @@ interface DictationRecognition {
 
 type DictationConstructor = new () => DictationRecognition
 
+interface NoteLinkOption {
+	id: string
+	title: string
+}
+
+interface WikiDraftContext {
+	from: number
+	to: number
+	query: string
+}
+
 const blob_to_base64 = async (blob: Blob): Promise<string> => {
 	return await new Promise<string>((resolve, reject) => {
 		const reader = new FileReader()
@@ -117,6 +128,7 @@ interface ChatPanelProps {
 	messages: AiMessage[]
 	modelName: string
 	noteTitlesById: Record<string, string>
+	noteLinkOptions: NoteLinkOption[]
 	searchQuery: string
 	searchResults: AiSearchResult[]
 	loadingThreads: boolean
@@ -187,6 +199,23 @@ const trim_message_preview = (value: string): string => {
 	return `${normalized.slice(0, 85)}...`
 }
 
+const get_wiki_draft_context = (value: string, cursor: number): WikiDraftContext | null => {
+	if (cursor < 0 || cursor > value.length) return null
+	const text_before_cursor = value.slice(0, cursor)
+	const open_bracket_index = text_before_cursor.lastIndexOf('[[')
+	if (-1 === open_bracket_index) return null
+
+	const fragment = text_before_cursor.slice(open_bracket_index + 2)
+	if (fragment.includes(']]')) return null
+	if (/\n|\r/.test(fragment)) return null
+
+	return {
+		from: open_bracket_index,
+		to: cursor,
+		query: fragment.trim().toLowerCase(),
+	}
+}
+
 const format_token_count = (value: number): string => value.toLocaleString()
 
 const format_implied_cost = (value: number | null): string => {
@@ -203,6 +232,7 @@ export function ChatPanel(props: ChatPanelProps) {
 		messages,
 		modelName,
 		noteTitlesById,
+		noteLinkOptions,
 		searchQuery,
 		searchResults,
 		loadingThreads,
@@ -239,6 +269,9 @@ export function ChatPanel(props: ChatPanelProps) {
 	const [renamingTitle, setRenamingTitle] = useState(false)
 	const [copiedCodeBlockId, setCopiedCodeBlockId] = useState<string | null>(null)
 	const [copyToastText, setCopyToastText] = useState<string | null>(null)
+	const [composeCursor, setComposeCursor] = useState(0)
+	const [activeWikiSuggestionIndex, setActiveWikiSuggestionIndex] = useState(0)
+	const [hideWikiSuggestions, setHideWikiSuggestions] = useState(false)
 	const liveDictationTextRef = useRef('')
 	const chatMessagesRef = useRef<HTMLDivElement | null>(null)
 	const chatSearchInputRef = useRef<HTMLInputElement | null>(null)
@@ -271,6 +304,20 @@ export function ChatPanel(props: ChatPanelProps) {
 		() => threads.find((entry) => entry.thread.id === activeThreadId) ?? null,
 		[activeThreadId, threads],
 	)
+	const wiki_draft_context = useMemo(() => get_wiki_draft_context(draft, composeCursor), [composeCursor, draft])
+	const wiki_suggestions = useMemo(() => {
+		if (hideWikiSuggestions || !wiki_draft_context) return []
+
+		const query = wiki_draft_context.query
+		const suggestions = noteLinkOptions
+			.filter((option) => {
+				if (!query) return true
+				return option.title.toLowerCase().includes(query)
+			})
+			.slice(0, 8)
+
+		return suggestions
+	}, [hideWikiSuggestions, noteLinkOptions, wiki_draft_context])
 	const chat_search_results = useMemo(() => {
 		const sorted_threads = [...threads].sort((a, b) => {
 			const a_time = Date.parse(a.thread.updatedAt)
@@ -327,6 +374,27 @@ export function ChatPanel(props: ChatPanelProps) {
 		textarea.style.height = `${next_height}px`
 		textarea.style.overflowY = textarea.scrollHeight > max_height ? 'auto' : 'hidden'
 	}, [])
+
+	const apply_wiki_suggestion = useCallback((note_title: string) => {
+		const textarea = composeTextareaRef.current
+		if (!textarea) return
+
+		const selection_start = textarea.selectionStart ?? composeCursor
+		const context = get_wiki_draft_context(draft, selection_start)
+		if (!context) return
+
+		const replacement = `[[${note_title}]]`
+		const next_draft = `${draft.slice(0, context.from)}${replacement}${draft.slice(context.to)}`
+		const next_cursor = context.from + replacement.length
+
+		setDraft(next_draft)
+		setComposeCursor(next_cursor)
+		setHideWikiSuggestions(false)
+		window.setTimeout(() => {
+			textarea.focus()
+			textarea.setSelectionRange(next_cursor, next_cursor)
+		}, 0)
+	}, [composeCursor, draft])
 
 	const show_copy_toast = useCallback((text: string) => {
 		setCopyToastText(text)
@@ -428,6 +496,18 @@ export function ChatPanel(props: ChatPanelProps) {
 	useEffect(() => {
 		resize_compose_textarea()
 	}, [draft, resize_compose_textarea])
+
+	useEffect(() => {
+		setHideWikiSuggestions(false)
+	}, [composeCursor, draft])
+
+	useEffect(() => {
+		if (0 === wiki_suggestions.length) {
+			setActiveWikiSuggestionIndex(0)
+			return
+		}
+		setActiveWikiSuggestionIndex((current) => Math.min(current, wiki_suggestions.length - 1))
+	}, [wiki_suggestions])
 
 	useEffect(() => {
 		if (!chatMessagesRef.current) return
@@ -819,19 +899,70 @@ export function ChatPanel(props: ChatPanelProps) {
 				<textarea
 					ref={composeTextareaRef}
 					value={draft}
-					onChange={(event) => setDraft(event.target.value)}
+					onChange={(event) => {
+						setDraft(event.target.value)
+						setComposeCursor(event.target.selectionStart ?? event.target.value.length)
+					}}
+					onClick={(event) => {
+						setComposeCursor(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+					}}
+					onSelect={(event) => {
+						setComposeCursor(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+					}}
 					onKeyDown={(event) => {
+						if (wiki_suggestions.length > 0) {
+							if ('ArrowDown' === event.key) {
+								event.preventDefault()
+								setActiveWikiSuggestionIndex((current) => (current + 1) % wiki_suggestions.length)
+								return
+							}
+							if ('ArrowUp' === event.key) {
+								event.preventDefault()
+								setActiveWikiSuggestionIndex((current) => (current - 1 + wiki_suggestions.length) % wiki_suggestions.length)
+								return
+							}
+							if ('Escape' === event.key) {
+								event.preventDefault()
+								setHideWikiSuggestions(true)
+								return
+							}
+							if ('Tab' === event.key || ('Enter' === event.key && !event.shiftKey)) {
+								event.preventDefault()
+								const option = wiki_suggestions[activeWikiSuggestionIndex]
+								if (option) apply_wiki_suggestion(option.title)
+								return
+							}
+						}
+
 						if ('Enter' !== event.key || event.shiftKey) return
 						event.preventDefault()
 						const next = draft.trim()
 						if (!next || sending || assistantTyping || isDictating || isTranscribing) return
 						void onSendMessage(next)
 						setDraft('')
+						setComposeCursor(0)
 					}}
 					placeholder="Message Strata AI…"
 					rows={3}
 					disabled={sending || assistantTyping}
 				/>
+				{wiki_suggestions.length > 0 && (
+					<div className="chat-compose-wikilinks" role="listbox" aria-label="Wiki link suggestions">
+						{wiki_suggestions.map((option, index) => (
+							<button
+								key={`${option.id}:${option.title}`}
+								type="button"
+								className={`chat-compose-wikilink-item ${index === activeWikiSuggestionIndex ? 'chat-compose-wikilink-item-active' : ''}`}
+								onMouseDown={(event) => {
+									event.preventDefault()
+									apply_wiki_suggestion(option.title)
+								}}
+							>
+								<span>{option.title}</span>
+							</button>
+						))}
+					</div>
+				)}
 				<button
 					className={`icon-button chat-mic-button ${isDictating ? 'chip-active chat-mic-recording' : ''}`}
 					type="button"

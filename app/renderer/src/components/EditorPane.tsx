@@ -698,6 +698,14 @@ export function EditorPane(props: EditorPaneProps) {
 		carry[item.id.toLowerCase()] = deriveNoteTitle(item.content)
 		return carry
 	}, {})
+	const note_link_options = useMemo(() => {
+		return notes
+			.map((item) => ({
+				id: item.id,
+				title: deriveNoteTitle(item.content),
+			}))
+			.sort((a, b) => a.title.localeCompare(b.title))
+	}, [notes])
 	const open_note_context = useMemo(() => {
 		if (0 === openTabIds.length) return []
 		const notes_by_id = new Map(notes.map((item) => [item.id, item]))
@@ -1312,6 +1320,7 @@ export function EditorPane(props: EditorPaneProps) {
 								messages={chatMessages}
 								modelName={active_chat_model}
 								noteTitlesById={note_titles_by_id}
+								noteLinkOptions={note_link_options}
 								searchQuery={chatSearchQuery}
 								searchResults={chatSearchResults}
 								loadingThreads={chatLoadingThreads}
