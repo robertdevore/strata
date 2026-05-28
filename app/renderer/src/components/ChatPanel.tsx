@@ -336,6 +336,7 @@ export function ChatPanel(props: ChatPanelProps) {
 		const match = modelCatalog.find((entry) => entry.model === effective_model)
 		return match ? `${match.providerLabel} — ${match.model}` : effective_model
 	}, [modelCatalog, optimisticModel, threadModel])
+	const active_model = null !== optimisticModel ? optimisticModel : threadModel
 	const wiki_draft_context = useMemo(() => get_wiki_draft_context(draft, composeCursor), [composeCursor, draft])
 	const wiki_suggestions = useMemo(() => {
 		if (hideWikiSuggestions || !wiki_draft_context) return []
@@ -1081,10 +1082,10 @@ export function ChatPanel(props: ChatPanelProps) {
 							<div className="chat-model-list" role="listbox">
 								<button
 									type="button"
-									className={`chat-model-option ${!optimisticModel && !threadModel ? 'chat-model-option-active' : ''}`}
+									className={`chat-model-option ${!active_model ? 'chat-model-option-active' : ''}`}
 									onClick={() => { setOptimisticModel(''); onSetThreadModel(''); setModelMenuOpen(false) }}
 									role="option"
-									aria-selected={!optimisticModel && !threadModel}
+									aria-selected={!active_model}
 								>
 									Auto
 								</button>
@@ -1092,10 +1093,10 @@ export function ChatPanel(props: ChatPanelProps) {
 									<button
 										key={`${entry.providerId}:${entry.model}`}
 										type="button"
-										className={`chat-model-option ${entry.model === (optimisticModel || threadModel) ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
+										className={`chat-model-option ${entry.model === active_model ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
 										onClick={() => { setOptimisticModel(entry.model); onSetThreadModel(entry.model); setModelMenuOpen(false) }}
 										role="option"
-										aria-selected={entry.model === (optimisticModel || threadModel)}
+										aria-selected={entry.model === active_model}
 									>
 										<span className="chat-model-option-provider">{entry.providerLabel}</span>
 										<span className="chat-model-option-model">{entry.model}</span>
