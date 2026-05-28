@@ -172,11 +172,85 @@ export interface AiRunnerResult {
 
 interface AiRunnerOptions {
 	openNotesContext?: string
+	forcedModel?: string
 }
 
 const build_system_prompt = (open_notes_context?: string): string => {
 	if (!open_notes_context) return SYSTEM_PROMPT
 	return `${SYSTEM_PROMPT}\n\n${open_notes_context}`
+}
+
+const resolve_provider_for_forced_model = (
+	db: StrataDatabase,
+	forced_model: string,
+): { provider: AiProvider; model: string; provider_id: string; route_target: 'cheap' | 'premium' } => {
+	const ai_settings = resolve_ai_settings(db)
+	const normalized_model = forced_model.trim().toLowerCase()
+
+	if (!normalized_model) {
+		return {
+			...resolve_provider_for_route(db, 'premium'),
+			route_target: 'premium',
+		}
+	}
+
+	if (normalized_model === ai_settings.aiCheapModel.trim().toLowerCase()) {
+		const resolved = resolve_provider_for_route(db, 'cheap')
+		return {
+			provider: resolved.provider,
+			model: forced_model,
+			provider_id: resolved.provider_id,
+			route_target: 'cheap',
+		}
+	}
+
+	if (
+		normalized_model === ai_settings.aiPremiumModel.trim().toLowerCase() ||
+		normalized_model === ai_settings.openAiModel.trim().toLowerCase()
+	) {
+		const resolved = resolve_provider_for_route(db, 'premium')
+		return {
+			provider: resolved.provider,
+			model: forced_model,
+			provider_id: resolved.provider_id,
+			route_target: 'premium',
+		}
+	}
+
+	if (/deepseek/i.test(forced_model)) {
+		const provider = create_provider({
+			presetId: 'deepseek-flash',
+			model: forced_model,
+			apiKeys: build_api_keys_map(ai_settings),
+			customBaseUrl: ai_settings.aiCustomBaseUrl,
+		})
+		return { provider, model: forced_model, provider_id: 'deepseek-flash', route_target: 'cheap' }
+	}
+
+	if (/kimi|moonshot/i.test(forced_model)) {
+		const provider = create_provider({
+			presetId: 'kimi',
+			model: forced_model,
+			apiKeys: build_api_keys_map(ai_settings),
+			customBaseUrl: ai_settings.aiCustomBaseUrl,
+		})
+		return { provider, model: forced_model, provider_id: 'kimi', route_target: 'cheap' }
+	}
+
+	const premium_resolved = resolve_provider_for_route(db, 'premium')
+	const provider = create_provider({
+		presetId: premium_resolved.provider_id,
+		model: forced_model,
+		apiKeys: build_api_keys_map(ai_settings),
+		customBaseUrl: ai_settings.aiCustomBaseUrl,
+	})
+
+	return {
+		provider,
+		model: forced_model,
+		provider_id: premium_resolved.provider_id,
+		route_target: 'premium',
+	}
 }
 
 export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?: AiRunnerOptions): Promise<AiRunnerResult> => {
@@ -226,7 +300,16 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 	}
 
 	// 2. Resolve provider
-	let { provider, model, provider_id } = resolve_provider_for_route(db, decision.route)
+	let effective_route_target: 'cheap' | 'premium' = 'cheap' === decision.route ? 'cheap' : 'premium'
+	let provider_resolution = resolve_provider_for_route(db, effective_route_target)
+	if (options?.forcedModel && options.forcedModel.trim()) {
+		provider_resolution = resolve_provider_for_forced_model(db, options.forcedModel)
+		effective_route_target = provider_resolution.route_target
+		route_log.route = effective_route_target
+		route_log.reason = `Thread model locked to ${options.forcedModel}. ${decision.reason}`
+	}
+
+	let { provider, model, provider_id } = provider_resolution
 	route_log.providerId = provider_id
 	route_log.model = model
 
@@ -301,13 +384,14 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 		}
 	} catch (err) {
 		// Cheap provider failure — fall back to premium
-		if ('cheap' === decision.route) {
+		if ('cheap' === effective_route_target) {
 			const premium = resolve_provider_for_route(db, 'premium')
 			provider = premium.provider
 			model = premium.model
 			provider_id = premium.provider_id
 			route_log.providerId = provider_id
 			route_log.model = model
+			route_log.route = 'premium'
 			route_log.fallbackUsed = true
 			route_log.fallbackReason = err instanceof Error ? err.message : 'Cheap provider failed'
 

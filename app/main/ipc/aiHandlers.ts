@@ -93,7 +93,7 @@ const resolve_chat_model = (db: StrataDatabase): string => {
 	const ai_settings = resolve_ai_settings(db)
 	const mode = ai_settings.aiRoutingMode
 	if ('cheap_only' === mode) return ai_settings.aiCheapModel || 'deepseek-v4-flash'
-	return ai_settings.aiPremiumModel || ai_settings.openAiModel || 'gpt-4o'
+	return ai_settings.openAiModel || ai_settings.aiPremiumModel || 'gpt-4o'
 }
 
 export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => void) => {
@@ -128,17 +128,15 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 		if (!thread) {
 			throw new Error('Chat thread was not found.')
 		}
-		if (!thread.model) {
+		if (!thread.model || thread.model !== configured_model) {
 			thread = db.setAiThreadModel(thread.id, configured_model) || thread
 		}
 
 		db.createAiMessage(thread.id, 'user', message)
 		const ai_turn = await run_ai_turn(db, thread, {
 			openNotesContext: build_open_notes_context(openNotes),
+			forcedModel: thread.model || configured_model,
 		})
-		if (ai_turn.routeLog?.model) {
-			thread = db.setAiThreadModel(thread.id, ai_turn.routeLog.model) || thread
-		}
 		if (ai_turn.notesChanged) {
 			on_notes_changed?.()
 		}
