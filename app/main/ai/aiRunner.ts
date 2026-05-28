@@ -23,6 +23,7 @@ const SYSTEM_PROMPT = [
 	'You are Strata AI, an assistant embedded in a local notes app.',
 	'Use available tools to search notes/chats before making claims, especially for analytical requests.',
 	'You may create and edit notes when the user asks. Never delete notes.',
+	'Never claim a note was updated unless a tool call actually changed a note. If no note changed, say that clearly.',
 	'If you create or edit notes, tell the user which notes changed using markdown links in the format [Note title](#strata-note:note_id).',
 	'When referencing notes, prefer note titles with #strata-note: links instead of raw note IDs.',
 	'Thread IDs may be plain text when needed.',
@@ -50,6 +51,39 @@ const derive_chat_title = (message: string): string => {
 		.find((line) => line.length > 0)
 	if (!first_line) return 'New chat'
 	return first_line.length <= 64 ? first_line : `${first_line.slice(0, 61)}...`
+}
+
+const user_requested_note_edit = (user_message: string): boolean => {
+	const lower = user_message.toLowerCase()
+	const has_action = /\b(update|edit|rewrite|change|modify|insert|add|append|prepend|move|reorder|renumber|fix|patch|apply)\b/i.test(lower)
+	const has_note_target = /\b(note|notes|markdown|todo|list|section|callout|content|document)\b/i.test(lower)
+	const has_wiki_link = /\[\[[^\]]+\]\]/.test(user_message)
+	return (has_action && has_note_target) || has_wiki_link
+}
+
+const assistant_claims_note_edit_success = (content: string): boolean => {
+	const lower = content.toLowerCase()
+	const has_success_claim = /\b(done|updated|edited|inserted|added|applied|patched|rewrote|reordered|renumbered|created)\b/i.test(lower)
+	const has_note_scope = /\b(note|notes|markdown|todo|list|section|callout|content)\b/i.test(lower)
+	return has_success_claim && has_note_scope
+}
+
+const enforce_note_edit_truthfulness = (
+	content: string,
+	user_message: string,
+	notes_changed: boolean,
+): string => {
+	if (!content || notes_changed) return content
+
+	if (!user_requested_note_edit(user_message) && !assistant_claims_note_edit_success(content)) {
+		return content
+	}
+
+	return [
+		'I did not apply any note edits in this step.',
+		'No note content was changed.',
+		'Provide the exact note title or a note link like [Title](#strata-note:note_id), and I will apply the edit and confirm exactly what changed.',
+	].join('\n\n')
 }
 
 /** Convert raw note IDs in AI response text to #strata-note: links */
@@ -348,7 +382,7 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 
 			// No tool calls — we have a text response
 			if (!output.toolCalls.length) {
-				const content = output.content
+				const content = enforce_note_edit_truthfulness(output.content, user_message, notes_changed)
 				if (!content) {
 					if (ai_settings.aiEnableRouteLogs) log_route(db, route_log)
 					return {
@@ -416,7 +450,11 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 					route_log.outputTokens = accumulate_usage_value(route_log.outputTokens, fallback_output.usage.outputTokens)
 				}
 
-				const content = fallback_output.content || 'I could not generate a response. Please try again.'
+				const content = enforce_note_edit_truthfulness(
+					fallback_output.content || 'I could not generate a response. Please try again.',
+					user_message,
+					notes_changed,
+				)
 				if (ai_settings.aiEnableRouteLogs) log_route(db, route_log)
 				return {
 					content: linkify_note_ids(db, content),
