@@ -72,12 +72,11 @@ const assistant_claims_note_edit_success = (content: string): boolean => {
 
 const enforce_note_edit_truthfulness = (
 	content: string,
-	user_message: string,
 	notes_changed: boolean,
 ): string => {
 	if (!content || notes_changed) return content
 
-	if (!user_requested_note_edit(user_message) && !assistant_claims_note_edit_success(content)) {
+	if (!assistant_claims_note_edit_success(content)) {
 		return content
 	}
 
@@ -301,6 +300,8 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 	const history = db.listAiMessages(thread.id).slice(-40)
 	const last_user = history.filter((m) => 'user' === m.role).pop()
 	const user_message = last_user?.content || ''
+	const user_messages = history.filter((m) => 'user' === m.role).map((m) => m.content || '')
+	const note_edit_requested_recently = user_messages.slice(-6).some((value) => user_requested_note_edit(value))
 	const system_prompt = build_system_prompt(options?.openNotesContext)
 
 	// 1. Route the request
@@ -358,6 +359,7 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 
 	// 3. Run turn with tool loop
 	let notes_changed = false
+	let forced_note_tool_retry_used = false
 	const input_messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = history
 		.filter((m: { role: string }) => 'user' === m.role || 'assistant' === m.role)
 		.map((m: { role: string; content?: string | null }) => ({
@@ -384,7 +386,19 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 
 			// No tool calls — we have a text response
 			if (!output.toolCalls.length) {
-				const content = enforce_note_edit_truthfulness(output.content, user_message, notes_changed)
+				if (note_edit_requested_recently && !notes_changed && !forced_note_tool_retry_used) {
+					forced_note_tool_retry_used = true
+					if (output.content) {
+						input_messages.push({ role: 'assistant', content: output.content })
+					}
+					input_messages.push({
+						role: 'user',
+						content: 'The user requested a note edit. You must execute note tools now before replying. Use update_note_by_title when a note title is provided. If editing fails, report the exact tool error and any matching note candidates.',
+					})
+					continue
+				}
+
+				const content = enforce_note_edit_truthfulness(output.content, notes_changed)
 				if (!content) {
 					if (ai_settings.aiEnableRouteLogs) log_route(db, route_log)
 					return {
@@ -454,7 +468,6 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 
 				const content = enforce_note_edit_truthfulness(
 					fallback_output.content || 'I could not generate a response. Please try again.',
-					user_message,
 					notes_changed,
 				)
 				if (ai_settings.aiEnableRouteLogs) log_route(db, route_log)
