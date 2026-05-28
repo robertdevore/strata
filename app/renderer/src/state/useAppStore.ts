@@ -43,6 +43,7 @@ interface AppState {
 	openNoteInTab: (id: string) => void
 	closeTab: (id: string) => void
 	activateTab: (id: string) => void
+	reorderTabs: (from_id: string, to_id: string) => void
 	navigateBack: () => void
 	navigateForward: () => void
 	createNote: () => Promise<void>
@@ -110,7 +111,34 @@ export const useAppStore = create<AppState>((set, get) => ({
 	async load() {
 		const [notes, tags, settings] = await Promise.all([notesService.list(), notesService.listTags(), settingsService.get()])
 		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
-		set({ notes, tags, settings, activeFilter, selectedNoteId: null, openTabs: [], untouchedNewNoteIds: {} })
+		set((state) => {
+			const note_ids = new Set(notes.map((note) => note.id))
+			const open_tabs = state.openTabs.filter((note_id) => note_ids.has(note_id))
+			const selected_note_id = state.selectedNoteId && note_ids.has(state.selectedNoteId)
+				? state.selectedNoteId
+				: (open_tabs[0] ?? null)
+
+			const drafts: Record<string, string> = {}
+			for (const [note_id, draft] of Object.entries(state.drafts)) {
+				if (note_ids.has(note_id)) drafts[note_id] = draft
+			}
+
+			const untouched_new_note_ids: Record<string, true> = {}
+			for (const note_id of Object.keys(state.untouchedNewNoteIds)) {
+				if (note_ids.has(note_id)) untouched_new_note_ids[note_id] = true
+			}
+
+			return {
+				notes,
+				tags,
+				settings,
+				activeFilter,
+				selectedNoteId: selected_note_id,
+				openTabs: open_tabs,
+				drafts,
+				untouchedNewNoteIds: untouched_new_note_ids,
+			}
+		})
 	},
 
 	async refreshTags() {
@@ -169,6 +197,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 		} else {
 			set({ selectedNoteId: id })
 		}
+	},
+
+	reorderTabs(from_id, to_id) {
+		if (from_id === to_id) return
+		set((state) => {
+			const from_index = state.openTabs.indexOf(from_id)
+			const to_index = state.openTabs.indexOf(to_id)
+			if (-1 === from_index || -1 === to_index || from_index === to_index) return state
+
+			const reordered = [...state.openTabs]
+			const [moved] = reordered.splice(from_index, 1)
+			reordered.splice(to_index, 0, moved)
+
+			return { openTabs: reordered }
+		})
 	},
 
 	navigateBack() {
