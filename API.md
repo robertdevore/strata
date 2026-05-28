@@ -9,6 +9,18 @@ This document is a practical reference for tools/agents that need to read, creat
 - Data is local-only (SQLite under Strata `userData`).
 - Optional auth: set `STRATA_API_TOKEN` before launching Strata.
 
+## Enterprise CLI
+
+Strata now ships with an enterprise-grade TypeScript CLI that uses this HTTP API only:
+
+```bash
+npm run strata -- health
+npm run strata -- notes list --json
+npm run strata -- notes create --content "# Title\n\nBody"
+```
+
+See `CLI.md` for command coverage, safety behavior, output modes, and exit codes.
+
 If auth is enabled, include one of:
 
 - `X-Strata-Token: <token>`

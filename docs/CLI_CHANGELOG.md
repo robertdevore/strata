@@ -35,3 +35,16 @@ Validation:
 - vitest run app/renderer/src/tests/cli/validators.test.ts
 - vitest run app/renderer/src/tests/cli/errors.test.ts
 - vitest run app/renderer/src/tests/cli/noSqliteAccess.test.ts
+
+### Item 3: CLI documentation and command discoverability
+Status: completed
+
+Summary:
+- Added canonical root CLI guide with command surface, safety model, environment variables, and exit code contract.
+- Updated README and API docs to reference the enterprise CLI entrypoints and command examples.
+- Simplified docs/CLI.md to point to the canonical root CLI.md source of truth.
+
+Validation:
+- npm run strata -- --help
+- npm run strata -- notes list --json
+- npm run strata -- ai route "Create a note about provider routing"

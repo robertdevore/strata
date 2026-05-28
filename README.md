@@ -85,8 +85,11 @@ npm run test:watch   # Run tests in watch mode
 npm run lint         # Lint project
 npm run format       # Format project
 npm run backup:notes # Backup local notes database files
+npm run strata -- <command> # Enterprise CLI entrypoint
+npm run strata:ai -- <command> # AI-focused CLI namespace
+npm run strata:notes -- <command> # Notes-focused CLI namespace
 npm run notes:api -- <command> [args] # Local notes HTTP API helper
-npm run strata:ai    # AI helper script
+npm run strata:ai:legacy -- <command> # Legacy AI helper script
 ```
 
 ## Build Outputs
@@ -158,9 +161,16 @@ Common endpoints:
 - `GET /notes/:id/ai-edits`
 - `POST /ai-edits/:id/revert`
 
+Enterprise CLI docs:
+
+- `CLI.md`
+
 CLI helper examples:
 
 ```bash
+npm run strata -- health
+npm run strata -- notes list --query "routing" --json
+npm run strata -- notes create --content "# Script note\n\nCreated from CLI" --tag automation
 npm run notes:api -- health
 npm run notes:api -- list
 npm run notes:api -- create '{"content":"# Script note","tags":["automation"]}'
@@ -173,7 +183,8 @@ npm run notes:api -- delete <NOTE_ID>
 Defaults (all configurable in Settings):
 
 - `Cmd/Ctrl+N` New note
-- `Cmd/Ctrl+P` Quick Open
+- `Cmd/Ctrl+O` Quick Open
+- `Cmd/Ctrl+P` Toggle Preview Panel
 - `Cmd/Ctrl+K` Command palette
 - `Cmd/Ctrl+F` Find in note / focus search
 - `Cmd/Ctrl+S` Save note
