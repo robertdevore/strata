@@ -1235,14 +1235,7 @@ export function EditorPane(props: EditorPaneProps) {
 					<button className={`icon-button ${showChatPanel ? 'chip-active' : ''}`} onClick={() => {
 						setShowChatPanel((value) => {
 							const next = !value
-							if (next) {
-								setShowPreview(false)
-								setChatThreadId(null)
-								setChatMessages([])
-								setChatSearchResults([])
-								setChatSearchQuery('')
-								setChatErrorMessage('')
-							}
+							if (next) setShowPreview(false)
 							return next
 						})
 					}} title="Open AI Chat"><ChatbotIcon /></button>

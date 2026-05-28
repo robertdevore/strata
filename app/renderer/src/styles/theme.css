@@ -1501,6 +1501,24 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	gap: 4px;
 }
 
+.chat-message-user {
+	justify-items: end;
+}
+
+.chat-message-user .chat-bubble {
+	width: min(66.677%, 100%);
+	margin-left: auto;
+}
+
+.chat-message-user .chat-bubble-meta {
+	justify-content: flex-end;
+}
+
+.chat-message-user .chat-bubble-actions {
+	width: min(66.677%, 100%);
+	justify-self: end;
+}
+
 .chat-bubble {
 	border: 1px solid var(--border);
 	border-radius: 10px;
