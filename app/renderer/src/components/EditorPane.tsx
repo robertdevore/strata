@@ -1,8 +1,8 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
-import { EditorView } from '@codemirror/view'
-import { EditorSelection } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
+import { EditorSelection, Prec } from '@codemirror/state'
 import { autocompletion, type CompletionContext } from '@codemirror/autocomplete'
 import { oneDark } from '@codemirror/theme-one-dark'
 import ReactMarkdown from 'react-markdown'
@@ -249,6 +249,49 @@ const convertRichTextToMarkdown = (html_content: string): string => {
 	}
 }
 
+const normalize_pasted_list_newlines = (text: string): string => {
+	// Collapse blank lines that appear between consecutive list items
+	return text.replace(/\n\n(?=[-*+])/g, '\n')
+		.replace(/\n\n(?=\d+[.)])/g, '\n')
+}
+
+const listNewlineKeymap = Prec.highest(keymap.of([
+	{
+		key: 'Enter',
+		run: (view) => {
+			const { state } = view
+			const pos = state.selection.main.head
+			const line = state.doc.lineAt(pos)
+			const text = line.text
+			const cursor_in_line = pos - line.from
+
+			// Only handle when cursor is at end of line
+			if (cursor_in_line !== text.length) return false
+
+			// Match list markers: "- ", "* ", "+ ", "1. ", "1) "
+			const list_match = /^(\s*)([-*+]|\d+[.)])\s+/.exec(text)
+			if (!list_match) return false
+
+			const indent = list_match[1]
+			const marker = list_match[2]
+			const after_marker = text.slice(list_match[0].length)
+
+			// If line has content, continue list without blank line
+			if (after_marker.trim().length > 0) {
+				const insert_text = `\n${indent}${marker} `
+				view.dispatch({
+					changes: { from: pos, insert: insert_text },
+					selection: { anchor: pos + insert_text.length },
+				})
+				return true
+			}
+
+			// If line is empty after marker (just "- "), let default handler exit the list
+			return false
+		},
+	},
+]))
+
 const locateNextMatch = (content: string, query: string, start_at: number): number => {
 	if (!query) return -1
 	const direct_index = content.indexOf(query, start_at)
@@ -268,7 +311,7 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 			if (!converted) return false
 			insert_content = converted
 		} else if (plain_text) {
-			insert_content = plain_text
+			insert_content = normalize_pasted_list_newlines(plain_text)
 		} else {
 			return false
 		}
@@ -1309,7 +1352,7 @@ export function EditorPane(props: EditorPaneProps) {
 					<CodeMirror
 						value={editorContent}
 						height="100%"
-						extensions={[markdown(), EditorView.lineWrapping, richTextPasteExtension, selectionMarkdownWrapExtension, autocompletion({ override: [wikiLinkCompletions] })]}
+						extensions={[markdown(), EditorView.lineWrapping, listNewlineKeymap, richTextPasteExtension, selectionMarkdownWrapExtension, autocompletion({ override: [wikiLinkCompletions] })]}
 						onCreateEditor={(view) => {
 							editorViewRef.current = view
 						}}
