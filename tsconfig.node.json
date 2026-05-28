@@ -26,5 +26,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "app/main", "vitest.config.ts"]
+  "include": ["vite.config.ts", "app/main", "app/cli", "scripts/strata-cli.ts", "vitest.config.ts"]
 }

@@ -23,7 +23,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['app/main/**/*.ts', 'app/preload/**/*.ts', 'app/shared/**/*.ts', 'vite.config.ts', 'vitest.config.ts'],
+    files: ['app/main/**/*.ts', 'app/preload/**/*.ts', 'app/shared/**/*.ts', 'app/cli/**/*.ts', 'scripts/**/*.ts', 'vite.config.ts', 'vitest.config.ts'],
     extends: [js.configs.recommended, tseslint.configs.recommended, eslintConfigPrettier],
     languageOptions: {
       ecmaVersion: 2022,
