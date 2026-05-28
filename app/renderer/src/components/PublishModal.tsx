@@ -27,10 +27,6 @@ export function PublishModal({ open, noteTitle, noteContent, onClose }: PublishM
 		return () => window.removeEventListener('keydown', onKeyDown)
 	}, [open, onClose])
 
-	useEffect(() => {
-		if (!open) { setStatus('idle'); setMessage(''); setPublishedPath('') }
-	}, [open])
-
 	if (!open) return null
 
 	const handleExport = async () => {

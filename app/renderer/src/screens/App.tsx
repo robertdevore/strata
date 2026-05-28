@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
@@ -106,6 +106,7 @@ export function App() {
 	const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
 	const [showRelatedNotes, setShowRelatedNotes] = useState(false)
 	const [showTagsModal, setShowTagsModal] = useState(false)
+	const creatingInitialNoteRef = useRef(false)
 	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
 	const hotkeys: HotkeysSettings = useMemo(() => ({ ...DEFAULT_HOTKEYS, ...(store.settings.hotkeys ?? {}) }), [store.settings.hotkeys])
 	const clearUndoToast = useCallback(() => {
@@ -123,16 +124,20 @@ export function App() {
 	useEffect(() => {
 		// After initial load, start with a fresh blank note — but only if the
 		// newest note isn't already an empty untitled one (avoid duplicates).
+		if (creatingInitialNoteRef.current) return
 		if (store.notes.length > 0 && !store.selectedNoteId && store.openTabs.length === 0) {
 			const newest = store.notes[0]
 			const is_empty_untitled = !newest.content.trim() || '# Untitled\n\n' === newest.content
 			if (!is_empty_untitled) {
-				void store.createNote()
+				creatingInitialNoteRef.current = true
+				void store.createNote().finally(() => {
+					creatingInitialNoteRef.current = false
+				})
 			} else {
 				store.openNoteInTab(newest.id)
 			}
 		}
-	}, [store.notes, store.selectedNoteId, store.openTabs])
+	}, [store, store.notes, store.selectedNoteId, store.openTabs])
 
 	useEffect(() => {
 		document.body.classList.toggle('platform-mac', isMac)
@@ -434,10 +439,13 @@ export function App() {
 							store.activateTab(id)
 						}}
 						onCloseTab={(id) => store.closeTab(id)}
+						onReorderTabs={(from_id, to_id) => store.reorderTabs(from_id, to_id)}
 					/>
 					<EditorPane
 					note={store.selectedNote()}
 					notes={store.notes}
+					openTabIds={store.openTabs}
+					drafts={store.drafts}
 					openAiModel={store.settings.openAiModel}
 					content={store.effectiveContent()}
 					tags={store.tags}
@@ -502,6 +510,7 @@ export function App() {
 				}}
 			/>
 			<TagsModal
+				key={showTagsModal ? 'tags-modal-open' : 'tags-modal-closed'}
 				open={showTagsModal}
 				tags={store.tags}
 				pinnedTags={store.settings.pinnedTags ?? []}

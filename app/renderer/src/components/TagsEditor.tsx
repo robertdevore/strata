@@ -10,15 +10,14 @@ interface TagsEditorProps {
 }
 
 export function TagsEditor({ open, currentTags, existingTags, onClose, onApply }: TagsEditorProps) {
-	const [value, setValue] = useState('')
+	const [value, setValue] = useState(() => currentTags.join(', '))
 	const inputRef = useRef<HTMLInputElement>(null)
 
 	useEffect(() => {
-		if (open) {
-			setValue(currentTags.join(', '))
-			window.setTimeout(() => inputRef.current?.focus(), 0)
-		}
-	}, [open, currentTags])
+		if (!open) return
+		const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
+		return () => window.clearTimeout(timer)
+	}, [open])
 
 	const suggestions = useMemo(() => {
 		const input = value.split(',').pop()?.trim().toLowerCase() ?? ''

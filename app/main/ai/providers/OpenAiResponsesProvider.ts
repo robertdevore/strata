@@ -69,10 +69,10 @@ export class OpenAiResponsesProvider implements AiProvider {
 		}
 
 		const payload = (await response.json()) as OpenAiResponsesPayload
-		return this.normalize(payload, input.model)
+		return this.normalize(payload)
 	}
 
-	private normalize(payload: OpenAiResponsesPayload, _model: string): AiProviderTurnOutput {
+	private normalize(payload: OpenAiResponsesPayload): AiProviderTurnOutput {
 		const content = this.extract_text(payload)
 		const toolCalls = this.extract_tool_calls(payload)
 

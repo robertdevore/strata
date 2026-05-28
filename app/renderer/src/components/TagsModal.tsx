@@ -20,7 +20,6 @@ export function TagsModal({ open, tags, pinnedTags, selectedTag, onClose, onSele
 
 	useEffect(() => {
 		if (!open) return
-		setQuery('')
 		const onKeyDown = (event: KeyboardEvent) => {
 			if ('Escape' === event.key) { event.preventDefault(); onClose() }
 		}
@@ -28,14 +27,6 @@ export function TagsModal({ open, tags, pinnedTags, selectedTag, onClose, onSele
 		window.setTimeout(() => inputRef.current?.focus(), 10)
 		return () => window.removeEventListener('keydown', onKeyDown)
 	}, [open, onClose])
-
-	useEffect(() => {
-		if (!open) {
-			setQuery('')
-			set_sort_by('alphabet')
-			set_sort_order('asc')
-		}
-	}, [open])
 
 	if (!open) return null
 

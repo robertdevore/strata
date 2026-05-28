@@ -60,11 +60,6 @@ export function CommandPalette({
 		return () => window.clearTimeout(timer)
 	}, [])
 
-	// Reset selection when query changes
-	useEffect(() => {
-		setSelectedIndex(0)
-	}, [query])
-
 	// Filtered note results (quick-open mode)
 	const noteResults = useMemo(() => {
 		if ('quick-open' !== mode) return []
@@ -159,7 +154,10 @@ export function CommandPalette({
 					ref={inputRef}
 					className="palette-input"
 					value={query}
-					onChange={(event) => setQuery(event.target.value)}
+					onChange={(event) => {
+						setQuery(event.target.value)
+						setSelectedIndex(0)
+					}}
 					onKeyDown={onKeyDown}
 					placeholder={'quick-open' === mode ? 'Search notes...' : 'Run a command...'}
 					aria-label={'quick-open' === mode ? 'Quick open notes' : 'Command palette'}

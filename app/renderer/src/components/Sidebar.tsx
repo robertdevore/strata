@@ -46,15 +46,15 @@ export function Sidebar(props: SidebarProps) {
 	const [menu, setMenu] = useState<MenuState | null>(null)
 	const [tagsCollapsed, setTagsCollapsed] = useState(false)
 	const [dragIndex, setDragIndex] = useState<number | null>(null)
-	const [visibleCount, setVisibleCount] = useState(50)
+	const [visibleCountsByKey, setVisibleCountsByKey] = useState<Record<string, number>>({})
 	const menuRef = useRef<HTMLDivElement>(null)
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const selectedIndex = useMemo(() => props.notes.findIndex((note) => note.id === props.selectedId), [props.notes, props.selectedId])
-
-	// Reset visible count when the note list changes (filter, search, tag, sort)
-	useEffect(() => {
-		setVisibleCount(50)
-	}, [props.activeFilter, props.searchQuery, props.selectedTag, props.notes.length])
+	const active_list_key = useMemo(
+		() => `${props.activeFilter}|${props.searchQuery}|${props.selectedTag ?? ''}|${props.notes.length}`,
+		[props.activeFilter, props.searchQuery, props.selectedTag, props.notes.length],
+	)
+	const visibleCount = visibleCountsByKey[active_list_key] ?? 50
 
 	// Auto-load more notes on scroll
 	const onScrollNearBottom = useCallback(() => {
@@ -62,9 +62,17 @@ export function Sidebar(props: SidebarProps) {
 		if (!el) return
 		const threshold = 80 // px from bottom to trigger load
 		if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
-			setVisibleCount((prev) => Math.min(prev + 50, props.notes.length))
+			setVisibleCountsByKey((prev) => {
+				const current_count = prev[active_list_key] ?? 50
+				const next_count = Math.min(current_count + 50, props.notes.length)
+				if (next_count === current_count) return prev
+				return {
+					...prev,
+					[active_list_key]: next_count,
+				}
+			})
 		}
-	}, [props.notes.length])
+	}, [active_list_key, props.notes.length])
 
 	const visibleNotes = props.notes.slice(0, visibleCount)
 	const hasMore = visibleCount < props.notes.length

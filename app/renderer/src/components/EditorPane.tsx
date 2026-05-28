@@ -9,7 +9,7 @@ import ReactMarkdown from 'react-markdown'
 import { renderToStaticMarkup } from 'react-dom/server'
 import remarkGfm from 'remark-gfm'
 import TurndownService from 'turndown'
-import type { AiMessage, AiSearchResult, AiThreadSummary, Note } from '@shared/types'
+import type { AiMessage, AiRouteLog, AiSearchResult, AiThreadSummary, Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { aiService } from '@renderer/src/services/aiService'
 import { TagsEditor } from './TagsEditor'
@@ -20,6 +20,8 @@ import { PublishModal } from './PublishModal'
 interface EditorPaneProps {
 	note: Note | null
 	notes: Note[]
+	openTabIds: string[]
+	drafts: Record<string, string>
 	openAiModel: string
 	content: string
 	tags: Array<{ name: string; count: number }>
@@ -33,6 +35,103 @@ interface EditorPaneProps {
 	onSetTags: (tags: string[]) => void
 	onOpenNoteFromChat: (note_id: string, new_tab?: boolean) => Promise<void>
 	onShowRelatedNotes: () => void
+}
+
+interface ChatUsageSummary {
+	inputTokens: number
+	outputTokens: number
+	totalTokens: number
+	impliedCostUsd: number
+	providers: Array<{
+		providerId: string
+		model: string
+		inputTokens: number
+		outputTokens: number
+		impliedCostUsd: number
+		requests: number
+	}>
+}
+
+const CHAT_TOKEN_PRICING_BY_PROVIDER: Record<string, { inputPerMillion: number; outputPerMillion: number }> = {
+	openai: { inputPerMillion: 5, outputPerMillion: 15 },
+	deepseek: { inputPerMillion: 0.27, outputPerMillion: 1.1 },
+	'openrouter': { inputPerMillion: 2, outputPerMillion: 6 },
+	kimi: { inputPerMillion: 1.8, outputPerMillion: 3.2 },
+	custom: { inputPerMillion: 2, outputPerMillion: 6 },
+	default: { inputPerMillion: 2, outputPerMillion: 6 },
+}
+
+const CHAT_TOKEN_PRICING_BY_MODEL_PATTERN: Array<{ match: RegExp; pricing: { inputPerMillion: number; outputPerMillion: number } }> = [
+	{ match: /gpt-5|codex/i, pricing: { inputPerMillion: 2.5, outputPerMillion: 10 } },
+	{ match: /gpt-4o/i, pricing: { inputPerMillion: 5, outputPerMillion: 15 } },
+	{ match: /deepseek/i, pricing: { inputPerMillion: 0.27, outputPerMillion: 1.1 } },
+	{ match: /kimi|moonshot/i, pricing: { inputPerMillion: 1.8, outputPerMillion: 3.2 } },
+]
+
+const get_provider_pricing = (provider_id: string): { inputPerMillion: number; outputPerMillion: number } => {
+	const normalized = provider_id.trim().toLowerCase()
+	for (const key of Object.keys(CHAT_TOKEN_PRICING_BY_PROVIDER)) {
+		if ('default' === key) continue
+		if (normalized.includes(key)) return CHAT_TOKEN_PRICING_BY_PROVIDER[key]
+	}
+	return CHAT_TOKEN_PRICING_BY_PROVIDER.default
+}
+
+const get_model_pricing = (model: string): { inputPerMillion: number; outputPerMillion: number } | null => {
+	for (const candidate of CHAT_TOKEN_PRICING_BY_MODEL_PATTERN) {
+		if (candidate.match.test(model)) return candidate.pricing
+	}
+	return null
+}
+
+const estimate_log_cost = (log: AiRouteLog): number => {
+	const pricing = get_model_pricing(log.model) ?? get_provider_pricing(log.providerId)
+	const input_tokens = log.inputTokens ?? 0
+	const output_tokens = log.outputTokens ?? 0
+	return ((input_tokens / 1_000_000) * pricing.inputPerMillion) + ((output_tokens / 1_000_000) * pricing.outputPerMillion)
+}
+
+const build_chat_usage_summary = (logs: AiRouteLog[]): ChatUsageSummary => {
+	let input_tokens = 0
+	let output_tokens = 0
+	let implied_cost_usd = 0
+	const providers = new Map<string, ChatUsageSummary['providers'][number]>()
+
+	for (const log of logs) {
+		const log_input = log.inputTokens ?? 0
+		const log_output = log.outputTokens ?? 0
+		const log_cost = estimate_log_cost(log)
+		input_tokens += log_input
+		output_tokens += log_output
+		implied_cost_usd += log_cost
+
+		const provider_key = `${log.providerId}|${log.model}`
+		const current = providers.get(provider_key)
+		if (current) {
+			current.inputTokens += log_input
+			current.outputTokens += log_output
+			current.impliedCostUsd += log_cost
+			current.requests += 1
+			continue
+		}
+
+		providers.set(provider_key, {
+			providerId: log.providerId,
+			model: log.model,
+			inputTokens: log_input,
+			outputTokens: log_output,
+			impliedCostUsd: log_cost,
+			requests: 1,
+		})
+	}
+
+	return {
+		inputTokens: input_tokens,
+		outputTokens: output_tokens,
+		totalTokens: input_tokens + output_tokens,
+		impliedCostUsd: implied_cost_usd,
+		providers: [...providers.values()].sort((a, b) => b.impliedCostUsd - a.impliedCostUsd),
+	}
 }
 
 const saveLabel = (state: string, last: string | null): string => {
@@ -190,7 +289,7 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 })
 
 export function EditorPane(props: EditorPaneProps) {
-	const { note, notes, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes } = props
+	const { note, notes, openTabIds, drafts, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
 	const [showChatPanel, setShowChatPanel] = useState(false)
@@ -203,6 +302,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [chatThreads, setChatThreads] = useState<AiThreadSummary[]>([])
 	const [chatThreadId, setChatThreadId] = useState<string | null>(null)
 	const [chatMessages, setChatMessages] = useState<AiMessage[]>([])
+	const [chatUsageSummary, setChatUsageSummary] = useState<ChatUsageSummary | null>(null)
 	const [chatSearchQuery, setChatSearchQuery] = useState('')
 	const [chatSearchResults, setChatSearchResults] = useState<AiSearchResult[]>([])
 	const [chatLoadingThreads, setChatLoadingThreads] = useState(false)
@@ -219,6 +319,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [aiEdits, setAiEdits] = useState<Array<import('@shared/types').AiNoteEdit>>([])
 	const [showPublish, setShowPublish] = useState(false)
 	const [copyToast, setCopyToast] = useState(false)
+	const noteIdPatternRef = useRef(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi)
 	const [inlineFindQuery, setInlineFindQuery] = useState('')
 	const [showInlineFind, setShowInlineFind] = useState(false)
 	const [inlineFindCount, setInlineFindCount] = useState(0)
@@ -392,6 +493,7 @@ export function EditorPane(props: EditorPaneProps) {
 	useEffect(() => {
 		if (!showChatPanel || !chatThreadId) {
 			setChatMessages([])
+			setChatUsageSummary(null)
 			return
 		}
 
@@ -410,6 +512,29 @@ export function EditorPane(props: EditorPaneProps) {
 			.finally(() => {
 				if (disposed) return
 				setChatLoadingMessages(false)
+			})
+
+		return () => {
+			disposed = true
+		}
+	}, [chatThreadId, showChatPanel])
+
+	useEffect(() => {
+		if (!showChatPanel || !chatThreadId) {
+			setChatUsageSummary(null)
+			return
+		}
+
+		let disposed = false
+		void aiService
+			.listRouteLogs(chatThreadId)
+			.then((logs) => {
+				if (disposed) return
+				setChatUsageSummary(build_chat_usage_summary(logs))
+			})
+			.catch(() => {
+				if (disposed) return
+				setChatUsageSummary(null)
 			})
 
 		return () => {
@@ -547,6 +672,23 @@ export function EditorPane(props: EditorPaneProps) {
 		carry[item.id.toLowerCase()] = deriveNoteTitle(item.content)
 		return carry
 	}, {})
+	const open_note_context = useMemo(() => {
+		if (0 === openTabIds.length) return []
+		const notes_by_id = new Map(notes.map((item) => [item.id, item]))
+
+		return openTabIds
+			.map((note_id) => {
+				const open_note = notes_by_id.get(note_id)
+				if (!open_note) return null
+				const effective_content = drafts[note_id] ?? open_note.content
+				return {
+					id: note_id,
+					title: deriveNoteTitle(effective_content),
+					content: effective_content,
+				}
+			})
+			.filter((entry): entry is { id: string; title: string; content: string } => null !== entry)
+	}, [drafts, notes, openTabIds])
 	const active_chat_model = chatThreadId
 		? chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model || openAiModel
 		: openAiModel
@@ -800,6 +942,33 @@ export function EditorPane(props: EditorPaneProps) {
 		setChatThreads(threads)
 	}
 
+	const refreshChatUsage = async (thread_id: string | null) => {
+		if (!thread_id) {
+			setChatUsageSummary(null)
+			return
+		}
+		try {
+			const logs = await aiService.listRouteLogs(thread_id)
+			setChatUsageSummary(build_chat_usage_summary(logs))
+		} catch {
+			setChatUsageSummary(null)
+		}
+	}
+
+	const maybeOpenMutatedNoteFromAssistant = async (assistant_content: string) => {
+		const lower = assistant_content.toLowerCase()
+		const looks_like_mutation = lower.includes('create_note') || lower.includes('update_note') || lower.includes('created note') || lower.includes('updated note')
+		if (!looks_like_mutation) return
+
+		const matched_note_ids = Array.from(new Set((assistant_content.match(noteIdPatternRef.current) ?? []).map((value) => value.toLowerCase())))
+		if (0 === matched_note_ids.length) return
+
+		const existing_note = notes.find((candidate) => matched_note_ids.includes(candidate.id.toLowerCase()))
+		if (!existing_note) return
+
+		await onOpenNoteFromChat(existing_note.id)
+	}
+
 	const sendChatMessage = async (message: string) => {
 		if (chatSending || chatAssistantTyping) return
 		setChatErrorMessage('')
@@ -817,9 +986,11 @@ export function EditorPane(props: EditorPaneProps) {
 			const response = await aiService.sendMessage({
 				threadId: chatThreadId ?? undefined,
 				message,
+				openNotes: open_note_context,
 			})
 			setChatThreadId(response.thread.id)
 			await refreshChatThreads()
+			await refreshChatUsage(response.thread.id)
 
 			const persisted_messages = await aiService.listMessages(response.thread.id)
 			const base_messages = persisted_messages.filter((item) => item.id !== response.message.id)
@@ -843,6 +1014,8 @@ export function EditorPane(props: EditorPaneProps) {
 					}
 				}, 16)
 			})
+
+			await maybeOpenMutatedNoteFromAssistant(response.message.content)
 		} catch (error) {
 			stopAssistantTypingAnimation()
 			setChatMessages((current) => current.filter((item) => item.id !== optimistic_message.id))
@@ -852,8 +1025,8 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}
 
-	const runChatSearch = async () => {
-		const query = chatSearchQuery.trim()
+	const runChatSearch = async (query_override?: string) => {
+		const query = (query_override ?? chatSearchQuery).trim()
 		if (!query) {
 			setChatSearchResults([])
 			return
@@ -863,6 +1036,20 @@ export function EditorPane(props: EditorPaneProps) {
 			setChatSearchResults(await aiService.searchChats(query))
 		} catch (error) {
 			setChatErrorMessage(error instanceof Error ? error.message : 'Failed to search previous chats')
+		}
+	}
+
+	const renameChatThread = async (thread_id: string, title: string) => {
+		setChatErrorMessage('')
+		try {
+			const renamed = await aiService.renameThread(thread_id, title)
+			if (!renamed) {
+				setChatErrorMessage('Chat title could not be updated')
+				return
+			}
+			await refreshChatThreads()
+		} catch (error) {
+			setChatErrorMessage(error instanceof Error ? error.message : 'Failed to rename chat')
 		}
 	}
 
@@ -902,16 +1089,17 @@ export function EditorPane(props: EditorPaneProps) {
 	const wikiLinkToMarkdown = (md: string): string => {
 		// Protect inline code spans and fenced code blocks from wiki link conversion
 		const code_spans: string[] = []
+		const code_placeholder = (index: number) => `__STRATA_CODE_SPAN_${index}__`
 		const protected_md = md
 			// Protect fenced code blocks
 			.replace(/```[\s\S]*?```/g, (match) => {
 				code_spans.push(match)
-				return `\x00CODE${code_spans.length - 1}\x00`
+				return code_placeholder(code_spans.length - 1)
 			})
 			// Protect inline code spans
 			.replace(/`[^`]+`/g, (match) => {
 				code_spans.push(match)
-				return `\x00CODE${code_spans.length - 1}\x00`
+				return code_placeholder(code_spans.length - 1)
 			})
 
 		// Convert [[wiki links]] to standard markdown links (only outside code)
@@ -923,7 +1111,7 @@ export function EditorPane(props: EditorPaneProps) {
 		})
 
 		// Restore code spans
-		return converted.replace(/\x00CODE(\d+)\x00/g, (_m, idx) => code_spans[Number(idx)] ?? '')
+		return converted.replace(/__STRATA_CODE_SPAN_(\d+)__/g, (_m, idx) => code_spans[Number(idx)] ?? '')
 	}
 
 	// Handle clicks on wiki links in the preview panel
@@ -1108,11 +1296,13 @@ export function EditorPane(props: EditorPaneProps) {
 								assistantTyping={chatAssistantTyping}
 								deleting={chatDeleting}
 								errorMessage={chatErrorMessage}
+								chatUsageSummary={chatUsageSummary}
 								onSelectThread={(thread_id) => {
 									stopAssistantTypingAnimation()
 									if (!thread_id) {
 										setChatThreadId(null)
 										setChatMessages([])
+										setChatUsageSummary(null)
 										return
 									}
 									setChatThreadId(thread_id)
@@ -1122,19 +1312,21 @@ export function EditorPane(props: EditorPaneProps) {
 									stopAssistantTypingAnimation()
 									setChatThreadId(null)
 									setChatMessages([])
+									setChatUsageSummary(null)
 									setChatSearchResults([])
 									setChatErrorMessage('')
 								}}
 								onDeleteThread={deleteSelectedChatThread}
+								onRenameThread={renameChatThread}
 								onSearchQueryChange={setChatSearchQuery}
-								onRunSearch={() => void runChatSearch()}
+								onRunSearch={(query) => void runChatSearch(query)}
 								onClearSearch={() => {
 									setChatSearchQuery('')
 									setChatSearchResults([])
 								}}
 								onSendMessage={sendChatMessage}
-								onOpenNote={(note_id) => {
-									void onOpenNoteFromChat(note_id)
+								onOpenNote={(note_id, new_tab) => {
+									void onOpenNoteFromChat(note_id, new_tab)
 								}}
 							/>
 						) : (
@@ -1296,7 +1488,11 @@ export function EditorPane(props: EditorPaneProps) {
 						onChange={(event) => setInlineFindQuery(event.target.value)}
 						onKeyDown={(event) => {
 							if ('Enter' === event.key) {
-								event.shiftKey ? handleInlineFindPrev() : handleInlineFindNext()
+								if (event.shiftKey) {
+									handleInlineFindPrev()
+								} else {
+									handleInlineFindNext()
+								}
 							}
 							if ('Escape' === event.key) {
 								setShowInlineFind(false)
@@ -1377,8 +1573,9 @@ export function EditorPane(props: EditorPaneProps) {
 					</div>
 				</div>
 			)}
-			<TagsEditor open={showTagsEditor} currentTags={note.tags} existingTags={existingTags} onClose={() => setShowTagsEditor(false)} onApply={onSetTags} />
+			<TagsEditor key={showTagsEditor ? `tags-editor-open-${note.id}` : `tags-editor-closed-${note.id}`} open={showTagsEditor} currentTags={note.tags} existingTags={existingTags} onClose={() => setShowTagsEditor(false)} onApply={onSetTags} />
 			<PublishModal
+				key={showPublish ? `publish-open-${note.id}` : `publish-closed-${note.id}`}
 				open={showPublish}
 				noteTitle={deriveNoteTitle(content)}
 				noteContent={content}
