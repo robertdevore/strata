@@ -144,6 +144,13 @@ const resolve_provider_for_route = (
 	return { provider, model, provider_id: preset_id }
 }
 
+type ResolvedProvider = {
+	provider: AiProvider
+	model: string
+	provider_id: string
+	route_target?: 'cheap' | 'premium'
+}
+
 // ---- Route logging ----
 
 const log_route = (
@@ -301,10 +308,10 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 
 	// 2. Resolve provider
 	let effective_route_target: 'cheap' | 'premium' = 'cheap' === decision.route ? 'cheap' : 'premium'
-	let provider_resolution = resolve_provider_for_route(db, effective_route_target)
+	let provider_resolution: ResolvedProvider = resolve_provider_for_route(db, effective_route_target)
 	if (options?.forcedModel && options.forcedModel.trim()) {
 		provider_resolution = resolve_provider_for_forced_model(db, options.forcedModel)
-		effective_route_target = provider_resolution.route_target
+		effective_route_target = provider_resolution.route_target || effective_route_target
 		route_log.route = effective_route_target
 		route_log.reason = `Thread model locked to ${options.forcedModel}. ${decision.reason}`
 	}
