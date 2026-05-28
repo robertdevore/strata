@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AiMessage, AiSearchResult, AiThreadSummary } from '@shared/types'
 import { aiService } from '@renderer/src/services/aiService'
-import { MessageOffIcon, MessagePlusIcon, MicrophoneIcon, SearchIcon, SendIcon } from './icons'
+import { ChartCandleIcon, CloseIcon, CopyIcon, ListDetailsIcon, MessageOffIcon, MessagePlusIcon, MicrophoneIcon, SendIcon } from './icons'
+
+interface ChatUsageSummary {
+	inputTokens: number
+	outputTokens: number
+	totalTokens: number
+	impliedCostUsd: number | null
+	providers: Array<{
+		providerId: string
+		model: string
+		inputTokens: number
+		outputTokens: number
+		impliedCostUsd: number | null
+		requests: number
+	}>
+}
 
 interface DictationResult {
 	readonly 0: { transcript: string }
@@ -110,21 +125,23 @@ interface ChatPanelProps {
 	assistantTyping: boolean
 	deleting: boolean
 	errorMessage: string
+	chatUsageSummary: ChatUsageSummary | null
 	onSelectThread: (thread_id: string) => void
 	onCreateThread: () => void
 	onDeleteThread: () => Promise<void>
+	onRenameThread: (thread_id: string, title: string) => Promise<void>
 	onSearchQueryChange: (value: string) => void
-	onRunSearch: () => void
+	onRunSearch: (query?: string) => void
 	onClearSearch: () => void
 	onSendMessage: (message: string) => Promise<void>
-	onOpenNote: (note_id: string) => void
+	onOpenNote: (note_id: string, new_tab?: boolean) => void
 }
 
 const note_id_pattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
 const normalize_note_id = (value: string): string => value.toLowerCase()
 
-const escape_markdown_label = (value: string): string => value.replace(/[\\\[\]\(\)]/g, '\\$&')
+const escape_markdown_label = (value: string): string => value.replace(/[()[\]\\]/g, '\\$&')
 
 const format_assistant_content = (value: string, note_titles_by_id: Record<string, string>): string => {
 	const relevant_note_ids_pattern = /Relevant note IDs:\s*([^\n]+)/i
@@ -169,6 +186,15 @@ const trim_message_preview = (value: string): string => {
 	return `${normalized.slice(0, 85)}...`
 }
 
+const format_token_count = (value: number): string => value.toLocaleString()
+
+const format_implied_cost = (value: number | null): string => {
+	if (null === value) return 'n/a'
+	if (value < 0.0001) return '<$0.0001'
+	if (value < 0.01) return `$${value.toFixed(4)}`
+	return `$${value.toFixed(2)}`
+}
+
 export function ChatPanel(props: ChatPanelProps) {
 	const {
 		threads,
@@ -184,9 +210,11 @@ export function ChatPanel(props: ChatPanelProps) {
 		assistantTyping,
 		deleting,
 		errorMessage,
+		chatUsageSummary,
 		onSelectThread,
 		onCreateThread,
 		onDeleteThread,
+		onRenameThread,
 		onSearchQueryChange,
 		onRunSearch,
 		onClearSearch,
@@ -195,15 +223,23 @@ export function ChatPanel(props: ChatPanelProps) {
 	} = props
 	const assistant_label = `Strata AI - ${modelName || 'gpt-4o'}`
 	const [draft, setDraft] = useState('')
-	const [showSearchBar, setShowSearchBar] = useState(false)
+	const [showSearchModal, setShowSearchModal] = useState(false)
+	const [showUsageModal, setShowUsageModal] = useState(false)
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 	const [thinkingDots, setThinkingDots] = useState('.')
 	const [isDictating, setIsDictating] = useState(false)
 	const [isTranscribing, setIsTranscribing] = useState(false)
 	const [dictationError, setDictationError] = useState('')
 	const [liveDictationText, setLiveDictationText] = useState('')
+	const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+	const [titleDraft, setTitleDraft] = useState('')
+	const [editingThreadTitle, setEditingThreadTitle] = useState(false)
+	const [renamingTitle, setRenamingTitle] = useState(false)
 	const liveDictationTextRef = useRef('')
 	const chatMessagesRef = useRef<HTMLDivElement | null>(null)
+	const chatSearchInputRef = useRef<HTMLInputElement | null>(null)
+	const composeTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+	const copiedTimerRef = useRef<number | null>(null)
 	const mediaStreamRef = useRef<MediaStream | null>(null)
 	const liveTranscriptRef = useRef('')
 	const baseDraftBeforeDictationRef = useRef('')
@@ -225,6 +261,107 @@ export function ChatPanel(props: ChatPanelProps) {
 		return speech_window.SpeechRecognition ?? speech_window.webkitSpeechRecognition ?? null
 	}, [])
 
+	const active_thread = useMemo(
+		() => threads.find((entry) => entry.thread.id === activeThreadId) ?? null,
+		[activeThreadId, threads],
+	)
+	const chat_search_results = useMemo(() => {
+		const sorted_threads = [...threads].sort((a, b) => {
+			const a_time = Date.parse(a.thread.updatedAt)
+			const b_time = Date.parse(b.thread.updatedAt)
+			if (Number.isNaN(a_time) || Number.isNaN(b_time)) return 0
+			return b_time - a_time
+		})
+
+		const query = searchQuery.trim().toLowerCase()
+		if (!query) {
+			return sorted_threads.map((entry) => ({
+			threadId: entry.thread.id,
+			title: entry.thread.title,
+			preview: trim_message_preview(entry.lastMessage?.content ?? 'No messages yet.'),
+		}))
+		}
+
+		const by_title = sorted_threads
+			.filter((entry) => entry.thread.title.toLowerCase().includes(query))
+			.map((entry) => ({
+				threadId: entry.thread.id,
+				title: entry.thread.title,
+				preview: trim_message_preview(entry.lastMessage?.content ?? 'No messages yet.'),
+			}))
+
+		if (by_title.length > 0) return by_title
+
+		const fallback = new Map<string, { threadId: string; title: string; preview: string }>()
+		for (const result of searchResults) {
+			if (fallback.has(result.thread.id)) continue
+			fallback.set(result.thread.id, {
+				threadId: result.thread.id,
+				title: result.thread.title,
+				preview: trim_message_preview(result.message.content),
+			})
+		}
+
+		return [...fallback.values()]
+	}, [searchQuery, searchResults, threads])
+
+	const resize_compose_textarea = useCallback(() => {
+		const textarea = composeTextareaRef.current
+		if (!textarea) return
+
+		const computed = window.getComputedStyle(textarea)
+		const line_height = Number.parseFloat(computed.lineHeight) || 20
+		const vertical_padding = (Number.parseFloat(computed.paddingTop) || 0) + (Number.parseFloat(computed.paddingBottom) || 0)
+		const vertical_border = (Number.parseFloat(computed.borderTopWidth) || 0) + (Number.parseFloat(computed.borderBottomWidth) || 0)
+		const min_height = Math.ceil((line_height * 3) + vertical_padding + vertical_border)
+		const max_height = Math.ceil((line_height * 12) + vertical_padding + vertical_border)
+
+		textarea.style.height = 'auto'
+		const next_height = Math.min(max_height, Math.max(min_height, textarea.scrollHeight))
+		textarea.style.height = `${next_height}px`
+		textarea.style.overflowY = textarea.scrollHeight > max_height ? 'auto' : 'hidden'
+	}, [])
+
+	const copy_message_text = useCallback(async (message_id: string, message_content: string) => {
+		try {
+			await navigator.clipboard.writeText(message_content)
+			setCopiedMessageId(message_id)
+			if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
+			copiedTimerRef.current = window.setTimeout(() => {
+				setCopiedMessageId((current) => (current === message_id ? null : current))
+			}, 1600)
+		} catch {
+			setCopiedMessageId(null)
+		}
+	}, [])
+
+	const commit_thread_title = useCallback(async () => {
+		if (!active_thread || renamingTitle) {
+			setEditingThreadTitle(false)
+			return
+		}
+
+		const next_title = titleDraft.trim()
+		if (!next_title) {
+			setTitleDraft(active_thread.thread.title)
+			setEditingThreadTitle(false)
+			return
+		}
+
+		if (next_title === active_thread.thread.title) {
+			setEditingThreadTitle(false)
+			return
+		}
+
+		setRenamingTitle(true)
+		try {
+			await onRenameThread(active_thread.thread.id, next_title)
+			setEditingThreadTitle(false)
+		} finally {
+			setRenamingTitle(false)
+		}
+	}, [active_thread, onRenameThread, renamingTitle, titleDraft])
+
 	useEffect(() => {
 		if (!sending && !assistantTyping) {
 			setThinkingDots('.')
@@ -243,6 +380,27 @@ export function ChatPanel(props: ChatPanelProps) {
 	}, [assistantTyping, sending])
 
 	useEffect(() => {
+		if (!showSearchModal) return
+		window.setTimeout(() => {
+			chatSearchInputRef.current?.focus()
+			chatSearchInputRef.current?.select()
+		}, 0)
+	}, [showSearchModal])
+
+	useEffect(() => {
+		if (!active_thread) {
+			setTitleDraft('')
+			setEditingThreadTitle(false)
+			return
+		}
+		setTitleDraft(active_thread.thread.title)
+	}, [active_thread])
+
+	useEffect(() => {
+		resize_compose_textarea()
+	}, [draft, resize_compose_textarea])
+
+	useEffect(() => {
 		if (!chatMessagesRef.current) return
 		chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
 	}, [messages, sending, assistantTyping])
@@ -253,6 +411,7 @@ export function ChatPanel(props: ChatPanelProps) {
 
 	useEffect(() => {
 		return () => {
+			if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
 			liveDictationRef.current?.stop()
 			audioProcessorNodeRef.current?.disconnect()
 			audioSourceNodeRef.current?.disconnect()
@@ -451,61 +610,52 @@ export function ChatPanel(props: ChatPanelProps) {
 		<aside className="preview-panel chat-panel">
 			<div className="chat-panel-top">
 				<div className="chat-thread-row">
-					<select
-						value={activeThreadId ?? ''}
-						onChange={(event) => onSelectThread(event.target.value)}
-						disabled={loadingThreads || 0 === threads.length}
-						title="Select chat thread"
-					>
-						<option value="">New chat</option>
-						{threads.map((item) => (
-							<option key={item.thread.id} value={item.thread.id}>
-								{item.thread.title}
-							</option>
-						))}
-					</select>
+					{editingThreadTitle && active_thread ? (
+						<input
+							className="search-input chat-thread-title-input"
+							value={titleDraft}
+							onChange={(event) => setTitleDraft(event.target.value)}
+							onBlur={() => {
+								void commit_thread_title()
+							}}
+							onKeyDown={(event) => {
+								if ('Enter' === event.key) {
+									event.preventDefault()
+									void commit_thread_title()
+									return
+								}
+								if ('Escape' === event.key) {
+									event.preventDefault()
+									setTitleDraft(active_thread.thread.title)
+									setEditingThreadTitle(false)
+								}
+							}}
+							disabled={renamingTitle}
+						/>
+					) : (
+						<button
+							type="button"
+							className="ghost-button chat-thread-title-button"
+							onClick={() => {
+								if (!active_thread) return
+								setTitleDraft(active_thread.thread.title)
+								setEditingThreadTitle(true)
+							}}
+							title={active_thread ? 'Rename chat title' : 'Current chat title'}
+						>
+							{active_thread ? active_thread.thread.title : 'New chat'}
+						</button>
+					)}
 					<button className="icon-button" onClick={onCreateThread} title="New chat" aria-label="New chat"><MessagePlusIcon /></button>
 					<button className="icon-button" onClick={() => setShowDeleteConfirm(true)} disabled={!activeThreadId || deleting} title="Delete chat" aria-label="Delete chat"><MessageOffIcon /></button>
-					<button className={`icon-button ${showSearchBar ? 'chip-active' : ''}`} onClick={() => {
-						setShowSearchBar((value) => !value)
-						if (showSearchBar) {
-							onClearSearch()
-						}
-					}} title="Search chats" aria-label="Search chats"><SearchIcon /></button>
+					<button className={`icon-button ${showSearchModal ? 'chip-active' : ''}`} onClick={() => {
+						onSearchQueryChange('')
+						onClearSearch()
+						setShowSearchModal(true)
+					}} disabled={loadingThreads} title="Browse chats" aria-label="Browse chats"><ListDetailsIcon /></button>
+					<button className={`icon-button ${showUsageModal ? 'chip-active' : ''}`} onClick={() => setShowUsageModal(true)} disabled={!chatUsageSummary} title="Usage details" aria-label="Usage details"><ChartCandleIcon /></button>
 				</div>
-				{showSearchBar && <div className="chat-search-row">
-					<input
-						className="search-input"
-						placeholder="Search previous chats"
-						value={searchQuery}
-						onChange={(event) => onSearchQueryChange(event.target.value)}
-						onKeyDown={(event) => {
-							if ('Enter' === event.key) {
-								event.preventDefault()
-								onRunSearch()
-							}
-						}}
-					/>
-					<button className="ghost-button" onClick={onRunSearch}>Search</button>
-					{searchResults.length > 0 && <button className="ghost-button" onClick={onClearSearch}>Clear</button>}
-				</div>}
 			</div>
-
-			{searchResults.length > 0 && (
-				<div className="chat-search-results">
-					{searchResults.map((result) => (
-						<button
-							key={result.message.id}
-							className="chat-search-item"
-							onClick={() => onSelectThread(result.thread.id)}
-							title={result.thread.title}
-						>
-							<strong>{result.thread.title}</strong>
-							<span>{trim_message_preview(result.message.content)}</span>
-						</button>
-					))}
-				</div>
-			)}
 
 			<div className="chat-messages" aria-live="polite" ref={chatMessagesRef}>
 				{loadingMessages ? (
@@ -516,7 +666,6 @@ export function ChatPanel(props: ChatPanelProps) {
 							<div key={message.id} className={`chat-bubble chat-${message.role}`}>
 								<div className="chat-bubble-meta">
 									<span>{'user' === message.role ? 'You' : assistant_label}</span>
-									<time>{format_time(message.createdAt)}</time>
 								</div>
 								{'assistant' === message.role ? (
 									<div className="chat-bubble-content">
@@ -537,7 +686,7 @@ export function ChatPanel(props: ChatPanelProps) {
 																href="#"
 																onClick={(event) => {
 																	event.preventDefault()
-																	onOpenNote(note_id)
+																	onOpenNote(note_id, event.metaKey || event.ctrlKey)
 																}}
 																className="chat-note-link"
 															>
@@ -556,6 +705,18 @@ export function ChatPanel(props: ChatPanelProps) {
 								) : (
 									<p>{message.content}</p>
 								)}
+								<div className="chat-bubble-actions">
+									<time>{format_time(message.createdAt)}</time>
+									<button
+										type="button"
+										className="chat-copy-button"
+										onClick={() => void copy_message_text(message.id, message.content)}
+										title={copiedMessageId === message.id ? 'Copied' : 'Copy message'}
+										aria-label={copiedMessageId === message.id ? 'Copied' : 'Copy message'}
+									>
+										<CopyIcon size={16} />
+									</button>
+								</div>
 							</div>
 						))}
 						{sending && (
@@ -592,6 +753,7 @@ export function ChatPanel(props: ChatPanelProps) {
 				}}
 			>
 				<textarea
+					ref={composeTextareaRef}
 					value={draft}
 					onChange={(event) => setDraft(event.target.value)}
 					onKeyDown={(event) => {
@@ -618,6 +780,94 @@ export function ChatPanel(props: ChatPanelProps) {
 				</button>
 				<button className="icon-button chat-send-button" type="submit" disabled={sending || assistantTyping || isDictating || isTranscribing || !draft.trim()} title={sending ? 'Sending…' : 'Send message'} aria-label={sending ? 'Sending' : 'Send message'}><SendIcon /></button>
 			</form>
+			{showSearchModal && (
+				<div className="modal-overlay palette-overlay" onClick={() => {
+					setShowSearchModal(false)
+					onClearSearch()
+				}}>
+					<div className="palette-card chat-search-modal" onClick={(event) => event.stopPropagation()}>
+						<div className="palette-search-row">
+							<span className="palette-mode-badge">Chats</span>
+							<input
+								ref={chatSearchInputRef}
+								className="palette-search-input"
+								placeholder="Search chat titles..."
+								value={searchQuery}
+								onChange={(event) => {
+									const value = event.target.value
+									onSearchQueryChange(value)
+									if (!value.trim()) onClearSearch()
+									else onRunSearch(value)
+								}}
+								onKeyDown={(event) => {
+									if ('Enter' === event.key) {
+										event.preventDefault()
+										onRunSearch(searchQuery)
+									}
+								}}
+							/>
+							<button className="icon-button palette-search-close-btn" onClick={() => {
+								setShowSearchModal(false)
+								onClearSearch()
+							}} aria-label="Close chat search" title="Close chat search">
+								<CloseIcon />
+							</button>
+						</div>
+						<div className="palette-results chat-search-modal-results">
+							{chat_search_results.length > 0 ? (
+								chat_search_results.map((result) => (
+									<button
+										key={result.threadId}
+										className="chat-search-item"
+										onClick={() => {
+											onSelectThread(result.threadId)
+											setShowSearchModal(false)
+											onClearSearch()
+										}}
+										title={result.title}
+									>
+										<strong>{result.title}</strong>
+										<span>{result.preview}</span>
+									</button>
+								))
+							) : (
+								<p className="palette-empty">{searchQuery.trim() ? 'No matching chats.' : 'No chats yet. Start a new chat to build history.'}</p>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
+			{showUsageModal && chatUsageSummary && (
+				<div className="modal-overlay" onClick={() => setShowUsageModal(false)}>
+					<div className="modal-card chat-usage-modal" onClick={(event) => event.stopPropagation()}>
+						<div className="chat-usage-modal-header">
+							<h3>Chat Usage</h3>
+							<button className="icon-button" onClick={() => setShowUsageModal(false)} aria-label="Close usage modal" title="Close usage modal"><CloseIcon /></button>
+						</div>
+						<div className="chat-usage-kpis">
+							<span>{`Total tokens: ${format_token_count(chatUsageSummary.totalTokens)}`}</span>
+							<span>{`Input: ${format_token_count(chatUsageSummary.inputTokens)}`}</span>
+							<span>{`Output: ${format_token_count(chatUsageSummary.outputTokens)}`}</span>
+							<span>{`Implied cost: ${format_implied_cost(chatUsageSummary.impliedCostUsd)}`}</span>
+						</div>
+						<div className="chat-usage-provider-list">
+							{chatUsageSummary.providers.map((provider) => (
+								<article key={`${provider.providerId}-${provider.model}`} className="chat-usage-provider-card">
+									<strong>{provider.model || 'unknown-model'}</strong>
+									<span>{`Provider: ${provider.providerId || 'unknown'}`}</span>
+									<span>{`Requests: ${format_token_count(provider.requests)}`}</span>
+									<span>{`Input tokens: ${format_token_count(provider.inputTokens)}`}</span>
+									<span>{`Output tokens: ${format_token_count(provider.outputTokens)}`}</span>
+									<span>{`Cached input: n/a`}</span>
+									<span>{`Prefill tokens: n/a`}</span>
+									<span>{`Context window used: n/a`}</span>
+									<span>{`Implied cost: ${format_implied_cost(provider.impliedCostUsd)}`}</span>
+								</article>
+							))}
+						</div>
+					</div>
+				</div>
+			)}
 			{showDeleteConfirm && (
 				<div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
 					<div className="modal-card" onClick={(event) => event.stopPropagation()}>

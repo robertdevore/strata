@@ -157,6 +157,11 @@ const log_route = (
 	}
 }
 
+const accumulate_usage_value = (current: number | null, next: number | null | undefined): number | null => {
+	if ('number' !== typeof next) return current
+	return (current ?? 0) + next
+}
+
 // ---- Main AI Runner ----
 
 export interface AiRunnerResult {
@@ -165,11 +170,21 @@ export interface AiRunnerResult {
 	routeLog: AiRouteLog | null
 }
 
-export const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise<AiRunnerResult> => {
+interface AiRunnerOptions {
+	openNotesContext?: string
+}
+
+const build_system_prompt = (open_notes_context?: string): string => {
+	if (!open_notes_context) return SYSTEM_PROMPT
+	return `${SYSTEM_PROMPT}\n\n${open_notes_context}`
+}
+
+export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?: AiRunnerOptions): Promise<AiRunnerResult> => {
 	const ai_settings = resolve_ai_settings(db)
 	const history = db.listAiMessages(thread.id).slice(-40)
 	const last_user = history.filter((m) => 'user' === m.role).pop()
 	const user_message = last_user?.content || ''
+	const system_prompt = build_system_prompt(options?.openNotesContext)
 
 	// 1. Route the request
 	const route_config: RouterConfig = {
@@ -179,7 +194,7 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise
 	}
 	const decision = route_ai_request(user_message, route_config)
 
-	let route_log: AiRouteLog = {
+	const route_log: AiRouteLog = {
 		id: '',
 		threadId: thread.id,
 		userMessage: user_message.slice(0, 500),
@@ -211,8 +226,7 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise
 	}
 
 	// 2. Resolve provider
-	let current_route: 'cheap' | 'premium' = decision.route
-	let { provider, model, provider_id } = resolve_provider_for_route(db, current_route)
+	let { provider, model, provider_id } = resolve_provider_for_route(db, decision.route)
 	route_log.providerId = provider_id
 	route_log.model = model
 
@@ -229,7 +243,7 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise
 		for (let step = 0; step < 6; step += 1) {
 			const turn_input: AiProviderTurnInput = {
 				model,
-				systemPrompt: SYSTEM_PROMPT,
+				systemPrompt: system_prompt,
 				messages: input_messages,
 				tools: AI_TOOLS as unknown as AiProviderTurnInput['tools'],
 			}
@@ -238,8 +252,8 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise
 
 			// Track usage
 			if (output.usage) {
-				route_log.inputTokens = output.usage.inputTokens ?? null
-				route_log.outputTokens = output.usage.outputTokens ?? null
+				route_log.inputTokens = accumulate_usage_value(route_log.inputTokens, output.usage.inputTokens)
+				route_log.outputTokens = accumulate_usage_value(route_log.outputTokens, output.usage.outputTokens)
 			}
 
 			// No tool calls — we have a text response
@@ -287,26 +301,28 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread): Promise
 		}
 	} catch (err) {
 		// Cheap provider failure — fall back to premium
-		if ('cheap' === current_route) {
+		if ('cheap' === decision.route) {
 			const premium = resolve_provider_for_route(db, 'premium')
 			provider = premium.provider
 			model = premium.model
 			provider_id = premium.provider_id
+			route_log.providerId = provider_id
+			route_log.model = model
 			route_log.fallbackUsed = true
 			route_log.fallbackReason = err instanceof Error ? err.message : 'Cheap provider failed'
 
 			try {
 				const fallback_input: AiProviderTurnInput = {
 					model,
-					systemPrompt: SYSTEM_PROMPT,
+					systemPrompt: system_prompt,
 					messages: input_messages,
 					tools: AI_TOOLS as unknown as AiProviderTurnInput['tools'],
 				}
 				const fallback_output = await provider.sendTurn(fallback_input)
 
 				if (fallback_output.usage) {
-					route_log.inputTokens = fallback_output.usage.inputTokens ?? null
-					route_log.outputTokens = fallback_output.usage.outputTokens ?? null
+					route_log.inputTokens = accumulate_usage_value(route_log.inputTokens, fallback_output.usage.inputTokens)
+					route_log.outputTokens = accumulate_usage_value(route_log.outputTokens, fallback_output.usage.outputTokens)
 				}
 
 				const content = fallback_output.content || 'I could not generate a response. Please try again.'

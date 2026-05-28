@@ -41,13 +41,13 @@ interface ChatUsageSummary {
 	inputTokens: number
 	outputTokens: number
 	totalTokens: number
-	impliedCostUsd: number
+	impliedCostUsd: number | null
 	providers: Array<{
 		providerId: string
 		model: string
 		inputTokens: number
 		outputTokens: number
-		impliedCostUsd: number
+		impliedCostUsd: number | null
 		requests: number
 	}>
 }
@@ -58,7 +58,6 @@ const CHAT_TOKEN_PRICING_BY_PROVIDER: Record<string, { inputPerMillion: number; 
 	'openrouter': { inputPerMillion: 2, outputPerMillion: 6 },
 	kimi: { inputPerMillion: 1.8, outputPerMillion: 3.2 },
 	custom: { inputPerMillion: 2, outputPerMillion: 6 },
-	default: { inputPerMillion: 2, outputPerMillion: 6 },
 }
 
 const CHAT_TOKEN_PRICING_BY_MODEL_PATTERN: Array<{ match: RegExp; pricing: { inputPerMillion: number; outputPerMillion: number } }> = [
@@ -68,13 +67,12 @@ const CHAT_TOKEN_PRICING_BY_MODEL_PATTERN: Array<{ match: RegExp; pricing: { inp
 	{ match: /kimi|moonshot/i, pricing: { inputPerMillion: 1.8, outputPerMillion: 3.2 } },
 ]
 
-const get_provider_pricing = (provider_id: string): { inputPerMillion: number; outputPerMillion: number } => {
+const get_provider_pricing = (provider_id: string): { inputPerMillion: number; outputPerMillion: number } | null => {
 	const normalized = provider_id.trim().toLowerCase()
 	for (const key of Object.keys(CHAT_TOKEN_PRICING_BY_PROVIDER)) {
-		if ('default' === key) continue
 		if (normalized.includes(key)) return CHAT_TOKEN_PRICING_BY_PROVIDER[key]
 	}
-	return CHAT_TOKEN_PRICING_BY_PROVIDER.default
+	return null
 }
 
 const get_model_pricing = (model: string): { inputPerMillion: number; outputPerMillion: number } | null => {
@@ -84,8 +82,9 @@ const get_model_pricing = (model: string): { inputPerMillion: number; outputPerM
 	return null
 }
 
-const estimate_log_cost = (log: AiRouteLog): number => {
+const estimate_log_cost = (log: AiRouteLog): number | null => {
 	const pricing = get_model_pricing(log.model) ?? get_provider_pricing(log.providerId)
+	if (!pricing) return null
 	const input_tokens = log.inputTokens ?? 0
 	const output_tokens = log.outputTokens ?? 0
 	return ((input_tokens / 1_000_000) * pricing.inputPerMillion) + ((output_tokens / 1_000_000) * pricing.outputPerMillion)
@@ -95,6 +94,7 @@ const build_chat_usage_summary = (logs: AiRouteLog[]): ChatUsageSummary => {
 	let input_tokens = 0
 	let output_tokens = 0
 	let implied_cost_usd = 0
+	let has_known_cost = false
 	const providers = new Map<string, ChatUsageSummary['providers'][number]>()
 
 	for (const log of logs) {
@@ -103,14 +103,19 @@ const build_chat_usage_summary = (logs: AiRouteLog[]): ChatUsageSummary => {
 		const log_cost = estimate_log_cost(log)
 		input_tokens += log_input
 		output_tokens += log_output
-		implied_cost_usd += log_cost
+		if (null !== log_cost) {
+			implied_cost_usd += log_cost
+			has_known_cost = true
+		}
 
 		const provider_key = `${log.providerId}|${log.model}`
 		const current = providers.get(provider_key)
 		if (current) {
 			current.inputTokens += log_input
 			current.outputTokens += log_output
-			current.impliedCostUsd += log_cost
+			if (null !== log_cost) {
+				current.impliedCostUsd = (current.impliedCostUsd ?? 0) + log_cost
+			}
 			current.requests += 1
 			continue
 		}
@@ -129,8 +134,8 @@ const build_chat_usage_summary = (logs: AiRouteLog[]): ChatUsageSummary => {
 		inputTokens: input_tokens,
 		outputTokens: output_tokens,
 		totalTokens: input_tokens + output_tokens,
-		impliedCostUsd: implied_cost_usd,
-		providers: [...providers.values()].sort((a, b) => b.impliedCostUsd - a.impliedCostUsd),
+		impliedCostUsd: has_known_cost ? implied_cost_usd : null,
+		providers: [...providers.values()].sort((a, b) => (b.impliedCostUsd ?? -1) - (a.impliedCostUsd ?? -1)),
 	}
 }
 
