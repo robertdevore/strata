@@ -168,18 +168,17 @@ export function SearchIcon(props: IconProps) {
 }
 
 export function ListDetailsIcon(props: IconProps) {
+	const { size = 18, ...rest } = props
 	return (
-		<BaseIcon {...props}>
+		<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...rest}>
 			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-			<path d="M13 5h8" />
-			<path d="M13 9h5" />
-			<path d="M13 15h8" />
-			<path d="M13 19h5" />
-			<path d="M3 5h.01" />
-			<path d="M3 9h.01" />
-			<path d="M3 15h.01" />
-			<path d="M3 19h.01" />
-		</BaseIcon>
+			<path d="M21 6a1 1 0 0 1 -1 1h-10a1 1 0 1 1 0 -2h10a1 1 0 0 1 1 1" />
+			<path d="M21 12a1 1 0 0 1 -1 1h-10a1 1 0 0 1 0 -2h10a1 1 0 0 1 1 1" />
+			<path d="M21 18a1 1 0 0 1 -1 1h-10a1 1 0 0 1 0 -2h10a1 1 0 0 1 1 1" />
+			<path d="M7 5.995v.02c0 1.099 -.895 1.99 -2 1.99s-2 -.891 -2 -1.99v-.02c0 -1.099 .895 -1.99 2 -1.99s2 .891 2 1.99" />
+			<path d="M7 11.995v.02c0 1.099 -.895 1.99 -2 1.99s-2 -.891 -2 -1.99v-.02c0 -1.099 .895 -1.99 2 -1.99s2 .891 2 1.99" />
+			<path d="M7 17.995v.02c0 1.099 -.895 1.99 -2 1.99s-2 -.891 -2 -1.99v-.02c0 -1.099 .895 -1.99 2 -1.99s2 .891 2 1.99" />
+		</svg>
 	)
 }
 

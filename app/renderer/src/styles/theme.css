@@ -1352,16 +1352,21 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 }
 
 .chat-panel {
+	--chat-inline-padding: 12px;
+	--chat-vertical-padding: 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	padding: 10px;
+	padding: var(--chat-vertical-padding) 0;
 	line-height: 1.45;
+	overflow: hidden;
 }
 
 .chat-panel-top {
 	display: grid;
 	gap: 8px;
+	margin: 0;
+	padding: 0 0 0 var(--chat-inline-padding);
 }
 
 .chat-thread-row,
@@ -1373,14 +1378,24 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	gap: 8px;
 }
 
-.chat-thread-title-input {
-	flex: 1;
+.chat-thread-row {
 	min-width: 0;
 }
 
-.chat-thread-title-button {
-	flex: 1;
+.chat-thread-title-input {
+	flex: 1 1 auto;
 	min-width: 0;
+	max-width: calc(100% - 170px);
+	text-align: left;
+}
+
+.chat-thread-title-button {
+	display: inline-flex;
+	align-items: center;
+	flex: 1 1 auto;
+	min-width: 0;
+	max-width: calc(100% - 170px);
+	text-align: left;
 	justify-content: flex-start;
 	white-space: nowrap;
 	overflow: hidden;
@@ -1404,8 +1419,7 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	min-width: 0;
 }
 
-.chat-search-results,
-.chat-messages {
+.chat-search-results {
 	border: 1px solid var(--border);
 	border-radius: 10px;
 	background: var(--editor-bg);
@@ -1449,14 +1463,48 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 }
 
 .chat-messages {
+	border: 0;
+	border-radius: 0;
+	background: var(--editor-bg);
+	min-height: 0;
+	overflow: auto;
+	padding: 4px var(--chat-inline-padding);
 	flex: 1;
+	display: grid;
+	gap: 16px;
 	align-content: start;
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb) var(--editor-bg);
+}
+
+.chat-messages::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+	background: var(--editor-bg);
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+	border-radius: 999px;
+	border: 2px solid var(--editor-bg);
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+}
+
+.chat-message-row {
+	display: grid;
+	gap: 4px;
 }
 
 .chat-bubble {
 	border: 1px solid var(--border);
 	border-radius: 10px;
-	padding: 8px 10px;
+	padding: 8px 8px 8px 10px;
 	background: transparent;
 	color: var(--text);
 	display: grid;
@@ -1486,15 +1534,17 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	align-items: center;
 	gap: 6px;
 	opacity: 0;
-	transition: opacity 120ms ease;
+	pointer-events: none;
+	transition: opacity 120ms ease, color 120ms ease;
 	font-size: 11px;
 	color: var(--text-3);
-	min-height: 18px;
+	min-height: 0;
 }
 
-.chat-bubble:hover .chat-bubble-actions,
-.chat-bubble:focus-within .chat-bubble-actions {
+.chat-message-row:hover .chat-bubble-actions,
+.chat-message-row:focus-within .chat-bubble-actions {
 	opacity: 1;
+	pointer-events: auto;
 }
 
 .chat-copy-button {
@@ -1546,6 +1596,48 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	margin: 0 0 8px;
 }
 
+.chat-codeblock {
+	position: relative;
+}
+
+.chat-codeblock pre {
+	margin: 0;
+}
+
+.chat-codeblock-copy {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--panel-bg) 86%, transparent);
+	color: var(--text-2);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+	cursor: pointer;
+}
+
+.chat-codeblock:hover .chat-codeblock-copy,
+.chat-codeblock:focus-within .chat-codeblock-copy {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.chat-codeblock-copy:hover,
+.chat-codeblock-copy:focus-visible {
+	background: color-mix(in srgb, var(--panel-bg) 96%, transparent);
+	color: var(--text);
+	outline: none;
+}
+
 .chat-bubble-content code {
 	background: var(--tag-bg);
 	border: 1px solid var(--tag-border);
@@ -1583,10 +1675,17 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 }
 
 .chat-compose {
-	margin-top: auto;
+	margin: 0;
+	padding: 0 0 0 var(--chat-inline-padding);
 	position: relative;
 	display: grid;
 	gap: 8px;
+}
+
+.chat-panel > .chat-placeholder,
+.chat-panel > .chat-error {
+	margin: 0;
+	padding: 0;
 }
 
 .chat-compose textarea {
@@ -1642,6 +1741,7 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	display: grid;
 	gap: 12px;
 	overflow: hidden;
+	padding: 14px;
 }
 
 .chat-usage-modal-header {
@@ -1653,14 +1753,41 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 
 .chat-usage-modal-header h3 {
 	margin: 0;
+	font-size: 16px;
+}
+
+.chat-usage-modal-subtitle {
+	margin: 3px 0 0;
+	font-size: 12px;
+	color: var(--text-3);
 }
 
 .chat-usage-kpis {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 8px;
-	font-size: 12px;
-	color: var(--text-2);
+}
+
+.chat-usage-kpi-card {
+	display: grid;
+	gap: 4px;
+	padding: 12px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--editor-bg) 84%, var(--hover) 16%);
+}
+
+.chat-usage-kpi-label {
+	font-size: 11px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-3);
+}
+
+.chat-usage-kpi-value {
+	font-size: 16px;
+	line-height: 1.1;
+	color: var(--text);
 }
 
 .chat-usage-provider-list {
@@ -1672,13 +1799,40 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 
 .chat-usage-provider-card {
 	display: grid;
-	gap: 2px;
+	gap: 8px;
 	border: 1px solid var(--border);
 	border-radius: 10px;
-	padding: 10px;
+	padding: 12px;
 	font-size: 12px;
 	color: var(--text-2);
+	background: color-mix(in srgb, var(--editor-bg) 88%, var(--hover) 12%);
+}
+
+.chat-usage-provider-name {
+	color: var(--text-3);
+}
+
+.chat-usage-provider-metrics {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 6px 12px;
+}
+
+.chat-usage-empty {
+	margin: 0;
+	padding: 16px;
+	border: 1px dashed var(--border);
+	border-radius: 10px;
+	font-size: 13px;
+	color: var(--text-2);
 	background: color-mix(in srgb, var(--editor-bg) 92%, var(--hover) 8%);
+}
+
+@media (max-width: 760px) {
+	.chat-usage-provider-metrics,
+	.chat-usage-kpis {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 .chat-mic-recording {
