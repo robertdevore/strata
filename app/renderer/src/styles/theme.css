@@ -320,6 +320,17 @@ textarea {
 	padding: 9px 10px;
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+	-webkit-text-fill-color: var(--text);
+	box-shadow: 0 0 0 1000px var(--editor-bg) inset;
+	transition: background-color 9999s ease-in-out 0s;
+}
+
 button:focus-visible,
 .search-input:focus,
 .notes-list:focus {
@@ -893,6 +904,14 @@ body.theme-dark .tag-pin-btn.pin-active {
 	color: var(--text-2);
 }
 
+.tab-item-dragging {
+	opacity: 0.55;
+}
+
+.tab-item-drop-target {
+	box-shadow: inset 2px 0 0 var(--accent);
+}
+
 .tab-item-active {
 	background: var(--editor-bg);
 	color: var(--text);
@@ -1354,6 +1373,20 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	gap: 8px;
 }
 
+.chat-thread-title-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.chat-thread-title-button {
+	flex: 1;
+	min-width: 0;
+	justify-content: flex-start;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .chat-thread-row select,
 .chat-compose textarea {
 	width: 100%;
@@ -1380,7 +1413,7 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	overflow: auto;
 	padding: 8px;
 	display: grid;
-	gap: 8px;
+	gap: 16px;
 }
 
 .chat-search-results {
@@ -1430,14 +1463,59 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	gap: 6px;
 }
 
+.chat-assistant {
+	border: 0;
+	background: transparent;
+	padding-left: 0;
+	padding-right: 0;
+}
+
 .chat-user {
 	background: var(--hover);
 }
 
 .chat-bubble-meta {
-	justify-content: space-between;
+	justify-content: flex-start;
 	font-size: 11px;
 	color: var(--text-3);
+}
+
+.chat-bubble-actions {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 6px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+	font-size: 11px;
+	color: var(--text-3);
+	min-height: 18px;
+}
+
+.chat-bubble:hover .chat-bubble-actions,
+.chat-bubble:focus-within .chat-bubble-actions {
+	opacity: 1;
+}
+
+.chat-copy-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-3);
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.chat-copy-button:hover,
+.chat-copy-button:focus-visible {
+	background: var(--hover);
+	color: var(--text);
+	outline: none;
 }
 
 .chat-bubble p {
@@ -1512,10 +1590,19 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 }
 
 .chat-compose textarea {
-	resize: vertical;
-	min-height: 78px;
-	max-height: 220px;
+	resize: none;
+	min-height: 72px;
+	max-height: 260px;
+	overflow-y: hidden;
 	padding-right: 76px;
+	padding-bottom: 40px;
+	line-height: 1.45;
+}
+
+.chat-compose textarea:focus {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 1px var(--accent);
 }
 
 .chat-send-button {
@@ -1536,6 +1623,62 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	height: 28px;
 	padding: 0;
 	border-radius: 8px;
+}
+
+.chat-search-modal {
+	width: min(620px, 94vw);
+}
+
+.chat-search-modal-results {
+	max-height: 54vh;
+	overflow: auto;
+	display: grid;
+	gap: 8px;
+}
+
+.chat-usage-modal {
+	width: min(760px, 94vw);
+	max-height: 80vh;
+	display: grid;
+	gap: 12px;
+	overflow: hidden;
+}
+
+.chat-usage-modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+}
+
+.chat-usage-modal-header h3 {
+	margin: 0;
+}
+
+.chat-usage-kpis {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+	font-size: 12px;
+	color: var(--text-2);
+}
+
+.chat-usage-provider-list {
+	display: grid;
+	gap: 8px;
+	overflow: auto;
+	padding-right: 2px;
+}
+
+.chat-usage-provider-card {
+	display: grid;
+	gap: 2px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 10px;
+	font-size: 12px;
+	color: var(--text-2);
+	background: color-mix(in srgb, var(--editor-bg) 92%, var(--hover) 8%);
 }
 
 .chat-mic-recording {

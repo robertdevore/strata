@@ -166,6 +166,40 @@ export function SearchIcon(props: IconProps) {
 		</BaseIcon>
 	)
 }
+
+export function ListDetailsIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M13 5h8" />
+			<path d="M13 9h5" />
+			<path d="M13 15h8" />
+			<path d="M13 19h5" />
+			<path d="M3 5h.01" />
+			<path d="M3 9h.01" />
+			<path d="M3 15h.01" />
+			<path d="M3 19h.01" />
+		</BaseIcon>
+	)
+}
+
+export function ChartCandleIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M4 6m0 2a2 2 0 0 1 2 -2h.5a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-.5a2 2 0 0 1 -2 -2z" />
+			<path d="M6 4v2" />
+			<path d="M6 18v2" />
+			<path d="M10 14m0 2a2 2 0 0 1 2 -2h.5a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-.5a2 2 0 0 1 -2 -2z" />
+			<path d="M12 4v10" />
+			<path d="M12 20v0" />
+			<path d="M16 5m0 2a2 2 0 0 1 2 -2h.5a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-.5a2 2 0 0 1 -2 -2z" />
+			<path d="M18 3v2" />
+			<path d="M18 19v2" />
+		</BaseIcon>
+	)
+}
+
 export function FileSearchIcon(props: IconProps) {
 	return (
 		<BaseIcon {...props}>
