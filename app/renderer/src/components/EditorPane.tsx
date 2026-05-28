@@ -90,6 +90,17 @@ const estimate_log_cost = (log: AiRouteLog): number | null => {
 	return ((input_tokens / 1_000_000) * pricing.inputPerMillion) + ((output_tokens / 1_000_000) * pricing.outputPerMillion)
 }
 
+const normalize_model_id = (value: string): string => value.trim().toLowerCase()
+
+const select_usage_logs_for_model = (logs: AiRouteLog[], thread_id: string, preferred_model: string): AiRouteLog[] => {
+	const thread_logs = logs.filter((log) => log.threadId === thread_id)
+	const normalized_preferred_model = normalize_model_id(preferred_model)
+	if (!normalized_preferred_model) return thread_logs
+
+	const preferred_model_logs = thread_logs.filter((log) => normalize_model_id(log.model) === normalized_preferred_model)
+	return preferred_model_logs.length > 0 ? preferred_model_logs : thread_logs
+}
+
 const build_chat_usage_summary = (logs: AiRouteLog[]): ChatUsageSummary => {
 	let input_tokens = 0
 	let output_tokens = 0
@@ -308,6 +319,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [chatThreadId, setChatThreadId] = useState<string | null>(null)
 	const [chatMessages, setChatMessages] = useState<AiMessage[]>([])
 	const [chatUsageSummary, setChatUsageSummary] = useState<ChatUsageSummary | null>(null)
+	const [chatUsageLoading, setChatUsageLoading] = useState(false)
 	const [chatSearchQuery, setChatSearchQuery] = useState('')
 	const [chatSearchResults, setChatSearchResults] = useState<AiSearchResult[]>([])
 	const [chatLoadingThreads, setChatLoadingThreads] = useState(false)
@@ -527,25 +539,34 @@ export function EditorPane(props: EditorPaneProps) {
 	useEffect(() => {
 		if (!showChatPanel || !chatThreadId) {
 			setChatUsageSummary(null)
+			setChatUsageLoading(false)
 			return
 		}
 
+		const active_thread_model = chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model || openAiModel
 		let disposed = false
+		setChatUsageSummary(null)
+		setChatUsageLoading(true)
 		void aiService
 			.listRouteLogs(chatThreadId)
 			.then((logs) => {
 				if (disposed) return
-				setChatUsageSummary(build_chat_usage_summary(logs))
+				const filtered_logs = select_usage_logs_for_model(logs, chatThreadId, active_thread_model)
+				setChatUsageSummary(build_chat_usage_summary(filtered_logs))
 			})
 			.catch(() => {
 				if (disposed) return
 				setChatUsageSummary(null)
 			})
+			.finally(() => {
+				if (disposed) return
+				setChatUsageLoading(false)
+			})
 
 		return () => {
 			disposed = true
 		}
-	}, [chatThreadId, showChatPanel])
+	}, [chatThreadId, showChatPanel, chatThreads, openAiModel])
 
 	useEffect(() => {
 		const openFindReplace = () => {
@@ -694,9 +715,8 @@ export function EditorPane(props: EditorPaneProps) {
 			})
 			.filter((entry): entry is { id: string; title: string; content: string } => null !== entry)
 	}, [drafts, notes, openTabIds])
-	const active_chat_model = chatThreadId
-		? chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model || openAiModel
-		: openAiModel
+	const active_chat_model = openAiModel
+		|| (chatThreadId ? chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model || '' : '')
 	const showSidePanel = showPreview || showChatPanel
 
 	const stopAssistantTypingAnimation = () => {
@@ -947,16 +967,22 @@ export function EditorPane(props: EditorPaneProps) {
 		setChatThreads(threads)
 	}
 
-	const refreshChatUsage = async (thread_id: string | null) => {
+	const refreshChatUsage = async (thread_id: string | null, preferred_model = openAiModel) => {
 		if (!thread_id) {
 			setChatUsageSummary(null)
+			setChatUsageLoading(false)
 			return
 		}
+		setChatUsageSummary(null)
+		setChatUsageLoading(true)
 		try {
 			const logs = await aiService.listRouteLogs(thread_id)
-			setChatUsageSummary(build_chat_usage_summary(logs))
+			const filtered_logs = select_usage_logs_for_model(logs, thread_id, preferred_model)
+			setChatUsageSummary(build_chat_usage_summary(filtered_logs))
 		} catch {
 			setChatUsageSummary(null)
+		} finally {
+			setChatUsageLoading(false)
 		}
 	}
 
@@ -995,7 +1021,7 @@ export function EditorPane(props: EditorPaneProps) {
 			})
 			setChatThreadId(response.thread.id)
 			await refreshChatThreads()
-			await refreshChatUsage(response.thread.id)
+			await refreshChatUsage(response.thread.id, response.thread.model || openAiModel)
 
 			const persisted_messages = await aiService.listMessages(response.thread.id)
 			const base_messages = persisted_messages.filter((item) => item.id !== response.message.id)
@@ -1302,12 +1328,14 @@ export function EditorPane(props: EditorPaneProps) {
 								deleting={chatDeleting}
 								errorMessage={chatErrorMessage}
 								chatUsageSummary={chatUsageSummary}
+								chatUsageLoading={chatUsageLoading}
 								onSelectThread={(thread_id) => {
 									stopAssistantTypingAnimation()
 									if (!thread_id) {
 										setChatThreadId(null)
 										setChatMessages([])
 										setChatUsageSummary(null)
+										setChatUsageLoading(false)
 										return
 									}
 									setChatThreadId(thread_id)
@@ -1318,6 +1346,7 @@ export function EditorPane(props: EditorPaneProps) {
 									setChatThreadId(null)
 									setChatMessages([])
 									setChatUsageSummary(null)
+									setChatUsageLoading(false)
 									setChatSearchResults([])
 									setChatErrorMessage('')
 								}}

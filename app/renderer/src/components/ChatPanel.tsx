@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AiMessage, AiSearchResult, AiThreadSummary } from '@shared/types'
@@ -126,6 +126,7 @@ interface ChatPanelProps {
 	deleting: boolean
 	errorMessage: string
 	chatUsageSummary: ChatUsageSummary | null
+	chatUsageLoading: boolean
 	onSelectThread: (thread_id: string) => void
 	onCreateThread: () => void
 	onDeleteThread: () => Promise<void>
@@ -211,6 +212,7 @@ export function ChatPanel(props: ChatPanelProps) {
 		deleting,
 		errorMessage,
 		chatUsageSummary,
+		chatUsageLoading,
 		onSelectThread,
 		onCreateThread,
 		onDeleteThread,
@@ -235,11 +237,15 @@ export function ChatPanel(props: ChatPanelProps) {
 	const [titleDraft, setTitleDraft] = useState('')
 	const [editingThreadTitle, setEditingThreadTitle] = useState(false)
 	const [renamingTitle, setRenamingTitle] = useState(false)
+	const [copiedCodeBlockId, setCopiedCodeBlockId] = useState<string | null>(null)
+	const [copyToastText, setCopyToastText] = useState<string | null>(null)
 	const liveDictationTextRef = useRef('')
 	const chatMessagesRef = useRef<HTMLDivElement | null>(null)
 	const chatSearchInputRef = useRef<HTMLInputElement | null>(null)
 	const composeTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 	const copiedTimerRef = useRef<number | null>(null)
+	const copiedCodeTimerRef = useRef<number | null>(null)
+	const copyToastTimerRef = useRef<number | null>(null)
 	const mediaStreamRef = useRef<MediaStream | null>(null)
 	const liveTranscriptRef = useRef('')
 	const baseDraftBeforeDictationRef = useRef('')
@@ -322,10 +328,19 @@ export function ChatPanel(props: ChatPanelProps) {
 		textarea.style.overflowY = textarea.scrollHeight > max_height ? 'auto' : 'hidden'
 	}, [])
 
+	const show_copy_toast = useCallback((text: string) => {
+		setCopyToastText(text)
+		if (copyToastTimerRef.current) window.clearTimeout(copyToastTimerRef.current)
+		copyToastTimerRef.current = window.setTimeout(() => {
+			setCopyToastText(null)
+		}, 1800)
+	}, [])
+
 	const copy_message_text = useCallback(async (message_id: string, message_content: string) => {
 		try {
 			await navigator.clipboard.writeText(message_content)
 			setCopiedMessageId(message_id)
+			show_copy_toast('Message copied')
 			if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
 			copiedTimerRef.current = window.setTimeout(() => {
 				setCopiedMessageId((current) => (current === message_id ? null : current))
@@ -333,7 +348,21 @@ export function ChatPanel(props: ChatPanelProps) {
 		} catch {
 			setCopiedMessageId(null)
 		}
-	}, [])
+	}, [show_copy_toast])
+
+	const copy_code_block = useCallback(async (code_block_id: string, code_content: string) => {
+		try {
+			await navigator.clipboard.writeText(code_content)
+			setCopiedCodeBlockId(code_block_id)
+			show_copy_toast('Code copied')
+			if (copiedCodeTimerRef.current) window.clearTimeout(copiedCodeTimerRef.current)
+			copiedCodeTimerRef.current = window.setTimeout(() => {
+				setCopiedCodeBlockId((current) => (current === code_block_id ? null : current))
+			}, 1600)
+		} catch {
+			setCopiedCodeBlockId(null)
+		}
+	}, [show_copy_toast])
 
 	const commit_thread_title = useCallback(async () => {
 		if (!active_thread || renamingTitle) {
@@ -412,6 +441,8 @@ export function ChatPanel(props: ChatPanelProps) {
 	useEffect(() => {
 		return () => {
 			if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
+			if (copiedCodeTimerRef.current) window.clearTimeout(copiedCodeTimerRef.current)
+			if (copyToastTimerRef.current) window.clearTimeout(copyToastTimerRef.current)
 			liveDictationRef.current?.stop()
 			audioProcessorNodeRef.current?.disconnect()
 			audioSourceNodeRef.current?.disconnect()
@@ -653,7 +684,7 @@ export function ChatPanel(props: ChatPanelProps) {
 						onClearSearch()
 						setShowSearchModal(true)
 					}} disabled={loadingThreads} title="Browse chats" aria-label="Browse chats"><ListDetailsIcon /></button>
-					<button className={`icon-button ${showUsageModal ? 'chip-active' : ''}`} onClick={() => setShowUsageModal(true)} disabled={!chatUsageSummary} title="Usage details" aria-label="Usage details"><ChartCandleIcon /></button>
+					<button className={`icon-button ${showUsageModal ? 'chip-active' : ''}`} onClick={() => setShowUsageModal(true)} title="Usage details" aria-label="Usage details"><ChartCandleIcon /></button>
 				</div>
 			</div>
 
@@ -663,48 +694,81 @@ export function ChatPanel(props: ChatPanelProps) {
 				) : (
 					<>
 						{messages.map((message) => (
-							<div key={message.id} className={`chat-bubble chat-${message.role}`}>
-								<div className="chat-bubble-meta">
-									<span>{'user' === message.role ? 'You' : assistant_label}</span>
-								</div>
-								{'assistant' === message.role ? (
-									<div className="chat-bubble-content">
-										<ReactMarkdown
-											remarkPlugins={[remarkGfm]}
-											components={{
-												a: ({ href, children }) => {
-													const target = href ?? ''
-													let note_id = ''
-													if (target.startsWith('#strata-note:')) {
-														note_id = normalize_note_id(target.replace('#strata-note:', '').trim())
-													} else if (target.startsWith('strata-note://')) {
-														note_id = normalize_note_id(target.replace('strata-note://', '').trim())
-													}
-													if (note_id) {
-														return (
-															<a
-																href="#"
-																onClick={(event) => {
-																	event.preventDefault()
-																	onOpenNote(note_id, event.metaKey || event.ctrlKey)
-																}}
-																className="chat-note-link"
-															>
-																{children}
-															</a>
-														)
-													}
-
-													return <a href={target} target="_blank" rel="noreferrer">{children}</a>
-												},
-											}}
-										>
-											{format_assistant_content(message.content, noteTitlesById)}
-										</ReactMarkdown>
+							<div key={message.id} className={`chat-message-row chat-message-${message.role}`}>
+								<div className={`chat-bubble chat-${message.role}`}>
+									<div className="chat-bubble-meta">
+										<span>{'user' === message.role ? 'You' : assistant_label}</span>
 									</div>
-								) : (
-									<p>{message.content}</p>
-								)}
+									{'assistant' === message.role ? (
+										<div className="chat-bubble-content">
+											<ReactMarkdown
+												remarkPlugins={[remarkGfm]}
+												components={{
+													a: ({ href, children }) => {
+														const target = href ?? ''
+														let note_id = ''
+														if (target.startsWith('#strata-note:')) {
+															note_id = normalize_note_id(target.replace('#strata-note:', '').trim())
+														} else if (target.startsWith('strata-note://')) {
+															note_id = normalize_note_id(target.replace('strata-note://', '').trim())
+														}
+														if (note_id) {
+															return (
+																<a
+																	href="#"
+																	onClick={(event) => {
+																		event.preventDefault()
+																		onOpenNote(note_id, event.metaKey || event.ctrlKey)
+																	}}
+																	className="chat-note-link"
+																>
+																	{children}
+																</a>
+															)
+														}
+
+														return <a href={target} target="_blank" rel="noreferrer">{children}</a>
+													},
+													code: ({ className, children }) => {
+														return <code className={className}>{children}</code>
+													},
+													pre: ({ children }) => {
+														const child = Array.isArray(children) ? children[0] : children
+														if (!isValidElement(child)) {
+															return <pre>{children}</pre>
+														}
+
+														const child_props = child.props as { className?: string; children?: unknown }
+														const code_class_name = child_props.className
+														const code_value = String(child_props.children ?? '').replace(/\n$/, '')
+														const code_block_id = `${message.id}:${code_value.slice(0, 120)}`
+
+														return (
+															<div className="chat-codeblock">
+																<button
+																	type="button"
+																	className="chat-codeblock-copy"
+																	onClick={() => void copy_code_block(code_block_id, code_value)}
+																	title={copiedCodeBlockId === code_block_id ? 'Copied' : 'Copy code'}
+																	aria-label={copiedCodeBlockId === code_block_id ? 'Copied' : 'Copy code'}
+																>
+																	<CopyIcon size={14} />
+																</button>
+																<pre>
+																	<code className={code_class_name}>{code_value}</code>
+																</pre>
+															</div>
+														)
+													},
+												}}
+											>
+												{format_assistant_content(message.content, noteTitlesById)}
+											</ReactMarkdown>
+										</div>
+									) : (
+										<p>{message.content}</p>
+									)}
+								</div>
 								<div className="chat-bubble-actions">
 									<time>{format_time(message.createdAt)}</time>
 									<button
@@ -780,6 +844,7 @@ export function ChatPanel(props: ChatPanelProps) {
 				</button>
 				<button className="icon-button chat-send-button" type="submit" disabled={sending || assistantTyping || isDictating || isTranscribing || !draft.trim()} title={sending ? 'Sending…' : 'Send message'} aria-label={sending ? 'Sending' : 'Send message'}><SendIcon /></button>
 			</form>
+			{copyToastText && <span className="copy-toast" role="status" aria-live="polite">{copyToastText}</span>}
 			{showSearchModal && (
 				<div className="modal-overlay palette-overlay" onClick={() => {
 					setShowSearchModal(false)
@@ -837,34 +902,63 @@ export function ChatPanel(props: ChatPanelProps) {
 					</div>
 				</div>
 			)}
-			{showUsageModal && chatUsageSummary && (
+			{showUsageModal && (
 				<div className="modal-overlay" onClick={() => setShowUsageModal(false)}>
 					<div className="modal-card chat-usage-modal" onClick={(event) => event.stopPropagation()}>
 						<div className="chat-usage-modal-header">
-							<h3>Chat Usage</h3>
+							<div>
+								<h3>Chat Usage</h3>
+								<p className="chat-usage-modal-subtitle">Analytics from routed model logs for this chat thread.</p>
+							</div>
 							<button className="icon-button" onClick={() => setShowUsageModal(false)} aria-label="Close usage modal" title="Close usage modal"><CloseIcon /></button>
 						</div>
-						<div className="chat-usage-kpis">
-							<span>{`Total tokens: ${format_token_count(chatUsageSummary.totalTokens)}`}</span>
-							<span>{`Input: ${format_token_count(chatUsageSummary.inputTokens)}`}</span>
-							<span>{`Output: ${format_token_count(chatUsageSummary.outputTokens)}`}</span>
-							<span>{`Implied cost: ${format_implied_cost(chatUsageSummary.impliedCostUsd)}`}</span>
-						</div>
-						<div className="chat-usage-provider-list">
-							{chatUsageSummary.providers.map((provider) => (
-								<article key={`${provider.providerId}-${provider.model}`} className="chat-usage-provider-card">
-									<strong>{provider.model || 'unknown-model'}</strong>
-									<span>{`Provider: ${provider.providerId || 'unknown'}`}</span>
-									<span>{`Requests: ${format_token_count(provider.requests)}`}</span>
-									<span>{`Input tokens: ${format_token_count(provider.inputTokens)}`}</span>
-									<span>{`Output tokens: ${format_token_count(provider.outputTokens)}`}</span>
-									<span>{`Cached input: n/a`}</span>
-									<span>{`Prefill tokens: n/a`}</span>
-									<span>{`Context window used: n/a`}</span>
-									<span>{`Implied cost: ${format_implied_cost(provider.impliedCostUsd)}`}</span>
-								</article>
-							))}
-						</div>
+						{chatUsageLoading ? (
+							<p className="chat-usage-empty">Loading usage analytics…</p>
+						) : chatUsageSummary ? (
+							<>
+								<div className="chat-usage-kpis">
+									<article className="chat-usage-kpi-card">
+										<span className="chat-usage-kpi-label">Total Tokens</span>
+										<strong className="chat-usage-kpi-value">{format_token_count(chatUsageSummary.totalTokens)}</strong>
+									</article>
+									<article className="chat-usage-kpi-card">
+										<span className="chat-usage-kpi-label">Input</span>
+										<strong className="chat-usage-kpi-value">{format_token_count(chatUsageSummary.inputTokens)}</strong>
+									</article>
+									<article className="chat-usage-kpi-card">
+										<span className="chat-usage-kpi-label">Output</span>
+										<strong className="chat-usage-kpi-value">{format_token_count(chatUsageSummary.outputTokens)}</strong>
+									</article>
+									<article className="chat-usage-kpi-card">
+										<span className="chat-usage-kpi-label">Implied Cost</span>
+										<strong className="chat-usage-kpi-value">{format_implied_cost(chatUsageSummary.impliedCostUsd)}</strong>
+									</article>
+								</div>
+								{chatUsageSummary.providers.length > 0 ? (
+									<div className="chat-usage-provider-list">
+										{chatUsageSummary.providers.map((provider) => (
+											<article key={`${provider.providerId}-${provider.model}`} className="chat-usage-provider-card">
+												<strong>{provider.model || 'unknown-model'}</strong>
+												<span className="chat-usage-provider-name">{`Provider: ${provider.providerId || 'unknown'}`}</span>
+												<div className="chat-usage-provider-metrics">
+													<span>{`Requests: ${format_token_count(provider.requests)}`}</span>
+													<span>{`Input tokens: ${format_token_count(provider.inputTokens)}`}</span>
+													<span>{`Output tokens: ${format_token_count(provider.outputTokens)}`}</span>
+													<span>{`Implied cost: ${format_implied_cost(provider.impliedCostUsd)}`}</span>
+													<span>{`Cached input: n/a`}</span>
+													<span>{`Prefill tokens: n/a`}</span>
+													<span>{`Context window used: n/a`}</span>
+												</div>
+											</article>
+										))}
+									</div>
+								) : (
+									<p className="chat-usage-empty">No model usage has been logged for this chat yet.</p>
+								)}
+							</>
+						) : (
+							<p className="chat-usage-empty">No usage data yet. Send a message in this chat to generate analytics.</p>
+						)}
 					</div>
 				</div>
 			)}
