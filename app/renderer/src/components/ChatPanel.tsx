@@ -51,6 +51,12 @@ interface NoteLinkOption {
 	title: string
 }
 
+interface ModelCatalogEntry {
+	providerId: string
+	providerLabel: string
+	model: string
+}
+
 interface WikiDraftContext {
 	from: number
 	to: number
@@ -127,6 +133,8 @@ interface ChatPanelProps {
 	activeThreadId: string | null
 	messages: AiMessage[]
 	modelName: string
+	threadModel: string
+	modelCatalog: ModelCatalogEntry[]
 	noteTitlesById: Record<string, string>
 	noteLinkOptions: NoteLinkOption[]
 	searchQuery: string
@@ -148,6 +156,7 @@ interface ChatPanelProps {
 	onClearSearch: () => void
 	onSendMessage: (message: string) => Promise<void>
 	onOpenNote: (note_id: string, new_tab?: boolean) => void
+	onSetThreadModel: (model: string) => void
 }
 
 const note_id_pattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
@@ -231,6 +240,8 @@ export function ChatPanel(props: ChatPanelProps) {
 		activeThreadId,
 		messages,
 		modelName,
+		threadModel,
+		modelCatalog,
 		noteTitlesById,
 		noteLinkOptions,
 		searchQuery,
@@ -252,6 +263,7 @@ export function ChatPanel(props: ChatPanelProps) {
 		onClearSearch,
 		onSendMessage,
 		onOpenNote,
+		onSetThreadModel,
 	} = props
 	const assistant_label = `Strata AI - ${modelName || 'gpt-4o'}`
 	const [draft, setDraft] = useState('')
@@ -963,6 +975,24 @@ export function ChatPanel(props: ChatPanelProps) {
 						))}
 					</div>
 				)}
+				<select
+					className="chat-model-select"
+					value={threadModel || ''}
+					onChange={(event) => {
+						const next = event.target.value
+						onSetThreadModel(next)
+					}}
+					disabled={sending || assistantTyping}
+					title="Select AI model"
+					aria-label="Select AI model"
+				>
+					<option value="">Auto</option>
+					{modelCatalog.map((entry) => (
+						<option key={`${entry.providerId}:${entry.model}`} value={entry.model}>
+							{entry.providerLabel} — {entry.model}
+						</option>
+					))}
+				</select>
 				<button
 					className={`icon-button chat-mic-button ${isDictating ? 'chip-active chat-mic-recording' : ''}`}
 					type="button"

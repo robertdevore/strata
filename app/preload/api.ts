@@ -37,6 +37,7 @@ export interface StrataApi {
 		listThreads: () => Promise<AiThreadSummary[]>
 		deleteThread: (thread_id: string) => Promise<boolean>
 		renameThread: (thread_id: string, title: string) => Promise<boolean>
+		setThreadModel: (thread_id: string, model: string) => Promise<boolean>
 		listMessages: (thread_id: string) => Promise<AiMessage[]>
 		sendMessage: (payload: { threadId?: string; message: string; openNotes?: AiOpenNoteContext[] }) => Promise<AiChatResponse>
 		searchChats: (query: string) => Promise<AiSearchResult[]>
@@ -44,6 +45,7 @@ export interface StrataApi {
 		listEdits: (noteId: string) => Promise<AiNoteEdit[]>
 		revertEdit: (editId: string) => Promise<boolean>
 		listRouteLogs: (thread_id?: string) => Promise<AiRouteLog[]>
+		modelCatalog: () => Promise<Array<{ providerId: string; providerLabel: string; model: string }>>
 	}
 	links: {
 		backlinks: (note_id: string) => Promise<Array<{ link: NoteLink; source: Note }>>

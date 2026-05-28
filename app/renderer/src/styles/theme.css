@@ -1780,6 +1780,39 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	border-radius: 8px;
 }
 
+.chat-model-select {
+	position: absolute;
+	right: 74px;
+	bottom: 8px;
+	height: 28px;
+	padding: 0 4px;
+	border: 0;
+	background: transparent;
+	color: var(--text-3);
+	font-size: 11px;
+	font-family: inherit;
+	cursor: pointer;
+	max-width: 170px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border-radius: 6px;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+}
+
+.chat-model-select:hover,
+.chat-model-select:focus-visible {
+	color: var(--text-2);
+	background: var(--hover);
+	outline: none;
+}
+
+.chat-model-select:disabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
 .chat-search-modal {
 	width: min(620px, 94vw);
 }

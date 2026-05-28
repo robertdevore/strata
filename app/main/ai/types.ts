@@ -111,6 +111,7 @@ export interface AiProviderPreset {
 	kind: AiProviderKind
 	baseUrl: string
 	defaultModel: string
+	knownModels: string[]
 	apiKeySetting: keyof AiSettings
 	enabled: boolean
 	role: 'cheap' | 'premium' | 'disabled'

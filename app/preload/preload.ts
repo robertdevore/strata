@@ -33,6 +33,7 @@ const api: StrataApi = {
 		listThreads: () => ipcRenderer.invoke(IPC_CHANNELS.aiThreadsList),
 		deleteThread: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiThreadDelete, { threadId: thread_id }),
 		renameThread: (thread_id, title) => ipcRenderer.invoke(IPC_CHANNELS.aiThreadRename, { threadId: thread_id, title }),
+		setThreadModel: (thread_id, model) => ipcRenderer.invoke(IPC_CHANNELS.aiThreadSetModel, { threadId: thread_id, model }),
 		listMessages: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiMessagesList, { threadId: thread_id }),
 		sendMessage: (payload) => ipcRenderer.invoke(IPC_CHANNELS.aiSendMessage, payload),
 		searchChats: (query) => ipcRenderer.invoke(IPC_CHANNELS.aiSearchChats, { query }),
@@ -40,6 +41,7 @@ const api: StrataApi = {
 		listEdits: (noteId) => ipcRenderer.invoke(IPC_CHANNELS.aiEditsList, { noteId }),
 		revertEdit: (editId) => ipcRenderer.invoke(IPC_CHANNELS.aiEditsRevert, { editId }),
 		listRouteLogs: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiRouteLogsList, thread_id ? { threadId: thread_id } : undefined),
+		modelCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.aiModelCatalog),
 	},
 	links: {
 		backlinks: (note_id) => ipcRenderer.invoke(IPC_CHANNELS.linksBacklinks, { id: note_id }),

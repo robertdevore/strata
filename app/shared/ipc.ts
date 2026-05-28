@@ -18,6 +18,7 @@ export const IPC_CHANNELS = {
 	aiThreadsList: 'ai:threads:list',
 	aiThreadDelete: 'ai:thread:delete',
 	aiThreadRename: 'ai:thread:rename',
+	aiThreadSetModel: 'ai:thread:set-model',
 	aiMessagesList: 'ai:messages:list',
 	aiSendMessage: 'ai:send',
 	aiSearchChats: 'ai:search',
@@ -32,4 +33,5 @@ export const IPC_CHANNELS = {
 	publishHtmlFile: 'publish:html-file',
 	shellRun: 'shell:run',
 	aiRouteLogsList: 'ai:route-logs:list',
+	aiModelCatalog: 'ai:model-catalog',
 } as const

@@ -4,9 +4,11 @@ import { IPC_CHANNELS } from '../../shared/ipc'
 import type { AiChatResponse } from '../../shared/types'
 import type { StrataDatabase } from '../db/index'
 import { run_ai_turn, derive_chat_title, resolve_ai_settings } from '../ai/aiRunner'
+import { build_model_catalog } from '../ai/providers/providerRegistry'
 
 const thread_id_schema = z.object({ threadId: z.string().uuid() })
 const rename_thread_schema = z.object({ threadId: z.string().uuid(), title: z.string().trim().min(1).max(120) })
+const set_thread_model_schema = z.object({ threadId: z.string().uuid(), model: z.string().trim().max(120) })
 const search_schema = z.object({ query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(100).optional() })
 const open_note_context_schema = z.object({
 	id: z.string().uuid(),
@@ -111,6 +113,11 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 		return Boolean(db.setAiThreadTitle(threadId, title))
 	})
 
+	ipcMain.handle(IPC_CHANNELS.aiThreadSetModel, (_event, payload) => {
+		const { threadId, model } = set_thread_model_schema.parse(payload)
+		return Boolean(db.setAiThreadModel(threadId, model || ''))
+	})
+
 	ipcMain.handle(IPC_CHANNELS.aiMessagesList, (_event, payload) => {
 		const { threadId } = thread_id_schema.parse(payload)
 		return db.listAiMessages(threadId)
@@ -124,18 +131,17 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 	ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
 		const { threadId, message, openNotes } = send_schema.parse(payload)
 		const configured_model = resolve_chat_model(db)
-		let thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), configured_model)
+		const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
 		if (!thread) {
 			throw new Error('Chat thread was not found.')
 		}
-		if (!thread.model || thread.model !== configured_model) {
-			thread = db.setAiThreadModel(thread.id, configured_model) || thread
-		}
+		// Respect user-chosen model; only default to configured when thread model is empty (Auto)
+		const effective_model = thread.model?.trim() || configured_model
 
 		db.createAiMessage(thread.id, 'user', message)
 		const ai_turn = await run_ai_turn(db, thread, {
 			openNotesContext: build_open_notes_context(openNotes),
-			forcedModel: thread.model || configured_model,
+			forcedModel: effective_model,
 		})
 		if (ai_turn.notesChanged) {
 			on_notes_changed?.()
@@ -207,5 +213,11 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 	ipcMain.handle(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
 		const { editId } = z.object({ editId: z.string().uuid() }).parse(payload)
 		return db.revertAiEdit(editId)
+	})
+
+	// AI model catalog
+	ipcMain.handle(IPC_CHANNELS.aiModelCatalog, () => {
+		const ai_settings = resolve_ai_settings(db)
+		return build_model_catalog(ai_settings)
 	})
 }

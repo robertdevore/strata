@@ -25,4 +25,10 @@ export const aiService = {
 	listRouteLogs(thread_id?: string): Promise<AiRouteLog[]> {
 		return window.strata.ai.listRouteLogs(thread_id)
 	},
+	setThreadModel(thread_id: string, model: string): Promise<boolean> {
+		return window.strata.ai.setThreadModel(thread_id, model)
+	},
+	modelCatalog(): Promise<Array<{ providerId: string; providerLabel: string; model: string }>> {
+		return window.strata.ai.modelCatalog()
+	},
 }

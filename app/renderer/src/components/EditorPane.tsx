@@ -328,6 +328,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [chatAssistantTyping, setChatAssistantTyping] = useState(false)
 	const [chatDeleting, setChatDeleting] = useState(false)
 	const [chatErrorMessage, setChatErrorMessage] = useState('')
+	const [chatModelCatalog, setChatModelCatalog] = useState<Array<{ providerId: string; providerLabel: string; model: string }>>([])
 	const [backlinks, setBacklinks] = useState<Array<{ link: import('@shared/types').NoteLink; source: import('@shared/types').Note }>>([])
 	const [showBacklinks, setShowBacklinks] = useState(false)
 	const [showRelatedPreview, setShowRelatedPreview] = useState(false)
@@ -568,6 +569,19 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}, [chatThreadId, showChatPanel, chatThreads, openAiModel])
 
+	// Load model catalog
+	useEffect(() => {
+		let disposed = false
+		aiService.modelCatalog().then((catalog) => {
+			if (disposed) return
+			setChatModelCatalog(catalog)
+		}).catch(() => {
+			if (disposed) return
+			setChatModelCatalog([])
+		})
+		return () => { disposed = true }
+	}, [])
+
 	useEffect(() => {
 		const openFindReplace = () => {
 			const view = editorViewRef.current
@@ -725,6 +739,9 @@ export function EditorPane(props: EditorPaneProps) {
 	}, [drafts, notes, openTabIds])
 	const active_chat_model = openAiModel
 		|| (chatThreadId ? chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model || '' : '')
+	const chatThreadModel = chatThreadId
+		? (chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model ?? '')
+		: ''
 	const showSidePanel = showPreview || showChatPanel
 
 	const stopAssistantTypingAnimation = () => {
@@ -1092,6 +1109,17 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}
 
+	const setChatThreadModel = async (model: string) => {
+		if (!chatThreadId) return
+		setChatErrorMessage('')
+		try {
+			await aiService.setThreadModel(chatThreadId, model)
+			await refreshChatThreads()
+		} catch (error) {
+			setChatErrorMessage(error instanceof Error ? error.message : 'Failed to update model')
+		}
+	}
+
 	const deleteSelectedChatThread = async () => {
 		if (!chatThreadId) return
 		stopAssistantTypingAnimation()
@@ -1319,6 +1347,8 @@ export function EditorPane(props: EditorPaneProps) {
 								activeThreadId={chatThreadId}
 								messages={chatMessages}
 								modelName={active_chat_model}
+								threadModel={chatThreadModel}
+								modelCatalog={chatModelCatalog}
 								noteTitlesById={note_titles_by_id}
 								noteLinkOptions={note_link_options}
 								searchQuery={chatSearchQuery}
@@ -1364,6 +1394,7 @@ export function EditorPane(props: EditorPaneProps) {
 								onOpenNote={(note_id, new_tab) => {
 									void onOpenNoteFromChat(note_id, new_tab)
 								}}
+								onSetThreadModel={(model) => void setChatThreadModel(model)}
 							/>
 						) : (
 							<article className="preview-panel preview-markdown">

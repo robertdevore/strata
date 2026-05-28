@@ -9,40 +9,44 @@ import { ChatCompletionsProvider } from './ChatCompletionsProvider'
 export const PROVIDER_PRESETS: AiProviderPreset[] = [
 	{
 		id: 'openai',
-		label: 'OpenAI (Responses API)',
+		label: 'OpenAI',
 		kind: 'openai_responses',
 		baseUrl: 'https://api.openai.com',
 		defaultModel: 'gpt-4o',
+		knownModels: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-4o', 'gpt-4o-mini'],
 		apiKeySetting: 'openAiApiKey',
 		enabled: true,
 		role: 'premium',
 	},
 	{
 		id: 'deepseek-flash',
-		label: 'DeepSeek V4 Flash',
+		label: 'DeepSeek Flash',
 		kind: 'deepseek',
 		baseUrl: 'https://api.deepseek.com',
 		defaultModel: 'deepseek-v4-flash',
+		knownModels: ['deepseek-v4-flash', 'deepseek-v3-flash'],
 		apiKeySetting: 'aiDeepseekApiKey',
 		enabled: true,
 		role: 'cheap',
 	},
 	{
 		id: 'deepseek-pro',
-		label: 'DeepSeek V4 Pro',
+		label: 'DeepSeek Pro',
 		kind: 'deepseek',
 		baseUrl: 'https://api.deepseek.com',
 		defaultModel: 'deepseek-v4-pro',
+		knownModels: ['deepseek-v4-pro', 'deepseek-v3-pro'],
 		apiKeySetting: 'aiDeepseekApiKey',
 		enabled: true,
 		role: 'premium',
 	},
 	{
 		id: 'kimi',
-		label: 'Kimi / Moonshot',
+		label: 'Kimi',
 		kind: 'kimi',
 		baseUrl: 'https://api.moonshot.ai/v1',
 		defaultModel: 'kimi-k2.6',
+		knownModels: ['kimi-k2.6', 'kimi-k2'],
 		apiKeySetting: 'aiKimiApiKey',
 		enabled: true,
 		role: 'cheap',
@@ -53,33 +57,82 @@ export const PROVIDER_PRESETS: AiProviderPreset[] = [
 		kind: 'openrouter',
 		baseUrl: 'https://openrouter.ai/api/v1',
 		defaultModel: 'openai/gpt-4o',
+		knownModels: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'anthropic/claude-sonnet-4'],
 		apiKeySetting: 'aiOpenrouterApiKey',
 		enabled: true,
 		role: 'premium',
 	},
 	{
 		id: 'custom',
-		label: 'Custom OpenAI-compatible',
+		label: 'Custom',
 		kind: 'custom_openai_compatible',
 		baseUrl: '',
 		defaultModel: '',
+		knownModels: [],
 		apiKeySetting: 'aiCustomApiKey',
 		enabled: true,
 		role: 'premium',
 	},
 	{
 		id: 'local-llama-cpp',
-		label: 'Local llama.cpp (future)',
+		label: 'Local',
 		kind: 'local_llama_cpp',
 		baseUrl: 'http://127.0.0.1:8080/v1',
 		defaultModel: 'local-qwen-coder',
+		knownModels: ['local-qwen-coder', 'local-llama'],
 		apiKeySetting: 'aiCustomApiKey',
-		enabled: false,  // disabled for now
+		enabled: false,
 		role: 'disabled',
 	},
 ]
 
-// ---- Lookup Helpers ----
+// ---- Catalog Builder ----
+
+export interface ModelCatalogEntry {
+	providerId: string
+	providerLabel: string
+	model: string
+}
+
+/** Build the available model list from enabled presets, merging user settings. */
+export const build_model_catalog = (ai_settings: {
+	aiCheapModel: string
+	aiPremiumModel: string
+	openAiModel: string
+}): ModelCatalogEntry[] => {
+	const seen = new Set<string>()
+	const catalog: ModelCatalogEntry[] = []
+
+	for (const preset of PROVIDER_PRESETS) {
+		if (!preset.enabled) continue
+		if (0 === preset.knownModels.length) continue
+
+		for (const model of preset.knownModels) {
+			const key = `${preset.id}:${model}`
+			if (seen.has(key)) continue
+			seen.add(key)
+			catalog.push({ providerId: preset.id, providerLabel: preset.label, model })
+		}
+	}
+
+	// Ensure user-configured models are present even if not in knownModels
+	const ensure_model = (provider_id: string, provider_label: string, model: string) => {
+		if (!model.trim()) return
+		const key = `${provider_id}:${model}`
+		if (seen.has(key)) return
+		seen.add(key)
+		catalog.push({ providerId: provider_id, providerLabel: provider_label, model })
+	}
+
+	ensure_model('openai', 'OpenAI', ai_settings.openAiModel)
+	ensure_model('openai', 'OpenAI', ai_settings.aiPremiumModel)
+
+	const cheap_preset = get_preset_by_id('deepseek-flash')
+	ensure_model('deepseek-flash', cheap_preset?.label || 'DeepSeek Flash', ai_settings.aiCheapModel)
+
+	return catalog
+}
+
 
 export const get_preset_by_id = (id: string): AiProviderPreset | undefined => {
 	return PROVIDER_PRESETS.find((p) => p.id === id)
