@@ -19,3 +19,19 @@ Validation:
 - npm run strata -- tasks extract --stdin --json
 - npm run strata -- health --json
 - npm run strata -- config doctor --json
+
+### Item 2: CLI contract, safety, and architecture tests
+Status: completed
+
+Summary:
+- Added focused CLI unit coverage for config resolution, API client behavior, safety gates, markdown helpers, schema validation, and structured error payloads.
+- Added architecture guard test to ensure CLI client remains HTTP-only and does not import SQLite/database modules.
+
+Validation:
+- vitest run app/renderer/src/tests/cli/config.test.ts
+- vitest run app/renderer/src/tests/cli/apiClient.test.ts
+- vitest run app/renderer/src/tests/cli/agentMode.test.ts
+- vitest run app/renderer/src/tests/cli/markdown.test.ts
+- vitest run app/renderer/src/tests/cli/validators.test.ts
+- vitest run app/renderer/src/tests/cli/errors.test.ts
+- vitest run app/renderer/src/tests/cli/noSqliteAccess.test.ts
