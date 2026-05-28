@@ -94,15 +94,17 @@ export interface ModelCatalogEntry {
 	model: string
 }
 
-/** Build the available model list from enabled presets, merging user settings. */
+/** Build the available model list from enabled presets merged with user settings. */
 export const build_model_catalog = (ai_settings: {
 	aiCheapModel: string
 	aiPremiumModel: string
 	openAiModel: string
+	aiModelCatalog?: string
 }): ModelCatalogEntry[] => {
 	const seen = new Set<string>()
 	const catalog: ModelCatalogEntry[] = []
 
+	// 1. Start with preset known models
 	for (const preset of PROVIDER_PRESETS) {
 		if (!preset.enabled) continue
 		if (0 === preset.knownModels.length) continue
@@ -115,7 +117,7 @@ export const build_model_catalog = (ai_settings: {
 		}
 	}
 
-	// Ensure user-configured models are present even if not in knownModels
+	// 2. Ensure user-configured single models are present
 	const ensure_model = (provider_id: string, provider_label: string, model: string) => {
 		if (!model.trim()) return
 		const key = `${provider_id}:${model}`
@@ -129,6 +131,25 @@ export const build_model_catalog = (ai_settings: {
 
 	const cheap_preset = get_preset_by_id('deepseek-flash')
 	ensure_model('deepseek-flash', cheap_preset?.label || 'DeepSeek Flash', ai_settings.aiCheapModel)
+
+	// 3. Merge user-configured model catalog from settings
+	if (ai_settings.aiModelCatalog) {
+		try {
+			const user_catalog = JSON.parse(ai_settings.aiModelCatalog) as Array<{ providerId?: string; model?: string }>
+			if (Array.isArray(user_catalog)) {
+				for (const entry of user_catalog) {
+					const pid = 'string' === typeof entry.providerId ? entry.providerId.trim() : ''
+					const m = 'string' === typeof entry.model ? entry.model.trim() : ''
+					if (!pid || !m) continue
+					const key = `${pid}:${m}`
+					if (seen.has(key)) continue
+					seen.add(key)
+					const preset = get_preset_by_id(pid)
+					catalog.push({ providerId: pid, providerLabel: preset?.label || pid, model: m })
+				}
+			}
+		} catch { /* ignore malformed catalog */ }
+	}
 
 	return catalog
 }

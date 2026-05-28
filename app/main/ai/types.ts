@@ -150,6 +150,9 @@ export interface AiSettings {
 	// Thresholds
 	aiCheapConfidenceThreshold: number
 	aiPremiumFallbackThreshold: number
+
+	// Model catalog — user-configured per-provider models
+	aiModelCatalog: string
 }
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
@@ -169,4 +172,5 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
 	aiEnableRouteLogs: true,
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
+	aiModelCatalog: '[]',
 }

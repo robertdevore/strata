@@ -58,6 +58,7 @@ export interface Settings {
 	aiPremiumFallbackThreshold: number
 	pinnedTags: string[]
 	hotkeys: HotkeysSettings
+	aiModelCatalog: string  // JSON array of {providerId:string, model:string}
 }
 
 export interface NoteUpdatePatch {

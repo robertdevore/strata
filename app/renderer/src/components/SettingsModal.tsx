@@ -52,6 +52,7 @@ const HOTKEY_FIELDS: Array<{ id: HotkeyAction; label: string }> = [
 	{ id: 'copyRichText', label: 'Copy Rich Text' },
 	{ id: 'deleteNote', label: 'Delete Note' },
 	{ id: 'toggleSidebar', label: 'Toggle Sidebar' },
+	{ id: 'toggleSettings', label: 'Open Settings' },
 	{ id: 'relatedNotes', label: 'Related Notes' },
 	{ id: 'navigateBack', label: 'Navigate Back' },
 	{ id: 'navigateForward', label: 'Navigate Forward' },
@@ -206,6 +207,13 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 									<option value="auto_apply">Auto Apply — AI edits freely (history kept)</option>
 								</select>
 							</label>
+
+							<h4 className="settings-section-title">Model Catalog</h4>
+							<p className="tags-label">Models available in the per-thread selector in AI chat.</p>
+							<ModelCatalogEditor
+								value={settings.aiModelCatalog || '[]'}
+								onChange={(next) => onUpdate({ aiModelCatalog: next })}
+							/>
 
 							<h4 className="settings-section-title">API Keys</h4>
 
@@ -411,6 +419,82 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 						</>
 					)}
 				</div>
+			</div>
+		</div>
+	)
+}
+
+// ---- Model Catalog Editor ----
+
+interface ModelCatalogEditorProps {
+	value: string  // JSON array
+	onChange: (value: string) => void
+}
+
+const PROVIDER_OPTIONS = [
+	{ value: 'openai', label: 'OpenAI' },
+	{ value: 'deepseek-flash', label: 'DeepSeek Flash' },
+	{ value: 'deepseek-pro', label: 'DeepSeek Pro' },
+	{ value: 'kimi', label: 'Kimi' },
+	{ value: 'openrouter', label: 'OpenRouter' },
+	{ value: 'custom', label: 'Custom' },
+]
+
+function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
+	const [newProvider, setNewProvider] = useState('openai')
+	const [newModel, setNewModel] = useState('')
+
+	const entries: Array<{ providerId: string; model: string }> = (() => {
+		try {
+			const parsed = JSON.parse(value)
+			if (Array.isArray(parsed)) return parsed.filter((e) => e && 'string' === typeof e.providerId && 'string' === typeof e.model)
+		} catch { /* ignore */ }
+		return []
+	})()
+
+	const remove_entry = (index: number) => {
+		const next = [...entries]
+		next.splice(index, 1)
+		onChange(JSON.stringify(next))
+	}
+
+	const add_entry = () => {
+		const provider = newProvider.trim()
+		const model = newModel.trim()
+		if (!provider || !model) return
+		const next = [...entries, { providerId: provider, model }]
+		onChange(JSON.stringify(next))
+		setNewModel('')
+	}
+
+	return (
+		<div className="model-catalog-editor">
+			{0 === entries.length && (
+				<p className="tags-label" style={{ marginBottom: 8 }}>No custom models added. Preset models are always available.</p>
+			)}
+			{entries.map((entry, index) => (
+				<div key={`${entry.providerId}:${entry.model}:${index}`} className="model-catalog-row">
+					<span className="model-catalog-provider">{entry.providerId}</span>
+					<span className="model-catalog-model">{entry.model}</span>
+					<button type="button" className="icon-button" onClick={() => remove_entry(index)} title="Remove model" aria-label="Remove model">
+						<CloseIcon />
+					</button>
+				</div>
+			))}
+			<div className="model-catalog-add">
+				<select value={newProvider} onChange={(event) => setNewProvider(event.target.value)}>
+					{PROVIDER_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+				</select>
+				<input
+					type="text"
+					className="search-input"
+					value={newModel}
+					onChange={(event) => setNewModel(event.target.value)}
+					onKeyDown={(event) => { if ('Enter' === event.key) { event.preventDefault(); add_entry() } }}
+					placeholder="Model name..."
+					spellCheck={false}
+				/>
+				<button type="button" className="primary-button" onClick={add_entry} disabled={!newProvider.trim() || !newModel.trim()}>Add</button>
 			</div>
 		</div>
 	)

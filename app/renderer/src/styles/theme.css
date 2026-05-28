@@ -1780,6 +1780,125 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	border-radius: 8px;
 }
 
+.chat-model-picker {
+	position: absolute;
+	right: 74px;
+	bottom: 8px;
+	z-index: 2;
+}
+
+.chat-model-trigger {
+	height: 28px;
+	padding: 0 4px;
+	border: 0;
+	background: transparent;
+	color: var(--text-3);
+	font-size: 11px;
+	font-family: inherit;
+	cursor: pointer;
+	max-width: 170px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+	border-radius: 6px;
+	line-height: 28px;
+}
+
+.chat-model-trigger:hover,
+.chat-model-trigger:focus-visible {
+	color: var(--text-2);
+	background: var(--hover);
+	outline: none;
+}
+
+.chat-model-trigger:disabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.chat-model-dropdown {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 8px);
+	width: 280px;
+	max-height: 320px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--editor-bg);
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.26);
+	display: grid;
+	grid-template-rows: auto 1fr;
+	overflow: hidden;
+	z-index: 4;
+}
+
+.chat-model-search-row {
+	padding: 8px;
+	border-bottom: 1px solid var(--border);
+}
+
+.chat-model-search-row input {
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--panel-bg);
+	color: var(--text);
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: inherit;
+}
+
+.chat-model-search-row input:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.chat-model-list {
+	overflow-y: auto;
+	padding: 4px;
+	display: grid;
+	gap: 2px;
+	align-content: start;
+}
+
+.chat-model-option {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	padding: 6px 8px;
+	border-radius: 6px;
+	text-align: left;
+	cursor: pointer;
+	font-size: 12px;
+	font-family: inherit;
+}
+
+.chat-model-option:hover,
+.chat-model-option-focus,
+.chat-model-option-active {
+	background: var(--hover);
+}
+
+.chat-model-option-provider {
+	color: var(--text-3);
+	font-size: 11px;
+	min-width: 70px;
+	flex: 0 0 auto;
+}
+
+.chat-model-option-model {
+	color: var(--text);
+	font-family: ui-monospace, monospace;
+	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .chat-model-select {
 	position: absolute;
 	right: 74px;
@@ -2249,6 +2368,54 @@ body.theme-light .cm-gutters {
 .settings-tab-content .inline-toggle {
 	font-weight: 400;
 	margin-bottom: 6px;
+}
+
+.model-catalog-editor {
+	display: grid;
+	gap: 6px;
+	margin-bottom: 12px;
+}
+
+.model-catalog-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	padding: 4px 6px;
+	border-radius: 6px;
+	background: var(--hover);
+}
+
+.model-catalog-provider {
+	color: var(--text-3);
+	font-weight: 500;
+	min-width: 100px;
+}
+
+.model-catalog-model {
+	color: var(--text);
+	flex: 1;
+	font-family: ui-monospace, monospace;
+}
+
+.model-catalog-add {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.model-catalog-add select {
+	flex: 0 0 auto;
+	min-width: 120px;
+}
+
+.model-catalog-add input {
+	flex: 1;
+	min-width: 0;
+}
+
+.model-catalog-add .primary-button {
+	flex: 0 0 auto;
 }
 
 /* backup list */

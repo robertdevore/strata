@@ -86,6 +86,7 @@ const DEFAULT_SETTINGS: Settings = {
 	aiPremiumFallbackThreshold: 0.65,
 	pinnedTags: [],
 	hotkeys: DEFAULT_HOTKEYS,
+	aiModelCatalog: '[]',
 }
 
 export class StrataDatabase {

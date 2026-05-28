@@ -284,6 +284,11 @@ export function ChatPanel(props: ChatPanelProps) {
 	const [composeCursor, setComposeCursor] = useState(0)
 	const [activeWikiSuggestionIndex, setActiveWikiSuggestionIndex] = useState(0)
 	const [hideWikiSuggestions, setHideWikiSuggestions] = useState(false)
+	const [modelMenuOpen, setModelMenuOpen] = useState(false)
+	const [modelSearch, setModelSearch] = useState('')
+	const [modelMenuActiveIndex, setModelMenuActiveIndex] = useState(0)
+	const modelMenuRef = useRef<HTMLDivElement | null>(null)
+	const modelSearchInputRef = useRef<HTMLInputElement | null>(null)
 	const liveDictationTextRef = useRef('')
 	const chatMessagesRef = useRef<HTMLDivElement | null>(null)
 	const chatSearchInputRef = useRef<HTMLInputElement | null>(null)
@@ -316,6 +321,19 @@ export function ChatPanel(props: ChatPanelProps) {
 		() => threads.find((entry) => entry.thread.id === activeThreadId) ?? null,
 		[activeThreadId, threads],
 	)
+	const filtered_models = useMemo(() => {
+		const query = modelSearch.trim().toLowerCase()
+		if (!query) return modelCatalog
+		return modelCatalog.filter((entry) =>
+			entry.model.toLowerCase().includes(query) ||
+			entry.providerLabel.toLowerCase().includes(query)
+		)
+	}, [modelCatalog, modelSearch])
+	const display_model_label = useMemo(() => {
+		if (!threadModel) return 'Auto'
+		const match = modelCatalog.find((entry) => entry.model === threadModel)
+		return match ? `${match.providerLabel} — ${match.model}` : threadModel
+	}, [modelCatalog, threadModel])
 	const wiki_draft_context = useMemo(() => get_wiki_draft_context(draft, composeCursor), [composeCursor, draft])
 	const wiki_suggestions = useMemo(() => {
 		if (hideWikiSuggestions || !wiki_draft_context) return []
@@ -495,6 +513,26 @@ export function ChatPanel(props: ChatPanelProps) {
 			chatSearchInputRef.current?.select()
 		}, 0)
 	}, [showSearchModal])
+
+	useEffect(() => {
+		if (modelMenuOpen) {
+			setModelMenuActiveIndex(0)
+			window.setTimeout(() => modelSearchInputRef.current?.focus(), 0)
+		} else {
+			setModelSearch('')
+		}
+	}, [modelMenuOpen])
+
+	useEffect(() => {
+		if (!modelMenuOpen) return
+		const onMouseDown = (event: MouseEvent) => {
+			if (modelMenuRef.current && !modelMenuRef.current.contains(event.target as Node)) {
+				setModelMenuOpen(false)
+			}
+		}
+		document.addEventListener('mousedown', onMouseDown)
+		return () => document.removeEventListener('mousedown', onMouseDown)
+	}, [modelMenuOpen])
 
 	useEffect(() => {
 		if (!active_thread) {
@@ -975,24 +1013,88 @@ export function ChatPanel(props: ChatPanelProps) {
 						))}
 					</div>
 				)}
-				<select
-					className="chat-model-select"
-					value={threadModel || ''}
-					onChange={(event) => {
-						const next = event.target.value
-						onSetThreadModel(next)
-					}}
-					disabled={sending || assistantTyping}
-					title="Select AI model"
-					aria-label="Select AI model"
-				>
-					<option value="">Auto</option>
-					{modelCatalog.map((entry) => (
-						<option key={`${entry.providerId}:${entry.model}`} value={entry.model}>
-							{entry.providerLabel} — {entry.model}
-						</option>
-					))}
-				</select>
+				<div className="chat-model-picker" ref={modelMenuRef}>
+					<button
+						type="button"
+						className="chat-model-trigger"
+						onClick={() => setModelMenuOpen((v) => !v)}
+						disabled={sending || assistantTyping}
+						title="Select AI model"
+						aria-label="Select AI model"
+						aria-expanded={modelMenuOpen}
+					>
+						{display_model_label}
+					</button>
+					{modelMenuOpen && (
+						<div className="chat-model-dropdown">
+							<div className="chat-model-search-row">
+								<input
+									ref={modelSearchInputRef}
+									type="text"
+									className="search-input"
+									value={modelSearch}
+									onChange={(event) => { setModelSearch(event.target.value); setModelMenuActiveIndex(0) }}
+									onKeyDown={(event) => {
+										if ('ArrowDown' === event.key) {
+											event.preventDefault()
+											setModelMenuActiveIndex((idx) => Math.min(idx + 1, filtered_models.length))
+											return
+										}
+										if ('ArrowUp' === event.key) {
+											event.preventDefault()
+											setModelMenuActiveIndex((idx) => Math.max(idx - 1, 0))
+											return
+										}
+										if ('Escape' === event.key) {
+											event.preventDefault()
+											setModelMenuOpen(false)
+											return
+										}
+										if ('Enter' === event.key) {
+											event.preventDefault()
+											if (0 === filtered_models.length) return
+											const option = filtered_models[modelMenuActiveIndex]
+											if (option) {
+												onSetThreadModel(option.model)
+												setModelMenuOpen(false)
+											}
+											return
+										}
+									}}
+									placeholder="Search models…"
+									spellCheck={false}
+								/>
+							</div>
+							<div className="chat-model-list" role="listbox">
+								<button
+									type="button"
+									className={`chat-model-option ${!threadModel ? 'chat-model-option-active' : ''}`}
+									onClick={() => { onSetThreadModel(''); setModelMenuOpen(false) }}
+									role="option"
+									aria-selected={!threadModel}
+								>
+									Auto
+								</button>
+								{filtered_models.map((entry, index) => (
+									<button
+										key={`${entry.providerId}:${entry.model}`}
+										type="button"
+										className={`chat-model-option ${entry.model === threadModel ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
+										onClick={() => { onSetThreadModel(entry.model); setModelMenuOpen(false) }}
+										role="option"
+										aria-selected={entry.model === threadModel}
+									>
+										<span className="chat-model-option-provider">{entry.providerLabel}</span>
+										<span className="chat-model-option-model">{entry.model}</span>
+									</button>
+								))}
+								{0 === filtered_models.length && (
+									<p className="tags-label" style={{ padding: '8px', textAlign: 'center', margin: 0 }}>No models match</p>
+								)}
+							</div>
+						</div>
+					)}
+				</div>
 				<button
 					className={`icon-button chat-mic-button ${isDictating ? 'chip-active chat-mic-recording' : ''}`}
 					type="button"
