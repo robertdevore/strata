@@ -1321,10 +1321,12 @@ export function EditorPane(props: EditorPaneProps) {
 						onChange={(value) => {
 							let body = value
 							let title = currentTitle
+							let title_changed = false
 							// Auto-detect pasted/typed H1 in editor: extract as title, strip from body
 							const val_lines = value.split('\n')
 							if (val_lines[0] && val_lines[0].startsWith('# ') && val_lines[0].trim().length > 2) {
 								title = val_lines[0].slice(2).trim()
+								title_changed = title !== currentTitle
 								if (val_lines[1] === '') {
 									body = val_lines.slice(2).join('\n')
 								} else {
@@ -1334,7 +1336,12 @@ export function EditorPane(props: EditorPaneProps) {
 							const full = fullContentWithTitle(body, title)
 							onChangeDraft(note.id, full)
 							if (debounceRef.current) window.clearTimeout(debounceRef.current)
-							debounceRef.current = window.setTimeout(() => void onFlush(note.id), 420)
+							// Flush immediately when title changes so sidebar/tab updates without delay
+							if (title_changed) {
+								void onFlush(note.id)
+							} else {
+								debounceRef.current = window.setTimeout(() => void onFlush(note.id), 420)
+							}
 						}}
 					/>
 				</div>
