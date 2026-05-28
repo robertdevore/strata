@@ -282,6 +282,11 @@ export function App() {
 				setSidebarCollapsed((v) => !v)
 				return
 			}
+			if (hotkey_matches(event, hotkeys.toggleSettings)) {
+				event.preventDefault()
+				store.setShowSettings(true)
+				return
+			}
 			if (hotkey_matches(event, hotkeys.navigateBack)) {
 				event.preventDefault()
 				if (store.selectedNoteId) await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
@@ -341,8 +346,12 @@ export function App() {
 				return
 			}
 			if (hotkey_matches(event, hotkeys.copyRichText)) {
-				event.preventDefault()
-				void runCommand('copy-rich-text')
+				const active_element = document.activeElement
+				const editor_focused = active_element instanceof HTMLElement && Boolean(active_element.closest('.cm-editor, .cm-content, .cm-scroller'))
+				if (editor_focused) {
+					event.preventDefault()
+					void runCommand('copy-rich-text')
+				}
 				return
 			}
 			if (hotkey_matches(event, hotkeys.deleteNote)) {

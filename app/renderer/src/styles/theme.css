@@ -1795,7 +1795,9 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	max-width: 170px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	overflow: hidden;
 	border-radius: 6px;
+	z-index: 2;
 	appearance: none;
 	-webkit-appearance: none;
 	-moz-appearance: none;

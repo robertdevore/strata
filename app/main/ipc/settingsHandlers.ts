@@ -20,6 +20,7 @@ const hotkeys_schema: z.ZodType<HotkeysSettings> = z.object({
 	copyRichText: z.string().max(40),
 	deleteNote: z.string().max(40),
 	toggleSidebar: z.string().max(40),
+	toggleSettings: z.string().max(40),
 	relatedNotes: z.string().max(40),
 	navigateBack: z.string().max(40),
 	navigateForward: z.string().max(40),

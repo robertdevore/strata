@@ -13,6 +13,7 @@ export type HotkeyAction =
 	| 'copyRichText'
 	| 'deleteNote'
 	| 'toggleSidebar'
+	| 'toggleSettings'
 	| 'relatedNotes'
 	| 'navigateBack'
 	| 'navigateForward'
@@ -29,11 +30,12 @@ export const DEFAULT_HOTKEYS: HotkeysSettings = {
 	findOrSearch: 'Cmd+F',
 	toggleFilters: 'Cmd+Shift+F',
 	saveNote: 'Cmd+S',
-	toggleStar: 'Cmd+Shift+S',
+	toggleStar: 'Cmd+D',
 	toggleArchive: 'Cmd+Shift+A',
-	copyRichText: 'Cmd+Shift+C',
+	copyRichText: 'Cmd+C',
 	deleteNote: 'Cmd+Backspace',
 	toggleSidebar: 'Cmd+Shift+B',
+	toggleSettings: 'Cmd+Shift+S',
 	relatedNotes: 'Cmd+R',
 	navigateBack: 'Cmd+[',
 	navigateForward: 'Cmd+]',
