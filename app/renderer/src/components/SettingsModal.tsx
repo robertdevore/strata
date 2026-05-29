@@ -432,12 +432,12 @@ interface ModelCatalogEditorProps {
 }
 
 const CATALOG_PROVIDERS = [
-	{ id: 'openai', label: 'OpenAI' },
-	{ id: 'deepseek-flash', label: 'DeepSeek Flash' },
-	{ id: 'deepseek-pro', label: 'DeepSeek Pro' },
-	{ id: 'kimi', label: 'Kimi' },
-	{ id: 'openrouter', label: 'OpenRouter' },
-	{ id: 'custom', label: 'Custom' },
+	{ id: 'openai', label: 'OpenAI', placeholder: 'gpt-5.3-codex, gpt-4o, gpt-4o-mini, o4-mini' },
+	{ id: 'deepseek-flash', label: 'DeepSeek Flash', placeholder: 'deepseek-v4-flash, deepseek-chat' },
+	{ id: 'deepseek-pro', label: 'DeepSeek Pro', placeholder: 'deepseek-v4-pro, deepseek-reasoner' },
+	{ id: 'kimi', label: 'Kimi', placeholder: 'kimi-k2.6, moonshot-v1-8k' },
+	{ id: 'openrouter', label: 'OpenRouter', placeholder: 'openai/gpt-4o, anthropic/claude-sonnet-4, google/gemini-2.5-pro' },
+	{ id: 'custom', label: 'Custom', placeholder: 'your-model-name' },
 ]
 
 function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
@@ -473,7 +473,7 @@ function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
 						className="search-input"
 						value={catalog[p.id] || ''}
 						onChange={(event) => update_provider(p.id, event.target.value)}
-						placeholder="gpt-5.5, gpt-4o, gpt-4o-mini"
+						placeholder={p.placeholder}
 						spellCheck={false}
 					/>
 				</label>
