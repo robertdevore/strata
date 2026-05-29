@@ -51,6 +51,7 @@ const settings_patch_schema = z.object({
 	aiEnableRouteLogs: z.boolean().optional(),
 	aiCheapConfidenceThreshold: z.number().min(0).max(1).optional(),
 	aiPremiumFallbackThreshold: z.number().min(0).max(1).optional(),
+	aiModelCatalog: z.string().max(8192).optional(),
 	pinnedTags: z.array(z.string()).optional(),
 	hotkeys: hotkeys_schema.optional(),
 })
