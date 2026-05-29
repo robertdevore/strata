@@ -12,8 +12,9 @@ import TurndownService from 'turndown'
 import type { AiMessage, AiRouteLog, AiSearchResult, AiThreadSummary, Note } from '@shared/types'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
 import { aiService } from '@renderer/src/services/aiService'
+import { useAppStore } from '@renderer/src/state/useAppStore'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, ChatbotIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EyeIcon, FileSearchIcon, FileTextAiIcon, PrinterIcon, StarFilledIcon, StarOutlineIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
+import { ArchiveIcon, ChatbotIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EarIcon, EyeIcon, FileDescriptionIcon, FileSearchIcon, FileTextAiIcon, MoonIcon, PrinterIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
 import { ChatPanel } from './ChatPanel'
 import { PublishModal } from './PublishModal'
 
@@ -613,6 +614,7 @@ export function EditorPane(props: EditorPaneProps) {
 	}, [chatThreadId, showChatPanel, chatThreads, openAiModel])
 
 	// Load model catalog
+	const aiModelCatalog = useAppStore((state) => state.settings.aiModelCatalog)
 	useEffect(() => {
 		if (!showChatPanel) return
 		let disposed = false
