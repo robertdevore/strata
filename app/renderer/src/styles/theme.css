@@ -2407,50 +2407,27 @@ body.theme-light .cm-gutters {
 
 .model-catalog-editor {
 	display: grid;
-	gap: 6px;
+	gap: 10px;
 	margin-bottom: 12px;
 }
 
-.model-catalog-row {
-	display: flex;
+.model-catalog-field {
+	display: grid;
+	grid-template-columns: 120px 1fr;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
+}
+
+.model-catalog-label {
 	font-size: 12px;
-	padding: 4px 6px;
-	border-radius: 6px;
-	background: var(--hover);
-}
-
-.model-catalog-provider {
-	color: var(--text-3);
 	font-weight: 500;
-	min-width: 100px;
+	color: var(--text-2);
+	text-align: right;
 }
 
-.model-catalog-model {
-	color: var(--text);
-	flex: 1;
-	font-family: ui-monospace, monospace;
-}
-
-.model-catalog-add {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-
-.model-catalog-add select {
-	flex: 0 0 auto;
-	min-width: 120px;
-}
-
-.model-catalog-add input {
+.model-catalog-field input {
 	flex: 1;
 	min-width: 0;
-}
-
-.model-catalog-add .primary-button {
-	flex: 0 0 auto;
 }
 
 /* backup list */

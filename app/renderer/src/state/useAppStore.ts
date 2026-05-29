@@ -88,7 +88,7 @@ const defaultSettings: Settings = {
 	aiPremiumFallbackThreshold: 0.65,
 	pinnedTags: [],
 	hotkeys: DEFAULT_HOTKEYS,
-	aiModelCatalog: '[]',
+	aiModelCatalog: '{}',
 }
 
 export const useAppStore = create<AppState>((set, get) => ({

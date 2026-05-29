@@ -58,7 +58,7 @@ export interface Settings {
 	aiPremiumFallbackThreshold: number
 	pinnedTags: string[]
 	hotkeys: HotkeysSettings
-	aiModelCatalog: string  // JSON array of {providerId:string, model:string}
+	aiModelCatalog: string  // JSON object: {"openai":"gpt-5.5, gpt-4o", "deepseek-flash":"deepseek-v4-flash"}
 }
 
 export interface NoteUpdatePatch {

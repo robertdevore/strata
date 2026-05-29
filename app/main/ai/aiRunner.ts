@@ -143,7 +143,7 @@ const resolve_ai_settings = (db: StrataDatabase): AiSettings => {
 		aiEnableRouteLogs: 'boolean' === typeof raw.aiEnableRouteLogs ? raw.aiEnableRouteLogs as boolean : true,
 		aiCheapConfidenceThreshold: 'number' === typeof raw.aiCheapConfidenceThreshold ? raw.aiCheapConfidenceThreshold as number : 0.85,
 		aiPremiumFallbackThreshold: 'number' === typeof raw.aiPremiumFallbackThreshold ? raw.aiPremiumFallbackThreshold as number : 0.65,
-		aiModelCatalog: 'string' === typeof raw.aiModelCatalog ? raw.aiModelCatalog as string : '[]',
+		aiModelCatalog: 'string' === typeof raw.aiModelCatalog ? raw.aiModelCatalog as string : '{}',
 	}
 }
 

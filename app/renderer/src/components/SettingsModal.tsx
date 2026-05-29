@@ -427,75 +427,57 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 // ---- Model Catalog Editor ----
 
 interface ModelCatalogEditorProps {
-	value: string  // JSON array
+	value: string  // JSON object: {"openai":"gpt-5.5, gpt-4o", ...}
 	onChange: (value: string) => void
 }
 
-const PROVIDER_OPTIONS = [
-	{ value: 'openai', label: 'OpenAI' },
-	{ value: 'deepseek-flash', label: 'DeepSeek Flash' },
-	{ value: 'deepseek-pro', label: 'DeepSeek Pro' },
-	{ value: 'kimi', label: 'Kimi' },
-	{ value: 'openrouter', label: 'OpenRouter' },
-	{ value: 'custom', label: 'Custom' },
+const CATALOG_PROVIDERS = [
+	{ id: 'openai', label: 'OpenAI' },
+	{ id: 'deepseek-flash', label: 'DeepSeek Flash' },
+	{ id: 'deepseek-pro', label: 'DeepSeek Pro' },
+	{ id: 'kimi', label: 'Kimi' },
+	{ id: 'openrouter', label: 'OpenRouter' },
+	{ id: 'custom', label: 'Custom' },
 ]
 
 function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
-	const [newProvider, setNewProvider] = useState('openai')
-	const [newModel, setNewModel] = useState('')
-
-	const entries: Array<{ providerId: string; model: string }> = (() => {
+	const catalog: Record<string, string> = (() => {
 		try {
 			const parsed = JSON.parse(value)
-			if (Array.isArray(parsed)) return parsed.filter((e) => e && 'string' === typeof e.providerId && 'string' === typeof e.model)
+			if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) return parsed as Record<string, string>
 		} catch { /* ignore */ }
-		return []
+		return {}
 	})()
 
-	const remove_entry = (index: number) => {
-		const next = [...entries]
-		next.splice(index, 1)
+	const update_provider = (provider_id: string, models: string) => {
+		const next = { ...catalog }
+		const trimmed = models.trim()
+		if (trimmed) {
+			next[provider_id] = trimmed
+		} else {
+			delete next[provider_id]
+		}
 		onChange(JSON.stringify(next))
-	}
-
-	const add_entry = () => {
-		const provider = newProvider.trim()
-		const model = newModel.trim()
-		if (!provider || !model) return
-		const next = [...entries, { providerId: provider, model }]
-		onChange(JSON.stringify(next))
-		setNewModel('')
 	}
 
 	return (
 		<div className="model-catalog-editor">
-			{0 === entries.length && (
-				<p className="tags-label" style={{ marginBottom: 8 }}>No custom models added. Preset models are always available.</p>
-			)}
-			{entries.map((entry, index) => (
-				<div key={`${entry.providerId}:${entry.model}:${index}`} className="model-catalog-row">
-					<span className="model-catalog-provider">{entry.providerId}</span>
-					<span className="model-catalog-model">{entry.model}</span>
-					<button type="button" className="icon-button" onClick={() => remove_entry(index)} title="Remove model" aria-label="Remove model">
-						<CloseIcon />
-					</button>
-				</div>
+			<p className="tags-label" style={{ marginBottom: 8 }}>
+				Add comma-separated model names per provider. Empty or remove a provider to hide it from the chat selector. Preset defaults are used when no custom models are configured.
+			</p>
+			{CATALOG_PROVIDERS.map((p) => (
+				<label key={p.id} className="model-catalog-field">
+					<span className="model-catalog-label">{p.label}</span>
+					<input
+						type="text"
+						className="search-input"
+						value={catalog[p.id] || ''}
+						onChange={(event) => update_provider(p.id, event.target.value)}
+						placeholder="gpt-5.5, gpt-4o, gpt-4o-mini"
+						spellCheck={false}
+					/>
+				</label>
 			))}
-			<div className="model-catalog-add">
-				<select value={newProvider} onChange={(event) => setNewProvider(event.target.value)}>
-					{PROVIDER_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-				</select>
-				<input
-					type="text"
-					className="search-input"
-					value={newModel}
-					onChange={(event) => setNewModel(event.target.value)}
-					onKeyDown={(event) => { if ('Enter' === event.key) { event.preventDefault(); add_entry() } }}
-					placeholder="Model name..."
-					spellCheck={false}
-				/>
-				<button type="button" className="primary-button" onClick={add_entry} disabled={!newProvider.trim() || !newModel.trim()}>Add</button>
-			</div>
 		</div>
 	)
 }

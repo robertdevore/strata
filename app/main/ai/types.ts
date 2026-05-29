@@ -172,5 +172,5 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
 	aiEnableRouteLogs: true,
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
-	aiModelCatalog: '[]',
+	aiModelCatalog: '{}',
 }

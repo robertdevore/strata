@@ -94,7 +94,7 @@ export interface ModelCatalogEntry {
 	model: string
 }
 
-/** Build the available model list from enabled presets merged with user settings. */
+/** Build the available model list from user-configured per-provider models, falling back to preset defaults. */
 export const build_model_catalog = (ai_settings: {
 	aiCheapModel: string
 	aiPremiumModel: string
@@ -104,20 +104,47 @@ export const build_model_catalog = (ai_settings: {
 	const seen = new Set<string>()
 	const catalog: ModelCatalogEntry[] = []
 
-	// 1. Start with preset known models
-	for (const preset of PROVIDER_PRESETS) {
-		if (!preset.enabled) continue
-		if (0 === preset.knownModels.length) continue
+	// Parse user catalog: { "openai": "gpt-5.5, gpt-4o", "deepseek-flash": "deepseek-v4-flash" }
+	const user_catalog: Record<string, string> = {}
+	if (ai_settings.aiModelCatalog) {
+		try {
+			const parsed = JSON.parse(ai_settings.aiModelCatalog)
+			if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) {
+				for (const [key, value] of Object.entries(parsed)) {
+					if ('string' === typeof value) user_catalog[key] = value
+				}
+			}
+		} catch { /* ignore */ }
+	}
 
-		for (const model of preset.knownModels) {
-			const key = `${preset.id}:${model}`
+	const add_models = (provider_id: string, provider_label: string, models_string: string) => {
+		const models = models_string.split(',').map((m) => m.trim()).filter(Boolean)
+		for (const model of models) {
+			const key = `${provider_id}:${model}`
 			if (seen.has(key)) continue
 			seen.add(key)
-			catalog.push({ providerId: preset.id, providerLabel: preset.label, model })
+			catalog.push({ providerId: provider_id, providerLabel: provider_label, model })
 		}
 	}
 
-	// 2. Ensure user-configured single models are present
+	for (const preset of PROVIDER_PRESETS) {
+		if (!preset.enabled) continue
+
+		if (user_catalog[preset.id]) {
+			// User has configured models for this provider — use those exclusively
+			add_models(preset.id, preset.label, user_catalog[preset.id])
+		} else if (preset.knownModels.length > 0) {
+			// Fall back to preset defaults
+			for (const model of preset.knownModels) {
+				const key = `${preset.id}:${model}`
+				if (seen.has(key)) continue
+				seen.add(key)
+				catalog.push({ providerId: preset.id, providerLabel: preset.label, model })
+			}
+		}
+	}
+
+	// Ensure single-model settings are always present
 	const ensure_model = (provider_id: string, provider_label: string, model: string) => {
 		if (!model.trim()) return
 		const key = `${provider_id}:${model}`
@@ -131,25 +158,6 @@ export const build_model_catalog = (ai_settings: {
 
 	const cheap_preset = get_preset_by_id('deepseek-flash')
 	ensure_model('deepseek-flash', cheap_preset?.label || 'DeepSeek Flash', ai_settings.aiCheapModel)
-
-	// 3. Merge user-configured model catalog from settings
-	if (ai_settings.aiModelCatalog) {
-		try {
-			const user_catalog = JSON.parse(ai_settings.aiModelCatalog) as Array<{ providerId?: string; model?: string }>
-			if (Array.isArray(user_catalog)) {
-				for (const entry of user_catalog) {
-					const pid = 'string' === typeof entry.providerId ? entry.providerId.trim() : ''
-					const m = 'string' === typeof entry.model ? entry.model.trim() : ''
-					if (!pid || !m) continue
-					const key = `${pid}:${m}`
-					if (seen.has(key)) continue
-					seen.add(key)
-					const preset = get_preset_by_id(pid)
-					catalog.push({ providerId: pid, providerLabel: preset?.label || pid, model: m })
-				}
-			}
-		} catch { /* ignore malformed catalog */ }
-	}
 
 	return catalog
 }
