@@ -20,7 +20,7 @@ export const PROVIDER_PRESETS: AiProviderPreset[] = [
 	},
 	{
 		id: 'deepseek-flash',
-		label: 'DeepSeek Flash',
+		label: 'DeepSeek',
 		kind: 'deepseek',
 		baseUrl: 'https://api.deepseek.com',
 		defaultModel: 'deepseek-v4-flash',
@@ -31,7 +31,7 @@ export const PROVIDER_PRESETS: AiProviderPreset[] = [
 	},
 	{
 		id: 'deepseek-pro',
-		label: 'DeepSeek Pro',
+		label: 'DeepSeek',
 		kind: 'deepseek',
 		baseUrl: 'https://api.deepseek.com',
 		defaultModel: 'deepseek-v4-pro',

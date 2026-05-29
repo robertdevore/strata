@@ -211,7 +211,7 @@ export function SettingsModal({ open, settings, onClose, onUpdate, onCreateBacku
 							<h4 className="settings-section-title">Model Catalog</h4>
 							<p className="tags-label">Models available in the per-thread selector in AI chat.</p>
 							<ModelCatalogEditor
-								value={settings.aiModelCatalog || '[]'}
+								value={settings.aiModelCatalog || '{}'}
 								onChange={(next) => onUpdate({ aiModelCatalog: next })}
 							/>
 
@@ -432,30 +432,43 @@ interface ModelCatalogEditorProps {
 }
 
 const CATALOG_PROVIDERS = [
-	{ id: 'openai', label: 'OpenAI', placeholder: 'gpt-5.3-codex, gpt-4o, gpt-4o-mini, o4-mini' },
-	{ id: 'deepseek-flash', label: 'DeepSeek Flash', placeholder: 'deepseek-v4-flash, deepseek-chat' },
-	{ id: 'deepseek-pro', label: 'DeepSeek Pro', placeholder: 'deepseek-v4-pro, deepseek-reasoner' },
-	{ id: 'kimi', label: 'Kimi', placeholder: 'kimi-k2.6, moonshot-v1-8k' },
-	{ id: 'openrouter', label: 'OpenRouter', placeholder: 'openai/gpt-4o, anthropic/claude-sonnet-4, google/gemini-2.5-pro' },
-	{ id: 'custom', label: 'Custom', placeholder: 'your-model-name' },
+	{ id: 'openai', label: 'OpenAI', defaults: 'gpt-5.3-codex, gpt-4o, gpt-4o-mini, o4-mini' },
+	{ id: 'deepseek-flash', label: 'DeepSeek Flash', defaults: 'deepseek-v4-flash, deepseek-chat' },
+	{ id: 'deepseek-pro', label: 'DeepSeek Pro', defaults: 'deepseek-v4-pro, deepseek-reasoner' },
+	{ id: 'kimi', label: 'Kimi', defaults: 'kimi-k2.6, moonshot-v1-8k' },
+	{ id: 'openrouter', label: 'OpenRouter', defaults: 'openai/gpt-4o, anthropic/claude-sonnet-4, google/gemini-2.5-pro' },
+	{ id: 'custom', label: 'Custom', defaults: '' },
 ]
 
 function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
 	const catalog: Record<string, string> = (() => {
 		try {
 			const parsed = JSON.parse(value)
-			if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) return parsed as Record<string, string>
+			if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) {
+				// Merge with defaults so fields show pre-populated values when empty
+				const merged: Record<string, string> = {}
+				for (const p of CATALOG_PROVIDERS) {
+					const stored = 'string' === typeof parsed[p.id] ? parsed[p.id] : ''
+					merged[p.id] = stored || p.defaults
+				}
+				return merged
+			}
 		} catch { /* ignore */ }
-		return {}
+		// Fallback: use defaults
+		const fallback: Record<string, string> = {}
+		for (const p of CATALOG_PROVIDERS) {
+			if (p.defaults) fallback[p.id] = p.defaults
+		}
+		return fallback
 	})()
 
 	const update_provider = (provider_id: string, models: string) => {
-		const next = { ...catalog }
-		const trimmed = models.trim()
-		if (trimmed) {
-			next[provider_id] = trimmed
-		} else {
-			delete next[provider_id]
+		const next: Record<string, string> = {}
+		for (const p of CATALOG_PROVIDERS) {
+			const trimmed = (p.id === provider_id ? models : (catalog[p.id] || '')).trim()
+			if (trimmed && trimmed !== p.defaults) {
+				next[p.id] = trimmed
+			}
 		}
 		onChange(JSON.stringify(next))
 	}
@@ -463,7 +476,7 @@ function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
 	return (
 		<div className="model-catalog-editor">
 			<p className="tags-label" style={{ marginBottom: 8 }}>
-				Add comma-separated model names per provider. Empty or remove a provider to hide it from the chat selector. Preset defaults are used when no custom models are configured.
+				Add comma-separated model names per provider. Default models are pre-filled. Clear a field to remove that provider from the chat selector.
 			</p>
 			{CATALOG_PROVIDERS.map((p) => (
 				<label key={p.id} className="model-catalog-field">
@@ -473,7 +486,7 @@ function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
 						className="search-input"
 						value={catalog[p.id] || ''}
 						onChange={(event) => update_provider(p.id, event.target.value)}
-						placeholder={p.placeholder}
+						placeholder={p.defaults || 'model-name'}
 						spellCheck={false}
 					/>
 				</label>
