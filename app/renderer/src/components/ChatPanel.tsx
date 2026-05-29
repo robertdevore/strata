@@ -331,12 +331,11 @@ export function ChatPanel(props: ChatPanelProps) {
 		)
 	}, [modelCatalog, modelSearch])
 	const display_model_label = useMemo(() => {
-		const effective_model = null !== optimisticModel ? optimisticModel : threadModel
-		if (!effective_model) return 'Auto'
-		const match = modelCatalog.find((entry) => entry.model === effective_model)
-		return match ? `${match.providerLabel} — ${match.model}` : effective_model
+		if (null === optimisticModel) return threadModel || 'Auto'
+		if (!optimisticModel) return 'Auto'
+		const match = modelCatalog.find((entry) => entry.model === optimisticModel)
+		return match ? `${match.providerLabel} — ${match.model}` : optimisticModel
 	}, [modelCatalog, optimisticModel, threadModel])
-	const active_model = null !== optimisticModel ? optimisticModel : threadModel
 	const wiki_draft_context = useMemo(() => get_wiki_draft_context(draft, composeCursor), [composeCursor, draft])
 	const wiki_suggestions = useMemo(() => {
 		if (hideWikiSuggestions || !wiki_draft_context) return []
@@ -526,9 +525,9 @@ export function ChatPanel(props: ChatPanelProps) {
 		}
 	}, [modelMenuOpen])
 
-	// Sync optimistic model when prop changes from outside (e.g., thread switch)
+	// Sync optimistic model when threadModel prop updates from external changes
 	useEffect(() => {
-		setOptimisticModel(threadModel || null)
+		if (threadModel) setOptimisticModel(threadModel)
 	}, [threadModel])
 
 	useEffect(() => {
@@ -1082,10 +1081,10 @@ export function ChatPanel(props: ChatPanelProps) {
 							<div className="chat-model-list" role="listbox">
 								<button
 									type="button"
-									className={`chat-model-option ${!active_model ? 'chat-model-option-active' : ''}`}
+									className={`chat-model-option ${null !== optimisticModel && '' === optimisticModel ? 'chat-model-option-active' : ''}`}
 									onClick={() => { setOptimisticModel(''); onSetThreadModel(''); setModelMenuOpen(false) }}
 									role="option"
-									aria-selected={!active_model}
+									aria-selected={null !== optimisticModel && '' === optimisticModel}
 								>
 									Auto
 								</button>
@@ -1093,10 +1092,10 @@ export function ChatPanel(props: ChatPanelProps) {
 									<button
 										key={`${entry.providerId}:${entry.model}`}
 										type="button"
-										className={`chat-model-option ${entry.model === active_model ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
+										className={`chat-model-option ${entry.model === optimisticModel ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
 										onClick={() => { setOptimisticModel(entry.model); onSetThreadModel(entry.model); setModelMenuOpen(false) }}
 										role="option"
-										aria-selected={entry.model === active_model}
+										aria-selected={entry.model === optimisticModel}
 									>
 										<span className="chat-model-option-provider">{entry.providerLabel}</span>
 										<span className="chat-model-option-model">{entry.model}</span>

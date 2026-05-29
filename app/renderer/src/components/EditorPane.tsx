@@ -614,6 +614,7 @@ export function EditorPane(props: EditorPaneProps) {
 
 	// Load model catalog
 	useEffect(() => {
+		if (!showChatPanel) return
 		let disposed = false
 		aiService.modelCatalog().then((catalog) => {
 			if (disposed) return
@@ -623,7 +624,7 @@ export function EditorPane(props: EditorPaneProps) {
 			setChatModelCatalog([])
 		})
 		return () => { disposed = true }
-	}, [])
+	}, [showChatPanel])
 
 	useEffect(() => {
 		const openFindReplace = () => {
