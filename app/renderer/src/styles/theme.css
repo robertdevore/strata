@@ -1913,7 +1913,6 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 }
 
 .chat-model-option:hover,
-.chat-model-option-focus,
 .chat-model-option-active {
 	background: var(--hover);
 }
