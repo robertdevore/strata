@@ -372,6 +372,66 @@ export function App() {
 		}
 	}, [undoTimeoutId])
 
+	// Drag-and-drop .md file import
+	useEffect(() => {
+		const onDragOver = (event: DragEvent) => {
+			event.preventDefault()
+			event.stopPropagation()
+			if (event.dataTransfer) {
+				event.dataTransfer.dropEffect = 'copy'
+			}
+			document.body.classList.add('drag-over')
+		}
+
+		const onDragLeave = (event: DragEvent) => {
+			event.preventDefault()
+			event.stopPropagation()
+			// Only remove class when leaving the document body
+			if (event.target === document.body || event.target === document.documentElement) {
+				document.body.classList.remove('drag-over')
+			}
+		}
+
+		const onDrop = async (event: DragEvent) => {
+			event.preventDefault()
+			event.stopPropagation()
+			document.body.classList.remove('drag-over')
+
+			const files = event.dataTransfer?.files
+			if (!files || 0 === files.length) return
+
+			const file = files[0]
+			if (!file.name.endsWith('.md')) return
+
+			try {
+				const text = await file.text()
+				const firstLine = text.trimStart().split('\n')[0] || ''
+				const hasHeading = firstLine.startsWith('# ')
+				const title = hasHeading ? firstLine.slice(2).trim() : file.name.replace(/\.md$/i, '')
+				const content = hasHeading ? text : `# ${title}\n\n${text}`
+
+				// Create note directly via API to avoid draft-system race conditions
+				const note = await window.strata.notes.create()
+				await window.strata.notes.update(note.id, { content })
+				await store.load()
+				store.openNoteInTab(note.id)
+			} catch (err) {
+				console.error('Failed to import markdown file', err)
+			}
+		}
+
+		document.addEventListener('dragover', onDragOver)
+		document.addEventListener('dragleave', onDragLeave)
+		document.addEventListener('drop', onDrop)
+
+		return () => {
+			document.removeEventListener('dragover', onDragOver)
+			document.removeEventListener('dragleave', onDragLeave)
+			document.removeEventListener('drop', onDrop)
+			document.body.classList.remove('drag-over')
+		}
+	}, [store])
+
 	return (
 		<div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
 			{sidebarCollapsed && createPortal(
@@ -460,6 +520,8 @@ export function App() {
 					tags={store.tags}
 					saveState={store.saveState}
 					lastSavedAt={store.lastSavedAt}
+					sidebarCollapsed={sidebarCollapsed}
+					theme={store.settings.theme}
 					onChangeDraft={store.setDraft}
 					onFlush={store.flushDraft}
 					onToggleStar={(id) => void store.toggleStar(id)}
@@ -473,6 +535,8 @@ export function App() {
 							setShowRelatedNotes(true)
 						}
 					}}
+					onOpenSettings={() => store.setShowSettings(true)}
+					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
 				/>
 				</div>
 			</div>
