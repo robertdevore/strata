@@ -518,7 +518,7 @@ export function ChatPanel(props: ChatPanelProps) {
 
 	useEffect(() => {
 		if (modelMenuOpen) {
-			setModelMenuActiveIndex(0)
+			setModelMenuActiveIndex(-1)
 			window.setTimeout(() => modelSearchInputRef.current?.focus(), 0)
 		} else {
 			setModelSearch('')
