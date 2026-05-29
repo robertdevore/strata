@@ -16,6 +16,17 @@ body {
 	overflow: hidden;
 }
 
+body.drag-over::after {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: 999;
+	border: 3px dashed var(--accent);
+	border-radius: 0;
+	background: rgba(0, 150, 255, 0.06);
+	pointer-events: none;
+}
+
 body.theme-dark {
 	--app-bg: #0e1113;
 	--sidebar-bg: #14181b;
@@ -91,7 +102,7 @@ body.theme-light {
 	gap: 12px;
 	background: var(--sidebar-bg);
 	border-right: 1px solid var(--border);
-	padding: 14px 4px 14px 14px;
+	padding: 14px 4px 6px 14px;
 	min-width: 0;
 	min-height: 0;
 }
@@ -986,6 +997,62 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	gap: 4px;
 }
 
+.editor-footer-left {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.editor-footer-left > .icon-button {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	color: var(--text-2);
+}
+
+.editor-footer-left > .icon-button:hover {
+	color: var(--text);
+}
+
+.editor-footer-left > .icon-button svg {
+	width: 15px;
+	height: 15px;
+	display: block;
+}
+
+.editor-footer-collapsed-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.editor-footer-collapsed-actions .icon-button {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	color: var(--text-2);
+}
+
+.editor-footer-collapsed-actions .icon-button:hover {
+	color: var(--text);
+}
+
+.editor-footer-collapsed-actions .icon-button svg {
+	width: 15px;
+	height: 15px;
+	display: block;
+}
+
 .editor-footer-actions .icon-button {
 	width: 28px;
 	height: 28px;
@@ -1006,6 +1073,148 @@ body.platform-mac .app-shell.sidebar-collapsed .has-tabs .editor-title-text {
 	width: 15px;
 	height: 15px;
 	display: block;
+}
+
+.doc-stats-modal {
+	width: min(360px, 94vw);
+	padding: 14px 16px 18px;
+}
+
+.doc-stats-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	margin-top: 12px;
+}
+
+.doc-stat-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.doc-stat-value {
+	font-size: 22px;
+	font-weight: 600;
+	color: var(--text);
+	font-family: ui-monospace, monospace;
+}
+
+.doc-stat-label {
+	font-size: 11px;
+	color: var(--text-3);
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+/* ---- TTS / Listen Modal ---- */
+
+.tts-modal {
+	width: min(320px, 94vw);
+	padding: 14px 16px 18px;
+}
+
+.tts-controls {
+	display: grid;
+	gap: 16px;
+	margin-top: 12px;
+}
+
+.tts-speed-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.tts-speed-label {
+	font-size: 14px;
+	color: var(--text);
+	font-family: ui-monospace, monospace;
+	min-width: 64px;
+}
+
+.tts-speed-slider {
+	flex: 1;
+	-webkit-appearance: none;
+	appearance: none;
+	height: 6px;
+	border-radius: 3px;
+	background: var(--border);
+	outline: none;
+}
+
+.tts-speed-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: var(--accent);
+	cursor: pointer;
+	border: none;
+}
+
+.tts-voice-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.tts-voice-label {
+	font-size: 12px;
+	color: var(--text-3);
+	min-width: 36px;
+}
+
+.tts-voice-select {
+	flex: 1;
+	padding: 6px 8px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--panel-bg);
+	color: var(--text);
+	font-size: 12px;
+	font-family: inherit;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tts-button-row {
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+}
+
+.tts-play-button {
+	padding: 8px 20px;
+	border: none;
+	border-radius: 8px;
+	background: var(--accent);
+	color: #fff;
+	font-size: 14px;
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.tts-play-button:hover {
+	background: var(--accent-hover);
+}
+
+.tts-stop-button {
+	padding: 8px 20px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text);
+	font-size: 14px;
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.tts-stop-button:hover {
+	background: var(--hover);
 }
 
 /* ---- Inline Find Bar ---- */
