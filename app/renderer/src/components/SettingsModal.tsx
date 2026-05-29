@@ -441,42 +441,44 @@ const CATALOG_PROVIDERS = [
 ]
 
 function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
-	const catalog: Record<string, string> = (() => {
+	const parse_value = (raw: string): Record<string, string> => {
 		try {
-			const parsed = JSON.parse(value)
-			if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) {
-				// Merge with defaults so fields show pre-populated values when empty
-				const merged: Record<string, string> = {}
-				for (const p of CATALOG_PROVIDERS) {
-					const stored = 'string' === typeof parsed[p.id] ? parsed[p.id] : ''
-					merged[p.id] = stored || p.defaults
-				}
-				return merged
-			}
+			const parsed = JSON.parse(raw)
+			if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) return parsed as Record<string, string>
 		} catch { /* ignore */ }
-		// Fallback: use defaults
-		const fallback: Record<string, string> = {}
-		for (const p of CATALOG_PROVIDERS) {
-			if (p.defaults) fallback[p.id] = p.defaults
-		}
-		return fallback
-	})()
+		return {}
+	}
 
-	const update_provider = (provider_id: string, models: string) => {
-		const next: Record<string, string> = {}
+	const [local, setLocal] = useState<Record<string, string>>(() => {
+		// Init from stored value, falling back to defaults
+		const stored = parse_value(value)
+		const init: Record<string, string> = {}
 		for (const p of CATALOG_PROVIDERS) {
-			const trimmed = (p.id === provider_id ? models : (catalog[p.id] || '')).trim()
-			if (trimmed && trimmed !== p.defaults) {
-				next[p.id] = trimmed
+			init[p.id] = stored[p.id] || p.defaults
+		}
+		return init
+	})
+
+	const commit = (provider_id: string, models: string) => {
+		const trimmed = models.trim()
+		const next_local = { ...local, [provider_id]: trimmed || CATALOG_PROVIDERS.find((p) => p.id === provider_id)?.defaults || '' }
+		setLocal(next_local)
+
+		// Save only non-default values to JSON
+		const to_save: Record<string, string> = {}
+		for (const p of CATALOG_PROVIDERS) {
+			const val = next_local[p.id].trim()
+			if (val && val !== p.defaults) {
+				to_save[p.id] = val
 			}
 		}
-		onChange(JSON.stringify(next))
+		onChange(JSON.stringify(to_save))
 	}
 
 	return (
 		<div className="model-catalog-editor">
 			<p className="tags-label" style={{ marginBottom: 8 }}>
-				Add comma-separated model names per provider. Default models are pre-filled. Clear a field to remove that provider from the chat selector.
+				Add comma-separated model names per provider. Default models are pre-filled. Clear a field to reset to defaults.
 			</p>
 			{CATALOG_PROVIDERS.map((p) => (
 				<label key={p.id} className="model-catalog-field">
@@ -484,8 +486,13 @@ function ModelCatalogEditor({ value, onChange }: ModelCatalogEditorProps) {
 					<input
 						type="text"
 						className="search-input"
-						value={catalog[p.id] || ''}
-						onChange={(event) => update_provider(p.id, event.target.value)}
+						value={local[p.id] || ''}
+						onChange={(event) => {
+							const next = { ...local, [p.id]: event.target.value }
+							setLocal(next)
+						}}
+						onBlur={(event) => commit(p.id, event.target.value)}
+						onKeyDown={(event) => { if ('Enter' === event.key) { event.preventDefault(); commit(p.id, event.currentTarget.value) } }}
 						placeholder={p.defaults || 'model-name'}
 						spellCheck={false}
 					/>
