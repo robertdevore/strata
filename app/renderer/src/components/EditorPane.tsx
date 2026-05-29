@@ -36,6 +36,10 @@ interface EditorPaneProps {
 	onSetTags: (tags: string[]) => void
 	onOpenNoteFromChat: (note_id: string, new_tab?: boolean) => Promise<void>
 	onShowRelatedNotes: () => void
+	sidebarCollapsed: boolean
+	theme: 'dark' | 'light' | 'system'
+	onOpenSettings: () => void
+	onThemeToggle: () => void
 }
 
 interface ChatUsageSummary {
@@ -349,7 +353,7 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 })
 
 export function EditorPane(props: EditorPaneProps) {
-	const { note, notes, openTabIds, drafts, openAiModel, content, tags, saveState, lastSavedAt, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes } = props
+	const { note, notes, openTabIds, drafts, openAiModel, content, tags, saveState, lastSavedAt, sidebarCollapsed, theme, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes, onOpenSettings, onThemeToggle } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
 	const [showChatPanel, setShowChatPanel] = useState(false)
@@ -381,6 +385,23 @@ export function EditorPane(props: EditorPaneProps) {
 	const [aiEdits, setAiEdits] = useState<Array<import('@shared/types').AiNoteEdit>>([])
 	const [showPublish, setShowPublish] = useState(false)
 	const [copyToast, setCopyToast] = useState(false)
+	const [showDocStats, setShowDocStats] = useState(false)
+	const [showTts, setShowTts] = useState(false)
+	const [ttsSpeaking, setTtsSpeaking] = useState(false)
+	const [ttsPaused, setTtsPaused] = useState(false)
+	const [ttsRate, setTtsRate] = useState(1)
+	const [ttsVoice, setTtsVoice] = useState<string | null>(null)
+	const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([])
+	const ttsUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+	const docStats = useMemo(() => {
+		const words = countWords(content)
+		const chars = content.length
+		const charsNoSpaces = content.replace(/\s/g, '').length
+		const lines = content.split('\n').length
+		const paragraphs = content.split(/\n\s*\n/).filter(Boolean).length
+		const readingTimeMin = Math.max(1, Math.ceil(words / 200))
+		return { words, chars, charsNoSpaces, lines, paragraphs, readingTimeMin }
+	}, [content])
 	const noteIdPatternRef = useRef(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi)
 	const [inlineFindQuery, setInlineFindQuery] = useState('')
 	const [showInlineFind, setShowInlineFind] = useState(false)
@@ -507,6 +528,23 @@ export function EditorPane(props: EditorPaneProps) {
 		}
 	}, [saveState, lastSavedAt])
 
+	// Pre-load TTS voices on mount (loads asynchronously in Chromium)
+	useEffect(() => {
+		const loadVoices = () => {
+			const voices = window.speechSynthesis.getVoices()
+			if (voices.length > 0) {
+				setTtsVoices(voices)
+				if (!ttsVoice) {
+					const preferred = voices.find((v) => v.name.includes('Samantha') || v.name.includes('Alex'))
+					setTtsVoice(preferred ? preferred.name : voices[0].name)
+				}
+			}
+		}
+		loadVoices()
+		window.speechSynthesis.addEventListener('voiceschanged', loadVoices)
+		return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices)
+	}, [])
+
 	useEffect(() => {
 		if (!note || '' !== content.trim()) return
 		// New empty note — focus the editor at position 0
@@ -626,7 +664,7 @@ export function EditorPane(props: EditorPaneProps) {
 			setChatModelCatalog([])
 		})
 		return () => { disposed = true }
-	}, [showChatPanel])
+	}, [showChatPanel, aiModelCatalog])
 
 	useEffect(() => {
 		const openFindReplace = () => {
@@ -1031,6 +1069,64 @@ export function EditorPane(props: EditorPaneProps) {
 		} catch {
 			// Print dialog was cancelled or failed — nothing to do
 		}
+	}
+
+	const startTts = () => {
+		window.speechSynthesis.cancel()
+		const plainText = content.replace(/^#{1,6}\s+/gm, '').replace(/\*{1,3}(.*?)\*{1,3}/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/`{1,3}[^`]*`{1,3}/g, '').replace(/^[-*+]\s+/gm, '').replace(/^\d+\.\s+/gm, '').replace(/\n{2,}/g, '. ').replace(/\n/g, ' ').trim()
+		const utterance = new SpeechSynthesisUtterance(plainText)
+		utterance.rate = ttsRate
+		if (ttsVoice) {
+			const voice = ttsVoices.find((v) => v.name === ttsVoice)
+			if (voice) utterance.voice = voice
+		}
+		utterance.onstart = () => { setTtsSpeaking(true); setTtsPaused(false) }
+		utterance.onend = () => { setTtsSpeaking(false); setTtsPaused(false) }
+		utterance.onerror = () => { setTtsSpeaking(false); setTtsPaused(false) }
+		ttsUtteranceRef.current = utterance
+		window.speechSynthesis.speak(utterance)
+	}
+
+	const openTtsModal = () => {
+		stopTts()
+		const loadVoices = () => {
+			const voices = window.speechSynthesis.getVoices()
+			if (voices.length > 0) {
+				setTtsVoices(voices)
+				if (!ttsVoice) {
+					const preferred = voices.find((v) => v.name.includes('Samantha') || v.name.includes('Alex'))
+					const defaultVoice = preferred || voices.find((v) => v.default) || voices[0]
+					setTtsVoice(defaultVoice.name)
+				}
+				return true
+			}
+			return false
+		}
+		const loaded = loadVoices()
+		if (!loaded) {
+			const onVoicesChanged = () => {
+				loadVoices()
+				window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged)
+			}
+			window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged)
+		}
+		setShowTts(true)
+	}
+
+	const pauseTts = () => {
+		if (ttsPaused) {
+			window.speechSynthesis.resume()
+			setTtsPaused(false)
+		} else {
+			window.speechSynthesis.pause()
+			setTtsPaused(true)
+		}
+	}
+
+	const stopTts = () => {
+		window.speechSynthesis.cancel()
+		setTtsSpeaking(false)
+		setTtsPaused(false)
 	}
 
 	const refreshChatThreads = async () => {
@@ -1637,7 +1733,15 @@ export function EditorPane(props: EditorPaneProps) {
 				</div>
 			)}
 			<footer className="editor-footer">
-				<span>{countWords(content)} words</span>
+				<span className="editor-footer-left">
+				{sidebarCollapsed && (
+					<span className="editor-footer-collapsed-actions">
+						<button className="icon-button" onClick={onOpenSettings} title="Settings"><SettingsIcon /></button>
+						<button className="icon-button" onClick={onThemeToggle} title="Toggle Theme">{'dark' === theme ? <MoonIcon /> : <SunIcon />}</button>
+					</span>
+				)}
+				<button className="icon-button" onClick={() => setShowDocStats(true)} title="Document Statistics"><FileDescriptionIcon /></button>
+				</span>
 				<div className="editor-footer-actions">
 					<button className={`icon-button ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
 						setFindReplaceStatus('')
@@ -1646,6 +1750,7 @@ export function EditorPane(props: EditorPaneProps) {
 					<button className="icon-button" onClick={() => setShowPublish(true)} title="Export / Publish Note"><UploadIcon /></button>
 					<button className="icon-button" onClick={onShowRelatedNotes} title="Related Notes"><CirclesRelationIcon /></button>
 					<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
+					<button className="icon-button" onClick={openTtsModal} title="Listen to Note"><EarIcon /></button>
 					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
 					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
 					<button className="icon-button" onClick={async () => {
@@ -1734,6 +1839,88 @@ export function EditorPane(props: EditorPaneProps) {
 					</div>
 				</div>
 			)}
+		{showDocStats && (
+			<div className="modal-overlay" onClick={() => setShowDocStats(false)}>
+				<div className="modal-card doc-stats-modal" onClick={(event) => event.stopPropagation()}>
+					<button className="icon-button modal-close-button" onClick={() => setShowDocStats(false)} aria-label="Close"><CloseIcon /></button>
+					<h3>Document Statistics</h3>
+					<div className="doc-stats-grid">
+						<div className="doc-stat-item">
+							<span className="doc-stat-value">{docStats.words.toLocaleString()}</span>
+							<span className="doc-stat-label">Words</span>
+						</div>
+						<div className="doc-stat-item">
+							<span className="doc-stat-value">{docStats.chars.toLocaleString()}</span>
+							<span className="doc-stat-label">Characters</span>
+						</div>
+						<div className="doc-stat-item">
+							<span className="doc-stat-value">{docStats.charsNoSpaces.toLocaleString()}</span>
+							<span className="doc-stat-label">Chars (no spaces)</span>
+						</div>
+						<div className="doc-stat-item">
+							<span className="doc-stat-value">{docStats.lines.toLocaleString()}</span>
+							<span className="doc-stat-label">Lines</span>
+						</div>
+						<div className="doc-stat-item">
+							<span className="doc-stat-value">{docStats.paragraphs.toLocaleString()}</span>
+							<span className="doc-stat-label">Paragraphs</span>
+						</div>
+						<div className="doc-stat-item">
+							<span className="doc-stat-value">~{docStats.readingTimeMin} min</span>
+							<span className="doc-stat-label">Reading time</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		)}
+		{showTts && (
+			<div className="modal-overlay" onClick={() => { stopTts(); setShowTts(false) }}>
+				<div className="modal-card tts-modal" onClick={(event) => event.stopPropagation()}>
+					<button className="icon-button modal-close-button" onClick={() => { stopTts(); setShowTts(false) }} aria-label="Close"><CloseIcon /></button>
+					<h3>Listen to Note</h3>
+					<div className="tts-controls">
+						<div className="tts-speed-row">
+							<span className="tts-speed-label">Speed: {ttsRate}x</span>
+							<input
+								type="range"
+								className="tts-speed-slider"
+								min="0.5"
+								max="2.5"
+								step="0.1"
+								value={ttsRate}
+								onChange={(event) => setTtsRate(parseFloat(event.target.value))}
+							/>
+						</div>
+						{ttsVoices.length > 0 && (
+							<div className="tts-voice-row">
+								<label className="tts-voice-label">Voice</label>
+								<select
+									className="tts-voice-select"
+									value={ttsVoice || ''}
+									onChange={(event) => setTtsVoice(event.target.value)}
+								>
+									{ttsVoices.map((voice) => (
+										<option key={voice.name} value={voice.name}>
+											{voice.name} ({voice.lang})
+										</option>
+									))}
+								</select>
+							</div>
+						)}
+						<div className="tts-button-row">
+							{!ttsSpeaking ? (
+								<button className="tts-play-button" onClick={startTts}>Play</button>
+							) : (
+								<>
+									<button className="tts-play-button" onClick={pauseTts}>{ttsPaused ? 'Resume' : 'Pause'}</button>
+									<button className="tts-stop-button" onClick={stopTts}>Stop</button>
+								</>
+							)}
+						</div>
+					</div>
+				</div>
+			</div>
+		)}
 		</section>
 	)
 }
