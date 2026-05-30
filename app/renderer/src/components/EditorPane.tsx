@@ -321,23 +321,19 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 			return false
 		}
 
-		// Instant H1 strip: if inserting into a mostly-empty editor and content starts with H1,
-		// strip it before CodeMirror renders it — no visual flash
+		// When pasting into an empty editor, keep the H1 heading so title derivation works.
+		// Strata derives note titles from the first # heading in content.
 		const current_doc = view.state.doc.toString()
 		const doc_is_empty = !current_doc.trim() || /^#\s[^\n]*\n?\n?$/.test(current_doc.trim())
 		const paste_lines = insert_content.split('\n')
 
 		if (doc_is_empty && paste_lines[0]?.startsWith('# ') && paste_lines[0].trim().length > 2) {
-			let body = ''
-			if (paste_lines[1] === '') {
-				body = paste_lines.slice(2).join('\n')
-			} else {
-				body = paste_lines.slice(1).join('\n')
-			}
-			view.dispatch({
-				changes: { from: 0, to: view.state.doc.length, insert: body },
-				selection: { anchor: body.length },
-			})
+			// Paste the full content including the H1 — title derivation will find it
+			const transaction = view.state.changeByRange((range) => ({
+				changes: { from: range.from, to: range.to, insert: insert_content },
+				range: EditorSelection.cursor(range.from + insert_content.length),
+			}))
+			view.dispatch(transaction)
 			event.preventDefault()
 			return true
 		}
