@@ -34,6 +34,11 @@ interface AppState {
 	openTabs: string[]
 	navigationBackStack: string[]
 	navigationForwardStack: string[]
+	splitNoteId: string | null
+	splitResizeRatio: number
+	toggleSplitNote: (id: string) => void
+	clearSplitNote: () => void
+	setSplitResizeRatio: (ratio: number) => void
 	load: () => Promise<void>
 	refreshTags: () => Promise<void>
 	setSearchQuery: (value: string) => void
@@ -54,6 +59,7 @@ interface AppState {
 	deleteSelected: () => Promise<Note | null>
 	restoreDeletedNote: (id: string) => Promise<boolean>
 	setTagsForSelected: (tags: string[]) => Promise<void>
+	setTagsForNote: (id: string, tags: string[]) => Promise<void>
 	setShowSettings: (show: boolean) => void
 	setShowFiltersPanel: (show: boolean) => void
 	updateSettings: (patch: Partial<Settings>) => Promise<void>
@@ -108,6 +114,25 @@ export const useAppStore = create<AppState>((set, get) => ({
 	openTabs: [],
 	navigationBackStack: [],
 	navigationForwardStack: [],
+	splitNoteId: null,
+	splitResizeRatio: 0.5,
+
+	toggleSplitNote(id) {
+		const state = get()
+		if (state.splitNoteId === id) {
+			set({ splitNoteId: null })
+		} else {
+			set({ splitNoteId: id })
+		}
+	},
+
+	clearSplitNote() {
+		set({ splitNoteId: null })
+	},
+
+	setSplitResizeRatio(ratio) {
+		set({ splitResizeRatio: Math.min(0.8, Math.max(0.2, ratio)) })
+	},
 
 	async load() {
 		const [notes, tags, settings] = await Promise.all([notesService.list(), notesService.listTags(), settingsService.get()])
@@ -129,6 +154,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 				if (note_ids.has(note_id)) untouched_new_note_ids[note_id] = true
 			}
 
+			const split_note_id = state.splitNoteId && note_ids.has(state.splitNoteId) ? state.splitNoteId : null
+
 			return {
 				notes,
 				tags,
@@ -138,6 +165,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 				openTabs: open_tabs,
 				drafts,
 				untouchedNewNoteIds: untouched_new_note_ids,
+				splitNoteId: split_note_id,
 			}
 		})
 	},
@@ -186,7 +214,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 			const idx = state.openTabs.indexOf(id)
 			next = tabs[Math.min(idx, tabs.length - 1)] ?? null
 		}
-		set({ openTabs: tabs, selectedNoteId: next, drafts, untouchedNewNoteIds: untouched_new_note_ids })
+		const split_note_id = state.splitNoteId === id ? null : state.splitNoteId
+		set({ openTabs: tabs, selectedNoteId: next, drafts, untouchedNewNoteIds: untouched_new_note_ids, splitNoteId: split_note_id })
 	},
 
 	activateTab(id) {
@@ -352,6 +381,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 				drafts,
 				untouchedNewNoteIds: untouched_new_note_ids,
 				selectedNoteId: notes[0]?.id ?? null, openTabs: state.openTabs.filter((t) => t !== id), navigationBackStack: state.navigationBackStack.filter((t) => t !== id), navigationForwardStack: state.navigationForwardStack.filter((t) => t !== id),
+				splitNoteId: state.splitNoteId === id ? null : state.splitNoteId,
 			}
 		})
 		await get().refreshTags()
@@ -375,6 +405,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 	async setTagsForSelected(tags) {
 		const id = get().selectedNoteId
 		if (!id) return
+		void get().setTagsForNote(id, tags)
+	},
+
+	async setTagsForNote(id, tags) {
 		const normalized = [...new Set(tags.map((tag) => normalizeTag(tag)).filter(Boolean))]
 		const updated = await notesService.update(id, { tags: normalized })
 		if (!updated) return
