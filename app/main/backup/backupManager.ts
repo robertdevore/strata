@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import type { Settings } from '../../shared/types'
 
@@ -102,7 +103,7 @@ export class BackupManager {
 		return entries
 	}
 
-	createBackupNow(reason: 'manual' | 'auto' = 'manual'): BackupResult {
+	async createBackupNow(reason: 'manual' | 'auto' = 'manual'): Promise<BackupResult> {
 		const now = new Date()
 		const stamp = format_stamp(now)
 		const backup_folder = path.join(this.backup_dir, `${stamp}-${reason}`)
@@ -111,7 +112,7 @@ export class BackupManager {
 		const copied_files: string[] = []
 		for (const source_file of collect_db_files(this.db_file_path)) {
 			const destination_file = path.join(backup_folder, path.basename(source_file))
-			fs.copyFileSync(source_file, destination_file)
+			await fsPromises.copyFile(source_file, destination_file)
 			copied_files.push(destination_file)
 		}
 
@@ -122,7 +123,7 @@ export class BackupManager {
 		}
 	}
 
-	checkAutoBackup(): void {
+	async checkAutoBackup(): Promise<void> {
 		if (this.running) return
 		this.running = true
 
@@ -137,7 +138,7 @@ export class BackupManager {
 			const now_ms = Date.now()
 			if (last && now_ms - last < frequency_ms) return
 
-			const result = this.createBackupNow('auto')
+			const result = await this.createBackupNow('auto')
 			this.on_auto_backup_created(result.createdAt)
 		} catch (error) {
 			console.error('[strata-backup] Auto backup failed', error)

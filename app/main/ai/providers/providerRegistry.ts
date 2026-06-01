@@ -94,6 +94,10 @@ export interface ModelCatalogEntry {
 	model: string
 }
 
+// ---- Catalog cache ----
+let catalogCacheKey = ''
+let catalogCacheResult: ModelCatalogEntry[] | null = null
+
 /** Build the available model list from user-configured per-provider models, falling back to preset defaults. */
 export const build_model_catalog = (ai_settings: {
 	aiCheapModel: string
@@ -101,6 +105,9 @@ export const build_model_catalog = (ai_settings: {
 	openAiModel: string
 	aiModelCatalog?: string
 }): ModelCatalogEntry[] => {
+	const cacheKey = `${ai_settings.aiCheapModel}|${ai_settings.aiPremiumModel}|${ai_settings.openAiModel}|${ai_settings.aiModelCatalog ?? ''}`
+	if (cacheKey === catalogCacheKey && catalogCacheResult) return catalogCacheResult
+
 	const seen = new Set<string>()
 	const catalog: ModelCatalogEntry[] = []
 
@@ -159,6 +166,8 @@ export const build_model_catalog = (ai_settings: {
 	const cheap_preset = get_preset_by_id('deepseek-flash')
 	ensure_model('deepseek-flash', cheap_preset?.label || 'DeepSeek Flash', ai_settings.aiCheapModel)
 
+	catalogCacheKey = cacheKey
+	catalogCacheResult = catalog
 	return catalog
 }
 

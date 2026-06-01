@@ -11,6 +11,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
+    minify: 'esbuild',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          codemirror: ['@codemirror/view', '@codemirror/state', '@codemirror/lang-markdown', '@codemirror/autocomplete', '@codemirror/theme-one-dark', '@uiw/react-codemirror'],
+          markdown: ['react-markdown', 'remark-gfm'],
+        },
+      },
+    },
   },
   plugins: [
     react(),
