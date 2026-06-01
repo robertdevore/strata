@@ -17,6 +17,9 @@ const is_effectively_untouched_content = (content: string): boolean => {
 	return '' === normalized || '# Untitled' === normalized
 }
 
+/** Maximum number of in-memory drafts before evicting stale entries. */
+const MAX_DRAFTS = 50
+
 interface AppState {
 	notes: Note[]
 	selectedNoteId: string | null
@@ -34,11 +37,15 @@ interface AppState {
 	openTabs: string[]
 	navigationBackStack: string[]
 	navigationForwardStack: string[]
-	splitNoteId: string | null
-	splitResizeRatio: number
+	splitNoteIds: string[]
+	splitRatios: number[]
+	splitLayout: 'columns' | 'grid'
+	splitGridColumns: number
 	toggleSplitNote: (id: string) => void
 	clearSplitNote: () => void
-	setSplitResizeRatio: (ratio: number) => void
+	setSplitResizeRatio: (resizerIndex: number, leftFraction: number) => void
+	setSplitLayout: (layout: 'columns' | 'grid') => void
+	setSplitGridColumns: (cols: number) => void
 	load: () => Promise<void>
 	refreshTags: () => Promise<void>
 	setSearchQuery: (value: string) => void
@@ -114,24 +121,48 @@ export const useAppStore = create<AppState>((set, get) => ({
 	openTabs: [],
 	navigationBackStack: [],
 	navigationForwardStack: [],
-	splitNoteId: null,
-	splitResizeRatio: 0.5,
+	splitNoteIds: [],
+	splitRatios: [],
+	splitLayout: 'columns',
+	splitGridColumns: 3,
 
 	toggleSplitNote(id) {
 		const state = get()
-		if (state.splitNoteId === id) {
-			set({ splitNoteId: null })
+		const idx = state.splitNoteIds.indexOf(id)
+		if (idx >= 0) {
+			const newIds = state.splitNoteIds.filter((nid) => nid !== id)
+			const count = newIds.length
+			const newRatios = count > 0 ? Array(count + 1).fill(1 / (count + 1)) : []
+			set({ splitNoteIds: newIds, splitRatios: newRatios })
 		} else {
-			set({ splitNoteId: id })
+			const newIds = [...state.splitNoteIds, id]
+			const count = newIds.length
+			const newRatios = Array(count + 1).fill(1 / (count + 1))
+			set({ splitNoteIds: newIds, splitRatios: newRatios })
 		}
 	},
 
 	clearSplitNote() {
-		set({ splitNoteId: null })
+		set({ splitNoteIds: [], splitRatios: [] })
 	},
 
-	setSplitResizeRatio(ratio) {
-		set({ splitResizeRatio: Math.min(0.8, Math.max(0.2, ratio)) })
+	setSplitResizeRatio(resizerIndex, leftFraction) {
+		const state = get()
+		const ratios = [...state.splitRatios]
+		if (resizerIndex < 0 || resizerIndex >= ratios.length - 1) return
+		const clamped = Math.max(0.15, Math.min(0.85, leftFraction))
+		const pairTotal = ratios[resizerIndex] + ratios[resizerIndex + 1]
+		ratios[resizerIndex] = pairTotal * clamped
+		ratios[resizerIndex + 1] = pairTotal * (1 - clamped)
+		set({ splitRatios: ratios })
+	},
+
+	setSplitLayout(layout) {
+		set({ splitLayout: layout })
+	},
+
+	setSplitGridColumns(cols) {
+		set({ splitGridColumns: Math.max(2, Math.min(6, cols)) })
 	},
 
 	async load() {
@@ -154,7 +185,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 				if (note_ids.has(note_id)) untouched_new_note_ids[note_id] = true
 			}
 
-			const split_note_id = state.splitNoteId && note_ids.has(state.splitNoteId) ? state.splitNoteId : null
+			const split_note_ids = state.splitNoteIds.filter((nid) => note_ids.has(nid))
+			const split_ratios = split_note_ids.length === state.splitNoteIds.length
+				? state.splitRatios
+				: (split_note_ids.length > 0 ? Array(split_note_ids.length + 1).fill(1 / (split_note_ids.length + 1)) : [])
 
 			return {
 				notes,
@@ -165,7 +199,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 				openTabs: open_tabs,
 				drafts,
 				untouchedNewNoteIds: untouched_new_note_ids,
-				splitNoteId: split_note_id,
+				splitNoteIds: split_note_ids,
+				splitRatios: split_ratios,
 			}
 		})
 	},
@@ -214,8 +249,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 			const idx = state.openTabs.indexOf(id)
 			next = tabs[Math.min(idx, tabs.length - 1)] ?? null
 		}
-		const split_note_id = state.splitNoteId === id ? null : state.splitNoteId
-		set({ openTabs: tabs, selectedNoteId: next, drafts, untouchedNewNoteIds: untouched_new_note_ids, splitNoteId: split_note_id })
+		const split_note_ids = state.splitNoteIds.filter((nid) => nid !== id)
+		const split_ratios = split_note_ids.length === state.splitNoteIds.length
+			? state.splitRatios
+			: (split_note_ids.length > 0 ? Array(split_note_ids.length + 1).fill(1 / (split_note_ids.length + 1)) : [])
+		set({ openTabs: tabs, selectedNoteId: next, drafts, untouchedNewNoteIds: untouched_new_note_ids, splitNoteIds: split_note_ids, splitRatios: split_ratios })
 	},
 
 	activateTab(id) {
@@ -283,8 +321,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 			if (untouched_new_note_ids[id] && !is_effectively_untouched_content(content)) {
 				delete untouched_new_note_ids[id]
 			}
+
+			let drafts = { ...state.drafts, [id]: content }
+			const draft_keys = Object.keys(drafts)
+			if (draft_keys.length > MAX_DRAFTS) {
+				const protected_ids = new Set([...state.openTabs, ...state.splitNoteIds, state.selectedNoteId].filter(Boolean) as string[])
+				// Evict the first draft whose id is not protected
+				for (const key of draft_keys) {
+					if (!protected_ids.has(key)) {
+						const { [key]: _, ...rest } = drafts
+						drafts = rest as Record<string, string>
+						break
+					}
+				}
+			}
+
 			return {
-				drafts: { ...state.drafts, [id]: content },
+				drafts,
 				untouchedNewNoteIds: untouched_new_note_ids,
 				saveState: 'saving',
 			}
@@ -381,7 +434,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 				drafts,
 				untouchedNewNoteIds: untouched_new_note_ids,
 				selectedNoteId: notes[0]?.id ?? null, openTabs: state.openTabs.filter((t) => t !== id), navigationBackStack: state.navigationBackStack.filter((t) => t !== id), navigationForwardStack: state.navigationForwardStack.filter((t) => t !== id),
-				splitNoteId: state.splitNoteId === id ? null : state.splitNoteId,
+				splitNoteIds: state.splitNoteIds.filter((nid) => nid !== id),
+				splitRatios: state.splitNoteIds.filter((nid) => nid !== id).length !== state.splitNoteIds.length
+					? (state.splitNoteIds.filter((nid) => nid !== id).length > 0 ? Array(state.splitNoteIds.filter((nid) => nid !== id).length + 1).fill(1 / (state.splitNoteIds.filter((nid) => nid !== id).length + 1)) : [])
+					: state.splitRatios,
 			}
 		})
 		await get().refreshTags()
