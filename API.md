@@ -1,17 +1,21 @@
 # Strata HTTP API Guide
 
-This document is a practical reference for tools/agents that need to read, create, update, and delete notes in Strata.
+[![Local API](https://img.shields.io/badge/base_url-127.0.0.1:3939-0366d6)](http://127.0.0.1:3939/health)
+[![CLI](https://img.shields.io/badge/cli-CLI.md-0b7285)](CLI.md)
+[![Security](https://img.shields.io/badge/security-SECURITY.md-1f6feb)](SECURITY.md)
+
+Practical reference for tools and agents that create, read, update, and delete Strata notes.
 
 ## Quick Facts
 
 - Base URL: `http://127.0.0.1:3939`
 - API is available only while Strata is running.
-- Data is local-only (SQLite under Strata `userData`).
+- Data is local-only (SQLite in Strata `userData`).
 - Optional auth: set `STRATA_API_TOKEN` before launching Strata.
 
-## Enterprise CLI
+## Quick Start
 
-Strata now ships with an enterprise-grade TypeScript CLI that uses this HTTP API only:
+CLI:
 
 ```bash
 npm run strata -- health
@@ -19,26 +23,49 @@ npm run strata -- notes list --json
 npm run strata -- notes create --content "# Title\n\nBody"
 ```
 
-See `CLI.md` for command coverage, safety behavior, output modes, and exit codes.
+curl:
 
-If auth is enabled, include one of:
+```bash
+curl http://127.0.0.1:3939/health
+curl "http://127.0.0.1:3939/notes?query=project"
+```
+
+For full CLI command coverage, see [CLI.md](CLI.md).
+
+## Authentication and Headers
+
+Required for write operations:
+
+- `Content-Type: application/json` for `POST`, `PUT`, `PATCH`
+
+If auth is enabled, send one of:
 
 - `X-Strata-Token: <token>`
 - `Authorization: Bearer <token>`
 
-## Headers
-
-Use at least:
-
-- `Content-Type: application/json` for `POST`, `PUT`, `PATCH`
-
-Optional auth header examples:
+Header examples:
 
 ```bash
 -H "X-Strata-Token: your-secret-token"
 # or
 -H "Authorization: Bearer your-secret-token"
 ```
+
+## Endpoint Index
+
+- `GET /health`
+- `GET /notes`
+- `GET /notes/:id`
+- `POST /notes`
+- `PUT /notes/:id`
+- `PATCH /notes/:id`
+- `DELETE /notes/:id`
+- `GET /tags`
+- `GET /search`
+- `GET /notes/:id/backlinks`
+- `GET /notes/:id/related`
+- `GET /notes/:id/ai-edits`
+- `POST /ai-edits/:id/revert`
 
 ## Endpoints
 

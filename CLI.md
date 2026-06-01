@@ -1,20 +1,14 @@
 # Strata CLI
 
-Strata CLI is a local-first, agent-safe command layer for Strata's HTTP API.
+[![Release](https://img.shields.io/github/v/release/robertdevore/strata?label=release&color=2f6feb)](https://github.com/robertdevore/strata/releases)
+[![Local API](https://img.shields.io/badge/api-localhost:3939-0366d6)](API.md)
+[![Docs](https://img.shields.io/badge/docs-README%20%7C%20API-0b7285)](README.md)
 
-- Uses the Strata local API (`http://127.0.0.1:3939` by default)
-- Never writes directly to SQLite
-- Supports JSON output for scripts/agents
-- Supports auth tokens, dry-run, confirmations, and deterministic exit codes
-- Designed to evolve with Strata AI provider routing
+Strata CLI is the automation-first interface for Strata.
 
-## Run
+It talks to the local HTTP API, never writes directly to SQLite, and is designed for both human and agent workflows.
 
-```bash
-npm run strata -- <command> [options]
-```
-
-Examples:
+## Quick Start
 
 ```bash
 npm run strata -- health
@@ -23,7 +17,13 @@ npm run strata -- notes create --content "# Test\n\nHello"
 npm run strata -- ai route "Create a note about provider routing"
 ```
 
-Legacy helper remains available:
+Command format:
+
+```bash
+npm run strata -- <command> [options]
+```
+
+Legacy helpers are still available:
 
 ```bash
 npm run notes:api -- health
@@ -32,30 +32,34 @@ npm run strata:ai:legacy -- health
 
 ## Global Flags
 
-Available for all commands:
+Available on all commands.
 
-- `--base-url <url>`
-- `--token <token>`
-- `--json`
-- `--pretty`
-- `--quiet`
-- `--verbose`
-- `--dry-run`
-- `--confirm`
-- `--timeout <ms>`
-- `--agent`
-- `--no-color`
-- `--fail-on-warning`
+| Flag | Description |
+|------|-------------|
+| `--base-url <url>` | Override API base URL |
+| `--token <token>` | Send auth token |
+| `--json` | Machine-readable output |
+| `--pretty` | Human-readable output |
+| `--quiet` | Minimal output |
+| `--verbose` | Extra diagnostics |
+| `--dry-run` | Show intent without executing |
+| `--confirm` | Explicitly allow write/destructive actions |
+| `--timeout <ms>` | Request timeout in milliseconds |
+| `--agent` | Agent-safe behavior defaults |
+| `--no-color` | Disable color output |
+| `--fail-on-warning` | Exit non-zero on warnings |
 
 ## Environment Variables
 
-- `STRATA_API_BASE_URL` default: `http://127.0.0.1:3939`
-- `STRATA_API_TOKEN` optional
-- `STRATA_CLI_OUTPUT` values: `pretty` or `json`
-- `STRATA_CLI_DRY_RUN` values: `true` or `false`
-- `STRATA_CLI_AGENT_MODE` values: `true` or `false`
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `STRATA_API_BASE_URL` | `http://127.0.0.1:3939` | Local API endpoint |
+| `STRATA_API_TOKEN` | unset | Optional auth token |
+| `STRATA_CLI_OUTPUT` | `pretty` | `pretty` or `json` |
+| `STRATA_CLI_DRY_RUN` | `false` | `true` or `false` |
+| `STRATA_CLI_AGENT_MODE` | `false` | `true` or `false` |
 
-Future provider variables can be used by future routing integrations (not required now):
+Forward-looking provider variables (optional today):
 
 - `STRATA_AI_CHEAP_PROVIDER`
 - `STRATA_AI_CHEAP_MODEL`
@@ -64,18 +68,20 @@ Future provider variables can be used by future routing integrations (not requir
 
 ## Exit Codes
 
-- `0` success
-- `1` generic failure
-- `2` validation error / bad input
-- `3` Strata API unavailable
-- `4` authentication failure
-- `5` not found
-- `6` conflict / unsafe operation refused
-- `7` AI/provider failure
-- `8` timeout
-- `9` partial failure
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Generic failure |
+| `2` | Validation error / bad input |
+| `3` | Strata API unavailable |
+| `4` | Authentication failure |
+| `5` | Not found |
+| `6` | Conflict / unsafe operation refused |
+| `7` | AI/provider failure |
+| `8` | Timeout |
+| `9` | Partial failure |
 
-## Command Surface
+## Command Reference
 
 ### Health
 
@@ -104,7 +110,7 @@ npm run strata -- notes star <noteId>
 npm run strata -- notes unstar <noteId>
 ```
 
-Safety:
+Safety behavior:
 
 - `update`, `archive`, `unarchive`, `delete`, and `delete-many` require `--confirm` unless `--dry-run`
 - `delete-many` also requires `--confirm-bulk-delete`
@@ -130,7 +136,7 @@ npm run strata -- tags normalize "AI Routing, provider abstraction, ai-routing"
 npm run strata -- tasks extract --stdin --json
 ```
 
-Uses deterministic extraction now and is ready for provider-backed extraction later.
+Task extraction is deterministic today and ready for provider-backed routing later.
 
 ### AI
 
@@ -151,7 +157,7 @@ npm run strata -- agent summary --file ./summary.md
 npm run strata -- agent context search "routing"
 ```
 
-Agent-mode behaviors:
+Agent-mode defaults:
 
 - JSON-first output
 - Non-interactive safe behavior
@@ -160,7 +166,7 @@ Agent-mode behaviors:
 
 ## JSON Error Shape
 
-In JSON mode, CLI errors are machine-safe:
+In JSON mode, CLI failures return machine-safe payloads:
 
 ```json
 {
@@ -175,7 +181,13 @@ In JSON mode, CLI errors are machine-safe:
 
 ## Security Model
 
-- No token values are printed
-- No direct DB access from CLI
-- No shell execution from model output
-- API base URL should remain localhost for local-first safety
+- No token values are printed.
+- No direct DB access from CLI.
+- No shell execution from model output.
+- Localhost API defaults support local-first safety.
+
+## Related Docs
+
+- [README.md](README.md)
+- [API.md](API.md)
+- [SECURITY.md](SECURITY.md)
