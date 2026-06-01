@@ -8,11 +8,15 @@ interface TabBarProps {
 	activeTabId: string | null
 	notes: Note[]
 	drafts: Record<string, string>
-	splitNoteId: string | null
+	splitNoteIds: string[]
+	splitLayout: 'columns' | 'grid'
+	splitGridColumns: number
 	onSelectTab: (id: string) => void
 	onCloseTab: (id: string) => void
 	onReorderTabs: (from_id: string, to_id: string) => void
 	onSplitNote: (id: string) => void
+	onSetSplitLayout: (layout: 'columns' | 'grid') => void
+	onSetSplitGridColumns: (cols: number) => void
 }
 
 interface ContextMenuState {
@@ -21,7 +25,7 @@ interface ContextMenuState {
 	y: number
 }
 
-export function TabBar({ tabs, activeTabId, notes, drafts, splitNoteId, onSelectTab, onCloseTab, onReorderTabs, onSplitNote }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, notes, drafts, splitNoteIds, splitLayout, splitGridColumns, onSelectTab, onCloseTab, onReorderTabs, onSplitNote, onSetSplitLayout, onSetSplitGridColumns }: TabBarProps) {
 	const [dragging_tab_id, setDraggingTabId] = useState<string | null>(null)
 	const [drop_target_tab_id, setDropTargetTabId] = useState<string | null>(null)
 	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -48,7 +52,7 @@ export function TabBar({ tabs, activeTabId, notes, drafts, splitNoteId, onSelect
 		}
 	}, [contextMenu])
 
-	if (tabs.length <= 1 && !splitNoteId) return null
+	if (tabs.length === 0 && splitNoteIds.length === 0) return null
 
 	return (
 		<div className="tab-bar">
@@ -57,7 +61,7 @@ export function TabBar({ tabs, activeTabId, notes, drafts, splitNoteId, onSelect
 				const effective_content = drafts[id] ?? note?.content ?? ''
 				const title = note ? deriveNoteTitle(effective_content) : 'Untitled'
 				const active = id === activeTabId
-				const is_pinned = id === splitNoteId
+				const is_pinned = splitNoteIds.includes(id)
 				return (
 					<div
 						key={id}
@@ -128,8 +132,38 @@ export function TabBar({ tabs, activeTabId, notes, drafts, splitNoteId, onSelect
 							setContextMenu(null)
 						}}
 					>
-						{splitNoteId === contextMenu.noteId ? 'Unpin Split' : 'Pin to Split View'}
+						{splitNoteIds.includes(contextMenu.noteId) ? 'Unpin Split' : 'Pin to Split View'}
 					</button>
+					{splitNoteIds.length >= 2 && (
+						<>
+							<div className="tab-context-menu-separator" />
+							<button
+								className="tab-context-menu-item"
+								onClick={() => {
+									onSetSplitLayout('columns' === splitLayout ? 'grid' : 'columns')
+									setContextMenu(null)
+								}}
+							>
+								{'columns' === splitLayout ? 'Switch to Grid Layout' : 'Switch to Column Layout'}
+							</button>
+							{'grid' === splitLayout && (
+								<div className="tab-context-menu-sub" role="group" aria-label="Grid columns">
+									{[2, 3, 4].map((cols) => (
+										<button
+											key={cols}
+											className={`tab-context-menu-item ${cols === splitGridColumns ? 'tab-context-menu-item-checked' : ''}`}
+											onClick={() => {
+												onSetSplitGridColumns(cols)
+												setContextMenu(null)
+											}}
+										>
+											{cols === splitGridColumns ? '✓ ' : '   '}{cols} Columns
+										</button>
+									))}
+								</div>
+							)}
+						</>
+					)}
 				</div>
 			)}
 		</div>

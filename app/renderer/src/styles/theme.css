@@ -3515,6 +3515,21 @@ body.theme-light .cm-gutters {
 	background: var(--hover);
 }
 
+.tab-context-menu-separator {
+	height: 1px;
+	margin: 4px 8px;
+	background: var(--border);
+}
+
+.tab-context-menu-sub {
+	padding-left: 0;
+}
+
+.tab-context-menu-item-checked {
+	color: var(--accent);
+	font-weight: 600;
+}
+
 /* ---- Pinned Tab ---- */
 
 .tab-item-pinned {
@@ -3565,8 +3580,8 @@ body.theme-light .cm-gutters {
 	overflow: hidden;
 }
 
-/* Remove right border on the left pane's editor-input when in split mode */
-.split-pane-left .editor-input-split {
+/* Remove right border on editor-input when in split mode — resizers handle visual separation */
+.split-pane .editor-input-split {
 	border-right: none;
 }
 
@@ -3588,4 +3603,18 @@ body.theme-light .cm-gutters {
 /* Ensure the resizer stretches full height */
 .split-panes .panel-resizer-split {
 	align-self: stretch;
+}
+
+/* ---- Grid Layout ---- */
+
+.split-panes-grid {
+	grid-auto-rows: 1fr;
+	gap: 2px;
+	padding: 2px;
+	background: var(--border);
+}
+
+.split-panes-grid .split-pane {
+	border-radius: 6px;
+	overflow: hidden;
 }

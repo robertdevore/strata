@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
@@ -150,22 +150,41 @@ export function App() {
 
 	const notes = store.filteredNotes()
 
-	const splitNoteId = store.splitNoteId
-	const splitNote = splitNoteId ? store.notes.find((n) => n.id === splitNoteId) ?? null : null
-	const splitContent = splitNoteId ? (store.drafts[splitNoteId] ?? splitNote?.content ?? '') : ''
+	const splitNoteIds = store.splitNoteIds
+	const pinnedNotes = useMemo(() => splitNoteIds.map((id) => {
+		const note = store.notes.find((n) => n.id === id) ?? null
+		return {
+			id,
+			note,
+			content: store.drafts[id] ?? note?.content ?? '',
+		}
+	}), [splitNoteIds, store.notes, store.drafts])
 
-	const startSplitResize = (event: React.MouseEvent<HTMLDivElement>) => {
+	const splitRatios = useMemo(() => {
+		if (store.splitRatios.length === splitNoteIds.length + 1) return store.splitRatios
+		if (splitNoteIds.length === 0) return []
+		return Array(splitNoteIds.length + 1).fill(1 / (splitNoteIds.length + 1))
+	}, [store.splitRatios, splitNoteIds.length])
+
+	const startSplitResize = (resizerIndex: number) => (event: React.MouseEvent<HTMLDivElement>) => {
 		event.preventDefault()
 		const start_x = event.clientX
-		const editor_col = (event.target as HTMLElement).closest('.editor-column')
-		if (!editor_col) return
-		const total_width = editor_col.getBoundingClientRect().width
-		const start_ratio = store.splitResizeRatio
+		const target = event.target as HTMLElement
+		const leftPane = target.previousElementSibling as HTMLElement | null
+		const rightPane = target.nextElementSibling as HTMLElement | null
+		if (!leftPane || !rightPane) return
+		const leftWidth = leftPane.getBoundingClientRect().width
+		const rightWidth = rightPane.getBoundingClientRect().width
+		const pairWidth = leftWidth + rightWidth
+		const ratios = splitRatios
+		if (resizerIndex < 0 || resizerIndex >= ratios.length - 1) return
+		const startPairTotal = ratios[resizerIndex] + ratios[resizerIndex + 1]
+		const startLeftFrac = startPairTotal > 0 ? ratios[resizerIndex] / startPairTotal : 0.5
 
 		const onMouseMove = (move_event: MouseEvent) => {
 			const delta = move_event.clientX - start_x
-			const next_ratio = start_ratio + delta / total_width
-			store.setSplitResizeRatio(next_ratio)
+			const nextFrac = startLeftFrac + delta / pairWidth
+			store.setSplitResizeRatio(resizerIndex, nextFrac)
 		}
 
 		const onMouseUp = () => {
@@ -522,13 +541,15 @@ export function App() {
 					theme={store.settings.theme}
 				/>
 				{!sidebarCollapsed && <div className="panel-resizer panel-resizer-sidebar" onMouseDown={startSidebarResize} role="separator" aria-orientation="vertical" aria-label="Resize sidebar" />}
-				<div className={`editor-column${(store.openTabs.length > 1 || splitNoteId) ? ' has-tabs' : ''}${splitNoteId ? ' editor-column-split' : ''}`}>
+				<div className={`editor-column${(store.openTabs.length > 1 || splitNoteIds.length > 0) ? ' has-tabs' : ''}${splitNoteIds.length > 0 ? ' editor-column-split' : ''}`}>
 					<TabBar
 						tabs={store.openTabs}
 						activeTabId={store.selectedNoteId}
 						notes={store.notes}
 						drafts={store.drafts}
-						splitNoteId={splitNoteId}
+						splitNoteIds={splitNoteIds}
+						splitLayout={store.splitLayout}
+						splitGridColumns={store.splitGridColumns}
 						onSelectTab={async (id) => {
 							if (store.selectedNoteId && store.selectedNoteId !== id) {
 								await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
@@ -538,45 +559,46 @@ export function App() {
 						onCloseTab={(id) => store.closeTab(id)}
 						onReorderTabs={(from_id, to_id) => store.reorderTabs(from_id, to_id)}
 						onSplitNote={(id) => store.toggleSplitNote(id)}
+						onSetSplitLayout={(layout) => store.setSplitLayout(layout)}
+						onSetSplitGridColumns={(cols) => store.setSplitGridColumns(cols)}
 					/>
-					{splitNoteId ? (
-						<div
-							className="split-panes"
-							style={{ gridTemplateColumns: `${store.splitResizeRatio * 100}% 3px ${(1 - store.splitResizeRatio) * 100}%` }}
-						>
-							<div className="split-pane split-pane-left">
-								<EditorPane
-									key={`pinned-${splitNoteId}`}
-									note={splitNote}
-									notes={store.notes}
-									openTabIds={store.openTabs}
-									drafts={store.drafts}
-									openAiModel={store.settings.openAiModel}
-									content={splitContent}
-									tags={store.tags}
-									saveState={store.saveState}
-									lastSavedAt={store.lastSavedAt}
-									sidebarCollapsed={sidebarCollapsed}
-									theme={store.settings.theme}
-									onChangeDraft={store.setDraft}
-									onFlush={store.flushDraft}
-									onToggleStar={(id) => void store.toggleStar(id)}
-									onToggleArchive={(id) => void store.toggleArchive(id)}
-									onDelete={(id) => void onDelete(id)}
-									onSetTags={(tags) => { if (splitNoteId) void store.setTagsForNote(splitNoteId, tags) }}
-									onOpenNoteFromChat={openNoteFromChat}
-									onShowRelatedNotes={() => {
-										if (splitNoteId) {
-											window.strata.links.relatedNotes(splitNoteId).then(setRelatedNotes).catch(() => setRelatedNotes([]))
-											setShowRelatedNotes(true)
-										}
-									}}
-									onOpenSettings={() => store.setShowSettings(true)}
-									onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
-								/>
-							</div>
-							<div className="panel-resizer panel-resizer-split" onMouseDown={startSplitResize} role="separator" aria-orientation="vertical" aria-label="Resize split panes" />
-							<div className="split-pane split-pane-right">
+					{splitNoteIds.length > 0 ? (
+						'grid' === store.splitLayout ? (
+							<div
+								className="split-panes split-panes-grid"
+								style={{ gridTemplateColumns: `repeat(${store.splitGridColumns}, 1fr)` }}
+							>
+								{pinnedNotes.map((pinned) => (
+									<div className="split-pane" key={`pinned-${pinned.id}`}>
+										<EditorPane
+											note={pinned.note}
+											notes={store.notes}
+											openTabIds={store.openTabs}
+											drafts={store.drafts}
+											openAiModel={store.settings.openAiModel}
+											content={pinned.content}
+											tags={store.tags}
+											saveState={store.saveState}
+											lastSavedAt={store.lastSavedAt}
+											sidebarCollapsed={sidebarCollapsed}
+											theme={store.settings.theme}
+											onChangeDraft={store.setDraft}
+											onFlush={store.flushDraft}
+											onToggleStar={(id) => void store.toggleStar(id)}
+											onToggleArchive={(id) => void store.toggleArchive(id)}
+											onDelete={(id) => void onDelete(id)}
+											onSetTags={(tags) => { void store.setTagsForNote(pinned.id, tags) }}
+											onOpenNoteFromChat={openNoteFromChat}
+											onShowRelatedNotes={() => {
+												window.strata.links.relatedNotes(pinned.id).then(setRelatedNotes).catch(() => setRelatedNotes([]))
+												setShowRelatedNotes(true)
+											}}
+											onOpenSettings={() => store.setShowSettings(true)}
+											onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+										/>
+									</div>
+								))}
+								<div className="split-pane">
 					<EditorPane
 					note={store.selectedNote()}
 					notes={store.notes}
@@ -605,8 +627,84 @@ export function App() {
 					onOpenSettings={() => store.setShowSettings(true)}
 					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
 				/>
+								</div>
 							</div>
-						</div>
+						) : (
+							<div
+								className="split-panes"
+								style={{ gridTemplateColumns: splitRatios.map((r, i) => i === splitRatios.length - 1 ? `${(r * 100).toFixed(1)}%` : `${(r * 100).toFixed(1)}% 3px`).join(' ') }}
+							>
+								{pinnedNotes.map((pinned, i) => (
+									<Fragment key={`pinned-${pinned.id}`}>
+										<div className="split-pane">
+											<EditorPane
+												note={pinned.note}
+												notes={store.notes}
+												openTabIds={store.openTabs}
+												drafts={store.drafts}
+												openAiModel={store.settings.openAiModel}
+												content={pinned.content}
+												tags={store.tags}
+												saveState={store.saveState}
+												lastSavedAt={store.lastSavedAt}
+												sidebarCollapsed={sidebarCollapsed}
+												theme={store.settings.theme}
+												onChangeDraft={store.setDraft}
+												onFlush={store.flushDraft}
+												onToggleStar={(id) => void store.toggleStar(id)}
+												onToggleArchive={(id) => void store.toggleArchive(id)}
+												onDelete={(id) => void onDelete(id)}
+												onSetTags={(tags) => { void store.setTagsForNote(pinned.id, tags) }}
+												onOpenNoteFromChat={openNoteFromChat}
+												onShowRelatedNotes={() => {
+													window.strata.links.relatedNotes(pinned.id).then(setRelatedNotes).catch(() => setRelatedNotes([]))
+													setShowRelatedNotes(true)
+												}}
+												onOpenSettings={() => store.setShowSettings(true)}
+												onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+											/>
+										</div>
+										<div
+											className="panel-resizer panel-resizer-split"
+											onMouseDown={startSplitResize(i)}
+											role="separator"
+											aria-orientation="vertical"
+											aria-label="Resize split panes"
+										/>
+									</Fragment>
+								))}
+								<div className="split-pane">
+					<EditorPane
+					note={store.selectedNote()}
+					notes={store.notes}
+					openTabIds={store.openTabs}
+					drafts={store.drafts}
+					openAiModel={store.settings.openAiModel}
+					content={store.effectiveContent()}
+					tags={store.tags}
+					saveState={store.saveState}
+					lastSavedAt={store.lastSavedAt}
+					sidebarCollapsed={sidebarCollapsed}
+					theme={store.settings.theme}
+					onChangeDraft={store.setDraft}
+					onFlush={store.flushDraft}
+					onToggleStar={(id) => void store.toggleStar(id)}
+					onToggleArchive={(id) => void store.toggleArchive(id)}
+					onDelete={(id) => void onDelete(id)}
+					onSetTags={(tags) => void store.setTagsForSelected(tags)}
+					onOpenNoteFromChat={openNoteFromChat}
+					onShowRelatedNotes={() => {
+						if (store.selectedNoteId) {
+							window.strata.links.relatedNotes(store.selectedNoteId).then(setRelatedNotes).catch(() => setRelatedNotes([]))
+							setShowRelatedNotes(true)
+						}
+					}}
+					onOpenSettings={() => store.setShowSettings(true)}
+					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+				/>
+								</div>
+							</div>
+						)
 					) : (
 					<EditorPane
 					note={store.selectedNote()}
