@@ -91,15 +91,26 @@ const DEFAULT_SETTINGS: Settings = {
 
 export class StrataDatabase {
 	private db: Database.Database
-
 	constructor(user_data_path: string) {
 		const data_dir = path.join(user_data_path, 'data')
 		if (!fs.existsSync(data_dir)) fs.mkdirSync(data_dir, { recursive: true })
 		const db_path = path.join(data_dir, 'strata.sqlite')
 		this.db = new Database(db_path)
 		this.db.pragma('journal_mode = WAL')
+		this.db.pragma('cache_size = -8000')
+		this.db.pragma('busy_timeout = 5000')
+		this.db.pragma('synchronous = NORMAL')
+		this.db.pragma('temp_store = MEMORY')
+		this.db.pragma('journal_size_limit = 10000000')
 		this.runMigrations()
 		this.ensureSettings()
+	}
+
+	close(): void {
+		try {
+			this.db.exec('PRAGMA optimize')
+		} catch { /* ignore — db may already be in bad state */ }
+		this.db.close()
 	}
 
 	private runMigrations() {

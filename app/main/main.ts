@@ -20,6 +20,7 @@ let main_window: BrowserWindow | null = null
 let notes_api_server: { close: () => Promise<void> } | null = null
 let backup_manager: BackupManager | null = null
 let current_settings: Settings | null = null
+let db: StrataDatabase | null = null
 
 const hotkey_to_electron_accelerator = (hotkey: string): string | undefined => {
 	const value = hotkey.trim()
@@ -219,7 +220,7 @@ app.whenReady().then(async () => {
 	setCspHeaders()
 
 	const user_data_path = app.getPath('userData')
-	const db = new StrataDatabase(user_data_path)
+	db = new StrataDatabase(user_data_path)
 	current_settings = db.getSettings()
 	const db_file_path = path.join(user_data_path, 'data', 'strata.sqlite')
 	const backup_directory = process.env.VITE_DEV_SERVER_URL
@@ -229,9 +230,9 @@ app.whenReady().then(async () => {
 	backup_manager = new BackupManager({
 		dbFilePath: db_file_path,
 		backupDir: backup_directory,
-		getSettings: () => db.getSettings(),
+		getSettings: () => db!.getSettings(),
 		onAutoBackupCreated: (created_at) => {
-			db.setSettings({ lastAutoBackupAt: created_at })
+			db!.setSettings({ lastAutoBackupAt: created_at })
 		},
 	})
 
@@ -266,6 +267,7 @@ app.on('before-quit', () => {
 	void notes_api_server?.close().catch((error) => {
 		console.error('[strata-api] Failed to stop notes API server', error)
 	})
+	db?.close()
 })
 
 app.on('window-all-closed', () => {
