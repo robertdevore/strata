@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
@@ -106,7 +106,6 @@ export function App() {
 	const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
 	const [showRelatedNotes, setShowRelatedNotes] = useState(false)
 	const [showTagsModal, setShowTagsModal] = useState(false)
-	const creatingInitialNoteRef = useRef(false)
 	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
 	const hotkeys: HotkeysSettings = useMemo(() => ({ ...DEFAULT_HOTKEYS, ...(store.settings.hotkeys ?? {}) }), [store.settings.hotkeys])
 	const clearUndoToast = useCallback(() => {
@@ -120,24 +119,6 @@ export function App() {
 	useEffect(() => {
 		void load()
 	}, [load])
-
-	useEffect(() => {
-		// After initial load, start with a fresh blank note — but only if the
-		// newest note isn't already an empty untitled one (avoid duplicates).
-		if (creatingInitialNoteRef.current) return
-		if (store.notes.length > 0 && !store.selectedNoteId && store.openTabs.length === 0) {
-			const newest = store.notes[0]
-			const is_empty_untitled = !newest.content.trim() || '# Untitled\n\n' === newest.content
-			if (!is_empty_untitled) {
-				creatingInitialNoteRef.current = true
-				void store.createNote().finally(() => {
-					creatingInitialNoteRef.current = false
-				})
-			} else {
-				store.openNoteInTab(newest.id)
-			}
-		}
-	}, [store, store.notes, store.selectedNoteId, store.openTabs])
 
 	useEffect(() => {
 		document.body.classList.toggle('platform-mac', isMac)
