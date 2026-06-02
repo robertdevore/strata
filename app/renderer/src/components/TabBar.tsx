@@ -52,7 +52,7 @@ export function TabBar({ tabs, activeTabId, notes, drafts, splitNoteIds, splitLa
 		}
 	}, [contextMenu])
 
-	if (tabs.length === 0 && splitNoteIds.length === 0) return null
+	if (tabs.length <= 1 && splitNoteIds.length === 0) return null
 
 	return (
 		<div className="tab-bar">
