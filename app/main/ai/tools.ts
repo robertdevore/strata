@@ -23,7 +23,7 @@ export const AI_TOOLS: AiToolDefinition[] = [
 	{
 		type: 'function',
 		name: 'search_notes',
-		description: 'Search notes by content or tags.',
+		description: 'Search notes by text content or tags (fuzzy match). Use this when the user provides keywords, tags, or general search terms.',
 		parameters: {
 			type: 'object',
 			properties: {
@@ -31,6 +31,19 @@ export const AI_TOOLS: AiToolDefinition[] = [
 				limit: { type: 'number', minimum: 1, maximum: 200 },
 			},
 			required: ['query'],
+		},
+	},
+	{
+		type: 'function',
+		name: 'search_notes_by_tag',
+		description: 'Search notes that have a specific tag. Use this when the user mentions a tag name (e.g., "review", "dev", "security") to find all notes with that tag.',
+		parameters: {
+			type: 'object',
+			properties: {
+				tag: { type: 'string', description: 'The exact tag name to search for (e.g., "review", "dev", "bug")' },
+				limit: { type: 'number', minimum: 1, maximum: 200 },
+			},
+			required: ['tag'],
 		},
 	},
 	{
@@ -262,6 +275,17 @@ export const execute_tool_call = (
 		if (!query) return { output: JSON.stringify({ notes: [] }), notesChanged: false }
 		return {
 			output: JSON.stringify({ notes: summarize_notes(db.aiSearchNotes(query, limit)) }),
+			notesChanged: false,
+		}
+	}
+
+	if ('search_notes_by_tag' === tool_name) {
+		const tag = 'string' === typeof args.tag ? args.tag.trim() : ''
+		const limit = 'number' === typeof args.limit ? args.limit : 50
+		if (!tag) return { output: JSON.stringify({ notes: [] }), notesChanged: false }
+		const matched = db.listNotes({ tag, includeDeleted: false }).slice(0, Math.max(1, Math.min(200, limit)))
+		return {
+			output: JSON.stringify({ notes: summarize_notes(matched) }),
 			notesChanged: false,
 		}
 	}
