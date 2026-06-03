@@ -76,19 +76,24 @@ const build_open_notes_context = (open_notes: Array<{ id: string; title: string;
 	if (!open_notes || 0 === open_notes.length) return ''
 
 	const sections = open_notes.map((note, index) => {
-		const compact_content = note.content.replace(/\s+/g, ' ').trim().slice(0, 2600)
+		const compact_content = note.content.replace(/\s+/g, ' ').trim().slice(0, 3000)
 		return [
-			`Open tab ${index + 1}:`,
-			`- Note ID: ${note.id}`,
-			`- Title: ${note.title}`,
-			`- Content excerpt: ${compact_content || '(empty)'}`,
+			`### Open Tab ${index + 1}: ${note.title}`,
+			`- **Note ID:** ${note.id}`,
+			`- **Title:** ${note.title}`,
+			`- **Content:**`,
+			compact_content || '(empty)',
 		].join('\n')
 	})
 
 	return [
-		'The user currently has these notes open in tabs. Use them as immediate context before broader note search:',
+		'## Currently Open Notes (read these first — they are the user\'s active context)',
+		'',
 		sections.join('\n\n'),
-	].join('\n\n')
+		'',
+		'---',
+		'**Instructions:** These are the notes the user has open right now. Before responding to any request involving note synthesis, review, or analysis, read through ALL of these notes first. If the user mentions a tag, use `search_notes_by_tag` to find all notes with that tag — do not ask for note titles.',
+	].join('\n')
 }
 
 const resolve_chat_model = (db: StrataDatabase): string => {
