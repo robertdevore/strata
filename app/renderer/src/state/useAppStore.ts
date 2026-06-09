@@ -1,10 +1,14 @@
 import { create } from 'zustand'
 import type { Note, Settings } from '@shared/types'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
+import { DEFAULT_HOME_TILES } from '@shared/homeTiles'
 import { applyFiltersAndSort, type ActiveFilter } from '@renderer/src/domain/filtering'
 import { normalizeTag } from '@renderer/src/domain/noteUtils'
 import { notesService } from '@renderer/src/services/notesService'
+import { projectsService } from '@renderer/src/services/projectsService'
 import { settingsService } from '@renderer/src/services/settingsService'
+import type { Project } from '@shared/types'
+import { DEFAULT_SIDEBAR_LAYOUT } from '@shared/sidebarLayout'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
 
@@ -22,6 +26,7 @@ const MAX_DRAFTS = 50
 
 interface AppState {
 	notes: Note[]
+	projects: Project[]
 	selectedNoteId: string | null
 	drafts: Record<string, string>
 	untouchedNewNoteIds: Record<string, true>
@@ -67,6 +72,7 @@ interface AppState {
 	restoreDeletedNote: (id: string) => Promise<boolean>
 	setTagsForSelected: (tags: string[]) => Promise<void>
 	setTagsForNote: (id: string, tags: string[]) => Promise<void>
+	setProjectForNote: (id: string, projectId: string | null) => Promise<void>
 	setShowSettings: (show: boolean) => void
 	setShowFiltersPanel: (show: boolean) => void
 	updateSettings: (patch: Partial<Settings>) => Promise<void>
@@ -100,12 +106,16 @@ const defaultSettings: Settings = {
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
 	pinnedTags: [],
+	pinnedNotes: [],
 	hotkeys: DEFAULT_HOTKEYS,
 	aiModelCatalog: '{}',
+	homeTiles: DEFAULT_HOME_TILES,
+	sidebarLayout: DEFAULT_SIDEBAR_LAYOUT,
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
 	notes: [],
+	projects: [],
 	selectedNoteId: null,
 	drafts: {},
 	untouchedNewNoteIds: {},
@@ -166,10 +176,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 	},
 
 	async load() {
-		const [notes, tags, settings] = await Promise.all([notesService.list(), notesService.listTags(), settingsService.get()])
+		const [notes, projects, tags, settings] = await Promise.all([notesService.list(), projectsService.list(), notesService.listTags(), settingsService.get()])
 		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
 		set((state) => {
 			const note_ids = new Set(notes.map((note) => note.id))
+			const project_ids = new Set(projects.map((project) => project.id))
 			const open_tabs = state.openTabs.filter((note_id) => note_ids.has(note_id))
 			const selected_note_id = state.selectedNoteId && note_ids.has(state.selectedNoteId)
 				? state.selectedNoteId
@@ -190,8 +201,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 				? state.splitRatios
 				: (split_note_ids.length > 0 ? Array(split_note_ids.length + 1).fill(1 / (split_note_ids.length + 1)) : [])
 
+			const filtered_projects = projects.filter((project) => project_ids.has(project.id))
+
 			return {
 				notes,
+				projects: filtered_projects,
 				tags,
 				settings,
 				activeFilter,
@@ -329,8 +343,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 				// Evict the first draft whose id is not protected
 				for (const key of draft_keys) {
 					if (!protected_ids.has(key)) {
-						const { [key]: _, ...rest } = drafts
-						drafts = rest as Record<string, string>
+						const next_drafts = { ...drafts }
+						delete next_drafts[key]
+						drafts = next_drafts
 						break
 					}
 				}
@@ -472,6 +487,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 		await get().refreshTags()
 	},
 
+	async setProjectForNote(id, projectId) {
+		const updated = await notesService.update(id, { projectId })
+		if (!updated) return
+		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+	},
+
 	setShowSettings(showSettings) {
 		set({ showSettings })
 	},
@@ -486,12 +507,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	filteredNotes() {
 		const state = get()
+		const project_names_by_id = Object.fromEntries(state.projects.map((project) => [project.id, project.name]))
 		return applyFiltersAndSort(state.notes, {
 			activeFilter: state.activeFilter,
 			selectedTag: state.selectedTag,
 			searchQuery: state.searchQuery,
 			sortMode: state.settings.sortMode,
-		})
+		}, project_names_by_id)
 	},
 
 	selectedNote() {

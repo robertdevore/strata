@@ -229,6 +229,24 @@ export function ChevronUpIcon(props: IconProps) {
 	)
 }
 
+export function ChevronLeftIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M15 6l-6 6l6 6" />
+		</BaseIcon>
+	)
+}
+
+export function ChevronRightIcon(props: IconProps) {
+	return (
+		<BaseIcon {...props}>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M9 6l6 6l-6 6" />
+		</BaseIcon>
+	)
+}
+
 export function PinIcon(props: IconProps) {
 	return (
 		<BaseIcon {...props}>

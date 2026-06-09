@@ -1,4 +1,6 @@
 import type { HotkeysSettings } from './hotkeys'
+import type { HomeTileConfig } from './homeTiles'
+import type { SidebarLayoutSettings } from './sidebarLayout'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 
@@ -12,6 +14,14 @@ export type AiEditMode = 'read_only' | 'confirm' | 'auto_apply'
 
 export type AiRoutingMode = 'premium_only' | 'cheap_only' | 'auto' | 'ask_each_time'
 
+export interface Project {
+	id: string
+	name: string
+	createdAt: string
+	updatedAt: string
+	sortOrder: number
+}
+
 export interface Note {
 	id: string
 	content: string
@@ -20,6 +30,7 @@ export interface Note {
 	starred: boolean
 	archived: boolean
 	tags: string[]
+	projectId: string | null
 	deletedAt: string | null
 }
 
@@ -28,6 +39,7 @@ export interface NotesFilter {
 	starred?: boolean
 	archived?: boolean
 	tag?: string
+	projectId?: string
 	includeDeleted?: boolean
 }
 
@@ -57,8 +69,11 @@ export interface Settings {
 	aiCheapConfidenceThreshold: number
 	aiPremiumFallbackThreshold: number
 	pinnedTags: string[]
+	pinnedNotes: string[]
 	hotkeys: HotkeysSettings
 	aiModelCatalog: string  // JSON object: {"openai":"gpt-5.5, gpt-4o", "deepseek-flash":"deepseek-v4-flash"}
+	homeTiles: HomeTileConfig[]
+	sidebarLayout: SidebarLayoutSettings
 }
 
 export interface NoteUpdatePatch {
@@ -66,6 +81,7 @@ export interface NoteUpdatePatch {
 	starred?: boolean
 	archived?: boolean
 	tags?: string[]
+	projectId?: string | null
 }
 
 export interface ListResult {
@@ -130,6 +146,8 @@ export interface AiNoteEdit {
 	afterContent: string | null
 	beforeTags: string[] | null
 	afterTags: string[] | null
+	beforeProjectId: string | null
+	afterProjectId: string | null
 	model: string | null
 	promptExcerpt: string | null
 	createdAt: string

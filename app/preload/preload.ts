@@ -6,7 +6,7 @@ const api: StrataApi = {
 	notes: {
 		list: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesList, filters),
 		get: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesGet, { id }),
-		create: () => ipcRenderer.invoke(IPC_CHANNELS.notesCreate),
+		create: (payload) => ipcRenderer.invoke(IPC_CHANNELS.notesCreate, payload),
 		update: (id, patch) => ipcRenderer.invoke(IPC_CHANNELS.notesUpdate, { id, patch }),
 		delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesDelete, { id }),
 		restore: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesRestore, { id }),
@@ -16,6 +16,14 @@ const api: StrataApi = {
 	tags: {
 		list: () => ipcRenderer.invoke(IPC_CHANNELS.tagsList),
 	},
+		projects: {
+			list: () => ipcRenderer.invoke(IPC_CHANNELS.projectsList),
+			create: (payload) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreate, payload),
+			update: (id, payload) => ipcRenderer.invoke(IPC_CHANNELS.projectsUpdate, { id, ...payload }),
+			delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.projectsDelete, { id }),
+			importFolder: (payload) => ipcRenderer.invoke(IPC_CHANNELS.projectsImportFolder, payload),
+			reorder: (projectIds) => ipcRenderer.invoke(IPC_CHANNELS.projectsReorder, { projectIds }),
+		},
 	settings: {
 		get: () => ipcRenderer.invoke(IPC_CHANNELS.settingsGet),
 		set: (patch) => ipcRenderer.invoke(IPC_CHANNELS.settingsSet, patch),

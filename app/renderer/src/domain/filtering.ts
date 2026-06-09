@@ -35,12 +35,14 @@ const sortNotes = (notes: Note[], sortMode: SortMode): Note[] => {
 	return copy.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
-export const applyFiltersAndSort = (notes: Note[], view: ViewFilter): Note[] => {
+export const applyFiltersAndSort = (notes: Note[], view: ViewFilter, project_names_by_id: Record<string, string> = {}): Note[] => {
 	const filtered = notes.filter((note) => {
 		if (note.deletedAt) return false
 		if (!baseFilter(note, view.activeFilter)) return false
 		if (view.selectedTag && !note.tags.includes(view.selectedTag)) return false
-		if (!searchMatch(note, view.searchQuery)) return false
+		const matches_query = searchMatch(note, view.searchQuery)
+			|| Boolean(note.projectId && project_names_by_id[note.projectId]?.toLowerCase().includes(view.searchQuery.toLowerCase()))
+		if (!matches_query) return false
 		return true
 	})
 	return sortNotes(filtered, view.sortMode)

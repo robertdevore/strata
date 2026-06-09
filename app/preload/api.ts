@@ -1,4 +1,4 @@
-import type { AiChatResponse, AiMessage, AiNoteEdit, AiOpenNoteContext, AiRouteLog, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../shared/types'
+import type { AiChatResponse, AiMessage, AiNoteEdit, AiOpenNoteContext, AiRouteLog, AiSearchResult, AiThreadSummary, AiTranscriptionResult, BackupResult, Note, NoteLink, NoteUpdatePatch, NotesFilter, Project, Settings } from '../shared/types'
 
 export interface BackupListing {
 	name: string
@@ -10,7 +10,14 @@ export interface StrataApi {
 	notes: {
 		list: (filters?: NotesFilter) => Promise<Note[]>
 		get: (id: string) => Promise<Note | null>
-		create: () => Promise<Note>
+		create: (payload?: {
+			content?: string
+			tags?: string[]
+			starred?: boolean
+			archived?: boolean
+			projectId?: string | null
+			projectName?: string
+		}) => Promise<Note>
 		update: (id: string, patch: NoteUpdatePatch) => Promise<Note | null>
 		delete: (id: string) => Promise<boolean>
 		restore: (id: string) => Promise<Note | null>
@@ -19,6 +26,14 @@ export interface StrataApi {
 	}
 	tags: {
 		list: () => Promise<Array<{ name: string; count: number }>>
+	}
+	projects: {
+		list: () => Promise<Project[]>
+		create: (payload: { name: string }) => Promise<Project>
+		update: (id: string, payload: { name: string }) => Promise<Project | null>
+		delete: (id: string) => Promise<boolean>
+		importFolder: (payload: { projectName: string; filePaths: string[] }) => Promise<{ project: Project; notes: Note[]; count: number }>
+		reorder: (projectIds: string[]) => Promise<Project[]>
 	}
 	settings: {
 		get: () => Promise<Settings>

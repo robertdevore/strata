@@ -2,8 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
-import type { AiMessage, AiNoteEdit, AiRouteLog, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Settings } from '../../shared/types'
+import type { AiMessage, AiNoteEdit, AiRouteLog, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Project, Settings } from '../../shared/types'
 import { DEFAULT_HOTKEYS } from '../../shared/hotkeys'
+import { DEFAULT_HOME_TILES } from '../../shared/homeTiles'
+import { DEFAULT_SIDEBAR_LAYOUT } from '../../shared/sidebarLayout'
 import { migrations } from './migrations/index'
 
 interface DbNoteRow {
@@ -14,7 +16,16 @@ interface DbNoteRow {
 	starred: number
 	archived: number
 	tags: string
+	project_id: string | null
 	deleted_at: string | null
+}
+
+interface DbProjectRow {
+	id: string
+	name: string
+	created_at: string
+	updated_at: string
+	sort_order: number
 }
 
 interface DbAiThreadRow {
@@ -54,6 +65,8 @@ interface DbAiNoteEditRow {
 	after_content: string | null
 	before_tags: string | null
 	after_tags: string | null
+	before_project_id: string | null
+	after_project_id: string | null
 	model: string | null
 	prompt_excerpt: string | null
 	created_at: string
@@ -85,8 +98,11 @@ const DEFAULT_SETTINGS: Settings = {
 	aiCheapConfidenceThreshold: 0.85,
 	aiPremiumFallbackThreshold: 0.65,
 	pinnedTags: [],
+	pinnedNotes: [],
 	hotkeys: DEFAULT_HOTKEYS,
 	aiModelCatalog: '{}',
+	homeTiles: DEFAULT_HOME_TILES,
+	sidebarLayout: DEFAULT_SIDEBAR_LAYOUT,
 }
 
 export class StrataDatabase {
@@ -144,7 +160,18 @@ export class StrataDatabase {
 			starred: Boolean(row.starred),
 			archived: Boolean(row.archived),
 			tags: JSON.parse(row.tags) as string[],
+			projectId: row.project_id,
 			deletedAt: row.deleted_at,
+		}
+	}
+
+	private mapProject(row: DbProjectRow): Project {
+		return {
+			id: row.id,
+			name: row.name,
+			createdAt: row.created_at,
+			updatedAt: row.updated_at,
+			sortOrder: row.sort_order,
 		}
 	}
 
@@ -186,16 +213,22 @@ export class StrataDatabase {
 			where.push("tags LIKE ?")
 			values.push(`%"${filters.tag}"%`)
 		}
+		if (filters?.projectId) {
+			where.push('project_id = ?')
+			values.push(filters.projectId)
+		}
 		if (filters?.query) {
-			where.push('(content LIKE ? OR tags LIKE ?)')
+			where.push('(content LIKE ? OR tags LIKE ? OR p.name LIKE ?)')
 			const wildcard = `%${filters.query}%`
-			values.push(wildcard, wildcard)
+			values.push(wildcard, wildcard, wildcard)
 		}
 
 		const query = `
-			SELECT * FROM notes
+			SELECT n.*
+			FROM notes n
+			LEFT JOIN projects p ON p.id = n.project_id
 			${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-			ORDER BY updated_at DESC
+			ORDER BY n.updated_at DESC
 		`
 		const rows = this.db.prepare(query).all(...values) as DbNoteRow[]
 		return rows.map((row) => this.mapNote(row))
@@ -209,14 +242,22 @@ export class StrataDatabase {
 		return this.mapNote(row)
 	}
 
-	createNote(): Note {
+	createNote(initial?: { content?: string; starred?: boolean; archived?: boolean; tags?: string[]; projectId?: string | null }): Note {
 		const now = new Date().toISOString()
 		const id = uuidv4()
+		const content = initial?.content ?? ''
+		const starred = Boolean(initial?.starred)
+		const archived = Boolean(initial?.archived)
+		const tags = Array.isArray(initial?.tags) ? initial.tags : []
+		const project_id = initial?.projectId ?? null
+		if (null !== project_id && !this.getProject(project_id)) {
+			throw new Error('Project not found')
+		}
 		this.db
 			.prepare(
-				'INSERT INTO notes (id, content, created_at, updated_at, starred, archived, tags, deleted_at) VALUES (?, ?, ?, ?, 0, 0, ?, NULL)',
+				'INSERT INTO notes (id, content, created_at, updated_at, starred, archived, tags, project_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)',
 			)
-			.run(id, '', now, now, JSON.stringify([]))
+			.run(id, content, now, now, starred ? 1 : 0, archived ? 1 : 0, JSON.stringify(tags), project_id)
 		const note = this.getNote(id)
 		if (!note) throw new Error('Failed to create note')
 		return note
@@ -230,19 +271,27 @@ export class StrataDatabase {
 		const next_starred = typeof patch.starred === 'boolean' ? patch.starred : current.starred
 		const next_archived = typeof patch.archived === 'boolean' ? patch.archived : current.archived
 		const next_tags = Array.isArray(patch.tags) ? patch.tags : current.tags
+		const next_project_id = Object.prototype.hasOwnProperty.call(patch, 'projectId')
+			? patch.projectId ?? null
+			: current.projectId
+		if (null !== next_project_id) {
+			const project_exists = this.getProject(next_project_id)
+			if (!project_exists) return null
+		}
 
 		// Only bump updated_at when content or tags actually change —
 		// star/archive toggles and no-op flushes should not reorder the list.
 		const has_real_change =
 			(typeof patch.content === 'string' && patch.content !== current.content) ||
-			(Array.isArray(patch.tags) && JSON.stringify(patch.tags) !== JSON.stringify(current.tags))
+			(Array.isArray(patch.tags) && JSON.stringify(patch.tags) !== JSON.stringify(current.tags)) ||
+			(Object.prototype.hasOwnProperty.call(patch, 'projectId') && patch.projectId !== current.projectId)
 		const next_updated = has_real_change ? new Date().toISOString() : current.updatedAt
 
 		this.db
 			.prepare(
-				'UPDATE notes SET content = ?, starred = ?, archived = ?, tags = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+				'UPDATE notes SET content = ?, starred = ?, archived = ?, tags = ?, project_id = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
 			)
-			.run(next_content, next_starred ? 1 : 0, next_archived ? 1 : 0, JSON.stringify(next_tags), next_updated, id)
+			.run(next_content, next_starred ? 1 : 0, next_archived ? 1 : 0, JSON.stringify(next_tags), next_project_id, next_updated, id)
 
 		// Rebuild wiki links when content changes
 		if (typeof patch.content === 'string' && patch.content !== current.content) {
@@ -286,6 +335,89 @@ export class StrataDatabase {
 
 	starNote(id: string, starred: boolean): Note | null {
 		return this.updateNote(id, { starred })
+	}
+
+	listProjects(): Project[] {
+		const rows = this.db.prepare('SELECT * FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE ASC').all() as DbProjectRow[]
+		return rows.map((row) => this.mapProject(row))
+	}
+
+	getProject(id: string): Project | null {
+		const row = this.db.prepare('SELECT * FROM projects WHERE id = ? LIMIT 1').get(id) as DbProjectRow | undefined
+		if (!row) return null
+		return this.mapProject(row)
+	}
+
+	getProjectByName(name: string): Project | null {
+		const normalized = name.trim()
+		if (!normalized) return null
+		const row = this.db.prepare('SELECT * FROM projects WHERE name = ? COLLATE NOCASE LIMIT 1').get(normalized) as DbProjectRow | undefined
+		if (!row) return null
+		return this.mapProject(row)
+	}
+
+	createProject(name: string): Project {
+		const normalized = name.trim().replace(/\s+/g, ' ')
+		if (!normalized) throw new Error('Project name is required')
+		const existing = this.getProjectByName(normalized)
+		if (existing) return existing
+		const now = new Date().toISOString()
+		const id = uuidv4()
+		const next_sort_order_row = this.db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort_order FROM projects').get() as { next_sort_order?: number } | undefined
+		const next_sort_order = next_sort_order_row?.next_sort_order ?? 0
+		this.db.prepare('INSERT INTO projects (id, name, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?)').run(id, normalized, now, now, next_sort_order)
+		const project = this.getProject(id)
+		if (!project) throw new Error('Failed to create project')
+		return project
+	}
+
+	reorderProjects(project_ids: string[]): Project[] {
+		const current_projects = this.listProjects()
+		const project_ids_set = new Set(current_projects.map((project) => project.id))
+		const ordered_ids: string[] = []
+		const seen = new Set<string>()
+
+		for (const project_id of project_ids) {
+			if (!project_ids_set.has(project_id) || seen.has(project_id)) continue
+			seen.add(project_id)
+			ordered_ids.push(project_id)
+		}
+
+		for (const project of current_projects) {
+			if (seen.has(project.id)) continue
+			ordered_ids.push(project.id)
+		}
+
+		const now = new Date().toISOString()
+		const transaction = this.db.transaction((ids: string[]) => {
+			const statement = this.db.prepare('UPDATE projects SET sort_order = ?, updated_at = ? WHERE id = ?')
+			ids.forEach((project_id, index) => {
+				statement.run(index, now, project_id)
+			})
+		})
+		transaction(ordered_ids)
+		return this.listProjects()
+	}
+
+	renameProject(id: string, name: string): Project | null {
+		const normalized = name.trim().replace(/\s+/g, ' ')
+		if (!normalized) return null
+		const current = this.getProject(id)
+		if (!current) return null
+		const duplicate = this.getProjectByName(normalized)
+		if (duplicate && duplicate.id !== id) return null
+		const result = this.db.prepare('UPDATE projects SET name = ?, updated_at = ? WHERE id = ?').run(normalized, new Date().toISOString(), id)
+		if (0 === result.changes) return null
+		return this.getProject(id)
+	}
+
+	deleteProject(id: string): boolean {
+		const transaction = this.db.transaction((project_id: string) => {
+			this.db.prepare('UPDATE notes SET project_id = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NULL').run(new Date().toISOString(), project_id)
+			const deleted = this.db.prepare('DELETE FROM projects WHERE id = ?').run(project_id)
+			return deleted.changes > 0
+		})
+		return transaction(id)
 	}
 
 	listTags(): Array<{ name: string; count: number }> {
@@ -428,13 +560,15 @@ export class StrataDatabase {
 		const wildcard = `%${query}%`
 		const rows = this.db
 			.prepare(
-				`SELECT * FROM notes
+				`SELECT n.*
+				 FROM notes n
+				 LEFT JOIN projects p ON p.id = n.project_id
 				 WHERE deleted_at IS NULL
-				 AND (content LIKE ? OR tags LIKE ?)
-				 ORDER BY updated_at DESC
+				 AND (content LIKE ? OR tags LIKE ? OR p.name LIKE ?)
+				 ORDER BY n.updated_at DESC
 				 LIMIT ?`,
 			)
-			.all(wildcard, wildcard, Math.max(1, Math.min(200, limit))) as DbNoteRow[]
+			.all(wildcard, wildcard, wildcard, Math.max(1, Math.min(200, limit))) as DbNoteRow[]
 		return rows.map((row) => this.mapNote(row))
 	}
 
@@ -456,14 +590,16 @@ export class StrataDatabase {
 		afterContent?: string | null
 		beforeTags?: string[] | null
 		afterTags?: string[] | null
+		beforeProjectId?: string | null
+		afterProjectId?: string | null
 		model?: string | null
 		promptExcerpt?: string | null
 	}): string {
 		const id = uuidv4()
 		const now = new Date().toISOString()
 		this.db.prepare(
-			`INSERT INTO ai_note_edits (id, note_id, thread_id, message_id, action, before_content, after_content, before_tags, after_tags, model, prompt_excerpt, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO ai_note_edits (id, note_id, thread_id, message_id, action, before_content, after_content, before_tags, after_tags, before_project_id, after_project_id, model, prompt_excerpt, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		).run(
 			id,
 			edit.noteId,
@@ -474,6 +610,8 @@ export class StrataDatabase {
 			edit.afterContent ?? null,
 			edit.beforeTags ? JSON.stringify(edit.beforeTags) : null,
 			edit.afterTags ? JSON.stringify(edit.afterTags) : null,
+			edit.beforeProjectId ?? null,
+			edit.afterProjectId ?? null,
 			edit.model ?? null,
 			edit.promptExcerpt ?? null,
 			now,
@@ -545,10 +683,14 @@ export class StrataDatabase {
 
 		// Restore previous content and tags
 		if ('update' === edit.action && edit.before_content !== null) {
-			this.updateNote(edit.note_id, {
+			const restore_patch: NoteUpdatePatch = {
 				content: edit.before_content,
 				tags: edit.before_tags ? (JSON.parse(edit.before_tags) as string[]) : undefined,
-			})
+			}
+			if (undefined !== edit.before_project_id) {
+				restore_patch.projectId = edit.before_project_id
+			}
+			this.updateNote(edit.note_id, restore_patch)
 		} else if ('create' === edit.action) {
 			// Soft-delete the created note
 			this.deleteNote(edit.note_id)
@@ -663,6 +805,8 @@ export class StrataDatabase {
 			afterContent: row.after_content,
 			beforeTags: row.before_tags ? (JSON.parse(row.before_tags) as string[]) : null,
 			afterTags: row.after_tags ? (JSON.parse(row.after_tags) as string[]) : null,
+			beforeProjectId: row.before_project_id,
+			afterProjectId: row.after_project_id,
 			model: row.model,
 			promptExcerpt: row.prompt_excerpt,
 			createdAt: row.created_at,

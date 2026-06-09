@@ -2,6 +2,8 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { Settings } from '../../shared/types'
 import type { HotkeysSettings } from '../../shared/hotkeys'
+import { HOME_TILE_ACTIONS } from '../../shared/homeTiles'
+import { SIDEBAR_SECTION_IDS } from '../../shared/sidebarLayout'
 import type { StrataDatabase } from '../db/index'
 import { IPC_CHANNELS } from '../../shared/ipc'
 
@@ -24,6 +26,21 @@ const hotkeys_schema: z.ZodType<HotkeysSettings> = z.object({
 	relatedNotes: z.string().max(40),
 	navigateBack: z.string().max(40),
 	navigateForward: z.string().max(40),
+})
+
+const home_tile_schema = z.object({
+	action: z.enum(HOME_TILE_ACTIONS),
+})
+
+const sidebar_layout_schema = z.object({
+	showSearch: z.boolean(),
+	sectionOrder: z.array(z.enum(SIDEBAR_SECTION_IDS)).max(4),
+	sectionVisibility: z.object({
+		tags: z.boolean(),
+		projects: z.boolean(),
+		pinned: z.boolean(),
+		notes: z.boolean(),
+	}),
 })
 
 const settings_patch_schema = z.object({
@@ -53,7 +70,10 @@ const settings_patch_schema = z.object({
 	aiPremiumFallbackThreshold: z.number().min(0).max(1).optional(),
 	aiModelCatalog: z.string().max(8192).optional(),
 	pinnedTags: z.array(z.string()).optional(),
+	pinnedNotes: z.array(z.string().uuid()).optional(),
 	hotkeys: hotkeys_schema.optional(),
+	homeTiles: z.array(home_tile_schema).max(3).optional(),
+	sidebarLayout: sidebar_layout_schema.optional(),
 })
 
 export const registerSettingsHandlers = (db: StrataDatabase, on_settings_set?: (settings: Settings) => void) => {

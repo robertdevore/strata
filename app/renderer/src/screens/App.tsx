@@ -10,6 +10,7 @@ import { RelatedNotesModal } from '@renderer/src/components/RelatedNotesModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
+import { normalize_home_tiles, type HomeTileAction } from '@shared/homeTiles'
 import { CircleChevronRightIcon, CirclePlusIcon } from '@renderer/src/components/icons'
 import type { HotkeysSettings } from '@shared/hotkeys'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
@@ -96,6 +97,89 @@ const applyThemeClass = (theme: 'dark' | 'light' | 'system') => {
 	document.body.classList.add('light' === theme ? 'theme-light' : 'theme-dark')
 }
 
+const isMarkdownFile = (name: string): boolean => name.toLowerCase().endsWith('.md')
+
+const isFileDrag = (dataTransfer: DataTransfer | null | undefined): boolean => {
+	if (!dataTransfer) return false
+	if (Array.from(dataTransfer.types ?? []).includes('Files')) return true
+	return Array.from(dataTransfer.items ?? []).some((item) => item.kind === 'file')
+}
+
+const readDirectoryEntries = async (entry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> => {
+	const reader = entry.createReader()
+	const entries: FileSystemEntry[] = []
+
+	// Chromium returns directory entries in batches, so keep reading until it yields an empty batch.
+	// This is the standard way to traverse folder drops in Electron/Chromium.
+	for (;;) {
+		const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+			reader.readEntries(resolve, reject)
+		})
+		if (0 === batch.length) break
+		entries.push(...batch)
+	}
+
+	return entries
+}
+
+const collectDroppedMarkdownImports = async (dataTransfer: DataTransfer): Promise<{
+	projectImports: Array<{ projectName: string; filePaths: string[] }>
+	looseMarkdownFiles: Array<File & { path?: string }>
+}> => {
+	const projectImports: Array<{ projectName: string; filePaths: string[] }> = []
+	const looseMarkdownFiles: Array<File & { path?: string }> = []
+	const items = Array.from(dataTransfer.items ?? [])
+
+	const walkEntry = async (entry: FileSystemEntry, project_name?: string): Promise<void> => {
+		if (entry.isFile) {
+			const file = await new Promise<File & { path?: string }>((resolve, reject) => {
+				(entry as FileSystemFileEntry).file(resolve, reject)
+			})
+			if (!isMarkdownFile(file.name)) return
+			if (project_name) {
+				const file_path = file.path
+				if (!file_path) return
+				const target = projectImports.find((item) => item.projectName === project_name)
+				if (target) {
+					target.filePaths.push(file_path)
+				} else {
+					projectImports.push({ projectName: project_name, filePaths: [file_path] })
+				}
+				return
+			}
+			looseMarkdownFiles.push(file)
+			return
+		}
+
+		if (entry.isDirectory) {
+			const directory = entry as FileSystemDirectoryEntry
+			const childEntries = await readDirectoryEntries(directory)
+			for (const child of childEntries) {
+				await walkEntry(child, project_name ?? directory.name)
+			}
+		}
+	}
+
+	for (const item of items) {
+		const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => FileSystemEntry | null }).webkitGetAsEntry?.()
+		if (!entry) continue
+		await walkEntry(entry)
+	}
+
+	if (0 === projectImports.length && 0 === looseMarkdownFiles.length) {
+		for (const file of Array.from(dataTransfer.files ?? [])) {
+			if (!isMarkdownFile(file.name)) continue
+			const file_with_path = file as File & { path?: string }
+			looseMarkdownFiles.push(file_with_path)
+		}
+	}
+
+	return {
+		projectImports,
+		looseMarkdownFiles,
+	}
+}
+
 export function App() {
 	const store = useAppStore()
 	const load = useAppStore((state) => state.load)
@@ -108,6 +192,7 @@ export function App() {
 	const [showTagsModal, setShowTagsModal] = useState(false)
 	const [relatedNotes, setRelatedNotes] = useState<Array<{ note: import('@shared/types').Note; reason: string; score: number }>>([])
 	const hotkeys: HotkeysSettings = useMemo(() => ({ ...DEFAULT_HOTKEYS, ...(store.settings.hotkeys ?? {}) }), [store.settings.hotkeys])
+	const homeTiles = useMemo(() => normalize_home_tiles(store.settings.homeTiles), [store.settings.homeTiles])
 	const clearUndoToast = useCallback(() => {
 		if (null !== undoTimeoutId) {
 			window.clearTimeout(undoTimeoutId)
@@ -132,7 +217,7 @@ export function App() {
 	const notes = store.filteredNotes()
 
 	const splitNoteIds = store.splitNoteIds
-	const pinnedNotes = useMemo(() => splitNoteIds.map((id) => {
+	const splitNotes = useMemo(() => splitNoteIds.map((id) => {
 		const note = store.notes.find((n) => n.id === id) ?? null
 		return {
 			id,
@@ -140,6 +225,27 @@ export function App() {
 			content: store.drafts[id] ?? note?.content ?? '',
 		}
 	}), [splitNoteIds, store.notes, store.drafts])
+	const pinnedNoteIds = useMemo(() => {
+		const note_ids = new Set(store.notes.map((note) => note.id))
+		const pinned = store.settings.pinnedNotes ?? []
+		return pinned.filter((id, index) => Boolean(id) && pinned.indexOf(id) === index && note_ids.has(id))
+	}, [store.notes, store.settings.pinnedNotes])
+	const sidebarPinnedNotes = useMemo(() => pinnedNoteIds.map((id) => {
+		const note = store.notes.find((n) => n.id === id) ?? null
+		return {
+			id,
+			note,
+			content: store.drafts[id] ?? note?.content ?? '',
+		}
+	}), [pinnedNoteIds, store.notes, store.drafts])
+	const projectNoteCounts = useMemo(() => {
+		const counts: Record<string, number> = {}
+		for (const note of store.notes) {
+			if (!note.projectId) continue
+			counts[note.projectId] = (counts[note.projectId] ?? 0) + 1
+		}
+		return counts
+	}, [store.notes])
 
 	const splitRatios = useMemo(() => {
 		if (store.splitRatios.length === splitNoteIds.length + 1) return store.splitRatios
@@ -181,6 +287,10 @@ export function App() {
 		if (store.selectedNoteId !== id) store.selectNote(id)
 		const deleted = await store.deleteSelected()
 		if (!deleted) return
+		const pinned_notes = store.settings.pinnedNotes ?? []
+		if (pinned_notes.includes(deleted.id)) {
+			await store.updateSettings({ pinnedNotes: pinned_notes.filter((note_id) => note_id !== deleted.id) })
+		}
 		if (null !== undoTimeoutId) {
 			window.clearTimeout(undoTimeoutId)
 		}
@@ -223,6 +333,28 @@ export function App() {
 		if ('open-tags-editor' === command) return window.dispatchEvent(new CustomEvent('strata:open-tags-editor'))
 		if ('copy-rich-text' === command) return window.dispatchEvent(new CustomEvent('strata:copy-rich-text'))
 	}, [onDelete, store])
+
+	const runHomeTileAction = useCallback((action: HomeTileAction) => {
+		if ('new_note' === action) {
+			void store.createNote()
+			return
+		}
+		if ('quick_open' === action) {
+			setPaletteMode('quick-open')
+			return
+		}
+		if ('open_tags' === action) {
+			setShowTagsModal(true)
+			return
+		}
+		if ('open_settings' === action) {
+			store.setShowSettings(true)
+			return
+		}
+		if ('toggle_sidebar' === action) {
+			setSidebarCollapsed((value) => !value)
+		}
+	}, [runCommand, store])
 
 	const startSidebarResize = (event: React.MouseEvent<HTMLDivElement>) => {
 		if (sidebarCollapsed) return
@@ -401,14 +533,18 @@ export function App() {
 
 	// Drag-and-drop .md file import
 	useEffect(() => {
-		const onDragOver = (event: DragEvent) => {
-			event.preventDefault()
-			event.stopPropagation()
-			if (event.dataTransfer) {
-				event.dataTransfer.dropEffect = 'copy'
+			const onDragOver = (event: DragEvent) => {
+				if (!isFileDrag(event.dataTransfer)) {
+					document.body.classList.remove('drag-over')
+					return
+				}
+				event.preventDefault()
+				event.stopPropagation()
+				if (event.dataTransfer) {
+					event.dataTransfer.dropEffect = 'copy'
+				}
+				document.body.classList.add('drag-over')
 			}
-			document.body.classList.add('drag-over')
-		}
 
 		const onDragLeave = (event: DragEvent) => {
 			event.preventDefault()
@@ -419,29 +555,44 @@ export function App() {
 			}
 		}
 
-		const onDrop = async (event: DragEvent) => {
-			event.preventDefault()
-			event.stopPropagation()
-			document.body.classList.remove('drag-over')
-
-			const files = event.dataTransfer?.files
-			if (!files || 0 === files.length) return
-
-			const file = files[0]
-			if (!file.name.endsWith('.md')) return
+			const onDrop = async (event: DragEvent) => {
+				if (!isFileDrag(event.dataTransfer)) {
+					document.body.classList.remove('drag-over')
+					return
+				}
+				event.preventDefault()
+				event.stopPropagation()
+				document.body.classList.remove('drag-over')
 
 			try {
-				const text = await file.text()
-				const firstLine = text.trimStart().split('\n')[0] || ''
-				const hasHeading = firstLine.startsWith('# ')
-				const title = hasHeading ? firstLine.slice(2).trim() : file.name.replace(/\.md$/i, '')
-				const content = hasHeading ? text : `# ${title}\n\n${text}`
+				const dataTransfer = event.dataTransfer
+				if (!dataTransfer) return
+				const { projectImports, looseMarkdownFiles } = await collectDroppedMarkdownImports(dataTransfer)
+				let opened_note_id: string | null = null
 
-				// Create note directly via API to avoid draft-system race conditions
-				const note = await window.strata.notes.create()
-				await window.strata.notes.update(note.id, { content })
+				for (const projectImport of projectImports) {
+					if (0 === projectImport.filePaths.length) continue
+					const result = await window.strata.projects.importFolder(projectImport)
+					if (!opened_note_id && result.notes[0]?.id) {
+						opened_note_id = result.notes[0].id
+					}
+				}
+
+				for (const file of looseMarkdownFiles) {
+					const text = await file.text()
+					const file_name = file.name ?? 'untitled.md'
+					const firstLine = text.trimStart().split('\n')[0] || ''
+					const hasHeading = firstLine.startsWith('# ')
+					const title = hasHeading ? firstLine.slice(2).trim() : file_name.replace(/\.md$/i, '')
+					const content = hasHeading ? text : `# ${title}\n\n${text}`
+					const note = await window.strata.notes.create({ content })
+					if (!opened_note_id) opened_note_id = note.id
+				}
+
 				await store.load()
-				store.openNoteInTab(note.id)
+				if (opened_note_id) {
+					store.openNoteInTab(opened_note_id)
+				}
 			} catch (err) {
 				console.error('Failed to import markdown file', err)
 			}
@@ -485,14 +636,17 @@ export function App() {
 			<div className="workspace-layout" style={{ gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 3px minmax(0, 1fr)` }}>
 				<Sidebar
 					notes={notes}
+					projects={store.projects}
 					selectedId={store.selectedNoteId}
 					activeFilter={store.activeFilter}
 					selectedTag={store.selectedTag}
 					searchQuery={store.searchQuery}
 					tags={store.tags}
-					showFiltersPanel={store.showFiltersPanel}
-					sidebarCollapsed={sidebarCollapsed}
-					pinnedTags={store.settings.pinnedTags ?? []}
+						showFiltersPanel={store.showFiltersPanel}
+						sidebarCollapsed={sidebarCollapsed}
+						sidebarLayout={store.settings.sidebarLayout}
+						pinnedTags={store.settings.pinnedTags ?? []}
+					pinnedNotes={sidebarPinnedNotes}
 					onSearchChange={store.setSearchQuery}
 					onSelect={async (id) => {
 						if (store.selectedNoteId && store.selectedNoteId !== id) await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
@@ -508,6 +662,7 @@ export function App() {
 					onStarToggle={(id) => void store.toggleStar(id)}
 					onArchiveToggle={(id) => void store.toggleArchive(id)}
 					onDelete={(id) => void onDelete(id)}
+					onSetNoteProject={(id, projectId) => void store.setProjectForNote(id, projectId)}
 					onPinTag={(tag) => {
 						const current = store.settings.pinnedTags ?? []
 						if (!current.includes(tag)) store.updateSettings({ pinnedTags: [...current, tag] })
@@ -517,6 +672,15 @@ export function App() {
 						store.updateSettings({ pinnedTags: current.filter((t) => t !== tag) })
 					}}
 					onReorderPinned={(tags) => store.updateSettings({ pinnedTags: tags })}
+					onPinNote={(id) => {
+						const current = store.settings.pinnedNotes ?? []
+						if (!current.includes(id)) store.updateSettings({ pinnedNotes: [...current, id] })
+					}}
+					onUnpinNote={(id) => {
+						const current = store.settings.pinnedNotes ?? []
+						store.updateSettings({ pinnedNotes: current.filter((note_id) => note_id !== id) })
+					}}
+					onReorderPinnedNotes={(ids) => store.updateSettings({ pinnedNotes: ids })}
 					undoDeleteTitle={undoDelete?.title ?? null}
 					onUndoDelete={() => void undoLastDelete()}
 					theme={store.settings.theme}
@@ -549,7 +713,7 @@ export function App() {
 								className="split-panes split-panes-grid"
 								style={{ gridTemplateColumns: `repeat(${store.splitGridColumns}, 1fr)` }}
 							>
-								{pinnedNotes.map((pinned) => (
+								{splitNotes.map((pinned) => (
 									<div className="split-pane" key={`pinned-${pinned.id}`}>
 										<EditorPane
 											note={pinned.note}
@@ -576,6 +740,8 @@ export function App() {
 											}}
 											onOpenSettings={() => store.setShowSettings(true)}
 											onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+											homeTiles={homeTiles}
+											onHomeTileAction={runHomeTileAction}
 										/>
 									</div>
 								))}
@@ -607,6 +773,8 @@ export function App() {
 					}}
 					onOpenSettings={() => store.setShowSettings(true)}
 					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+					homeTiles={homeTiles}
+					onHomeTileAction={runHomeTileAction}
 				/>
 								</div>
 							</div>
@@ -615,7 +783,7 @@ export function App() {
 								className="split-panes"
 								style={{ gridTemplateColumns: splitRatios.map((r, i) => i === splitRatios.length - 1 ? `${(r * 100).toFixed(1)}%` : `${(r * 100).toFixed(1)}% 3px`).join(' ') }}
 							>
-								{pinnedNotes.map((pinned, i) => (
+								{splitNotes.map((pinned, i) => (
 									<Fragment key={`pinned-${pinned.id}`}>
 										<div className="split-pane">
 											<EditorPane
@@ -641,9 +809,11 @@ export function App() {
 													window.strata.links.relatedNotes(pinned.id).then(setRelatedNotes).catch(() => setRelatedNotes([]))
 													setShowRelatedNotes(true)
 												}}
-												onOpenSettings={() => store.setShowSettings(true)}
-												onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
-											/>
+													onOpenSettings={() => store.setShowSettings(true)}
+													onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+													homeTiles={homeTiles}
+													onHomeTileAction={runHomeTileAction}
+												/>
 										</div>
 										<div
 											className="panel-resizer panel-resizer-split"
@@ -680,9 +850,11 @@ export function App() {
 							setShowRelatedNotes(true)
 						}
 					}}
-					onOpenSettings={() => store.setShowSettings(true)}
-					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
-				/>
+						onOpenSettings={() => store.setShowSettings(true)}
+						onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+						homeTiles={homeTiles}
+						onHomeTileAction={runHomeTileAction}
+					/>
 								</div>
 							</div>
 						)
@@ -714,6 +886,8 @@ export function App() {
 					}}
 					onOpenSettings={() => store.setShowSettings(true)}
 					onThemeToggle={() => void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })}
+					homeTiles={homeTiles}
+					onHomeTileAction={runHomeTileAction}
 				/>
 					)}
 				</div>
@@ -721,8 +895,13 @@ export function App() {
 			<SettingsModal
 				open={store.showSettings}
 				settings={store.settings}
+				projects={store.projects}
+				projectNoteCounts={projectNoteCounts}
 				onClose={() => store.setShowSettings(false)}
 				onUpdate={(patch) => void store.updateSettings(patch)}
+				onProjectsChanged={async () => {
+					await store.load()
+				}}
 				onCreateBackup={async () => {
 					const result = await window.strata.backups.createNow()
 					await store.updateSettings({ lastAutoBackupAt: result.createdAt })

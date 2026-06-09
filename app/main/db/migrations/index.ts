@@ -130,4 +130,42 @@ export const migrations: Migration[] = [
 			CREATE INDEX IF NOT EXISTS idx_route_logs_intent ON ai_route_logs (intent, created_at DESC);
 		`,
 	},
+	{
+		version: 7,
+		description: 'projects and note grouping',
+		upSql: `
+			CREATE TABLE IF NOT EXISTS projects (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			);
+
+			ALTER TABLE notes ADD COLUMN project_id TEXT NULL;
+			CREATE INDEX IF NOT EXISTS idx_notes_project_id ON notes (project_id);
+			CREATE INDEX IF NOT EXISTS idx_projects_name ON projects (name);
+		`,
+	},
+		{
+			version: 8,
+			description: 'ai edit project tracking',
+			upSql: `
+				ALTER TABLE ai_note_edits ADD COLUMN before_project_id TEXT;
+				ALTER TABLE ai_note_edits ADD COLUMN after_project_id TEXT;
+			`,
+		},
+		{
+			version: 9,
+			description: 'project ordering',
+			upSql: `
+				ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+				UPDATE projects
+				SET sort_order = (
+					SELECT COUNT(*)
+					FROM projects AS other
+					WHERE other.name COLLATE NOCASE < projects.name COLLATE NOCASE
+				);
+				CREATE INDEX IF NOT EXISTS idx_projects_sort_order ON projects (sort_order);
+			`,
+		},
 ]

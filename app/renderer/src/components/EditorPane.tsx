@@ -8,13 +8,14 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import ReactMarkdown from 'react-markdown'
 import { renderToStaticMarkup } from 'react-dom/server'
 import remarkGfm from 'remark-gfm'
-import TurndownService from 'turndown'
 import type { AiMessage, AiRouteLog, AiSearchResult, AiThreadSummary, Note } from '@shared/types'
+import { get_home_tile_option, type HomeTileAction, type HomeTileConfig } from '@shared/homeTiles'
 import { countWords, deriveNoteTitle, formatLastEdited } from '@renderer/src/domain/noteUtils'
+import { markdown_from_clipboard } from '@renderer/src/domain/markdownPaste'
 import { aiService } from '@renderer/src/services/aiService'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, ChatbotIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EarIcon, EyeIcon, FileDescriptionIcon, FileSearchIcon, FileTextAiIcon, MoonIcon, PrinterIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
+import { ArchiveIcon, ChatbotIcon, ChevronLeftIcon, ChevronRightIcon, CirclePlusIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EarIcon, EyeIcon, FileDescriptionIcon, FileSearchIcon, FileTextAiIcon, MenuIcon, MoonIcon, PrinterIcon, SearchIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
 import { ChatPanel } from './ChatPanel'
 import { PublishModal } from './PublishModal'
 
@@ -40,6 +41,8 @@ interface EditorPaneProps {
 	theme: 'dark' | 'light' | 'system'
 	onOpenSettings: () => void
 	onThemeToggle: () => void
+	homeTiles: HomeTileConfig[]
+	onHomeTileAction: (action: HomeTileAction) => void
 }
 
 interface ChatUsageSummary {
@@ -237,29 +240,6 @@ const copyRichTextToClipboard = async (markdown_content: string): Promise<void> 
 	await navigator.clipboard.writeText(markdown_content)
 }
 
-const turndown_service = new TurndownService({
-	headingStyle: 'atx',
-	codeBlockStyle: 'fenced',
-	bulletListMarker: '-',
-	emDelimiter: '*',
-})
-
-turndown_service.keep(['u'])
-
-const convertRichTextToMarkdown = (html_content: string): string => {
-	try {
-		return turndown_service.turndown(html_content).trimEnd()
-	} catch {
-		return ''
-	}
-}
-
-const normalize_pasted_list_newlines = (text: string): string => {
-	// Collapse blank lines that appear between consecutive list items
-	return text.replace(/\n\n(?=[-*+])/g, '\n')
-		.replace(/\n\n(?=\d+[.)])/g, '\n')
-}
-
 const listNewlineKeymap = Prec.highest(keymap.of([
 	{
 		key: 'Enter',
@@ -310,14 +290,8 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 		const html_content = event.clipboardData?.getData('text/html') ?? ''
 		const plain_text = event.clipboardData?.getData('text/plain') ?? ''
 
-		let insert_content = ''
-		if (html_content.trim()) {
-			const converted = convertRichTextToMarkdown(html_content)
-			if (!converted) return false
-			insert_content = converted
-		} else if (plain_text) {
-			insert_content = normalize_pasted_list_newlines(plain_text)
-		} else {
+		const insert_content = markdown_from_clipboard(html_content, plain_text)
+		if (!insert_content) {
 			return false
 		}
 
@@ -349,7 +323,7 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 })
 
 export function EditorPane(props: EditorPaneProps) {
-	const { note, notes, openTabIds, drafts, openAiModel, content, tags, saveState, lastSavedAt, sidebarCollapsed, theme, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes, onOpenSettings, onThemeToggle } = props
+	const { note, notes, openTabIds, drafts, openAiModel, content, tags, saveState, lastSavedAt, sidebarCollapsed, theme, onChangeDraft, onFlush, onToggleStar, onToggleArchive, onDelete, onSetTags, onOpenNoteFromChat, onShowRelatedNotes, onOpenSettings, onThemeToggle, homeTiles, onHomeTileAction } = props
 	const [showTagsEditor, setShowTagsEditor] = useState(false)
 	const [showPreview, setShowPreview] = useState(false)
 	const [showChatPanel, setShowChatPanel] = useState(false)
@@ -359,6 +333,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [replaceQuery, setReplaceQuery] = useState('')
 	const [findReplaceStatus, setFindReplaceStatus] = useState('')
 	const [previewWidth, setPreviewWidth] = useState<number | null>(null)
+	const [isPreviewResizing, setIsPreviewResizing] = useState(false)
 	const [chatThreads, setChatThreads] = useState<AiThreadSummary[]>([])
 	const [chatThreadId, setChatThreadId] = useState<string | null>(null)
 	const [chatMessages, setChatMessages] = useState<AiMessage[]>([])
@@ -388,6 +363,7 @@ export function EditorPane(props: EditorPaneProps) {
 	const [ttsRate, setTtsRate] = useState(1)
 	const [ttsVoice, setTtsVoice] = useState<string | null>(null)
 	const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([])
+	const [footerActionsCollapsed, setFooterActionsCollapsed] = useState(true)
 	const ttsUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 	const docStats = useMemo(() => {
 		const words = countWords(content)
@@ -417,6 +393,15 @@ export function EditorPane(props: EditorPaneProps) {
 	const contentRef = useRef(content)
 	contentRef.current = content
 	const isLightTheme = document.body.classList.contains('theme-light')
+	const resolvedHomeTiles = useMemo(() => homeTiles.slice(0, 3), [homeTiles])
+
+	const renderHomeTileIcon = (action: HomeTileAction) => {
+		if ('new_note' === action) return <CirclePlusIcon />
+		if ('quick_open' === action) return <SearchIcon />
+		if ('open_tags' === action) return <TagIcon />
+		if ('toggle_sidebar' === action) return <MenuIcon />
+		return <SettingsIcon />
+	}
 
 	// Derive current title from full content (with H1)
 	const currentTitle = deriveNoteTitle(content)
@@ -823,6 +808,15 @@ export function EditorPane(props: EditorPaneProps) {
 		? (chatThreads.find((entry) => entry.thread.id === chatThreadId)?.thread.model ?? '')
 		: ''
 	const showSidePanel = showPreview || showChatPanel
+	const editorBodyColumns = !showSidePanel
+		? 'minmax(0, 1fr)'
+		: showChatPanel
+			? (null === previewWidth
+				? 'minmax(0, 1fr) 3px minmax(0, 1fr)'
+				: `minmax(0, calc(100% - ${previewWidth}px - 3px)) 3px minmax(0, ${previewWidth}px)`)
+			: (null === previewWidth
+				? 'minmax(0, 0px) 3px minmax(0, 1fr)'
+				: `minmax(0, calc(100% - ${previewWidth}px - 3px)) 3px minmax(0, ${previewWidth}px)`)
 
 	const stopAssistantTypingAnimation = () => {
 		if (chatTypingIntervalRef.current) {
@@ -934,19 +928,25 @@ export function EditorPane(props: EditorPaneProps) {
 	const startPreviewResize = (event: React.MouseEvent<HTMLDivElement>) => {
 		event.preventDefault()
 		if (!editorBodyRef.current) return
+		setIsPreviewResizing(true)
 		const bounds = editorBodyRef.current.getBoundingClientRect()
 		const start_x = event.clientX
-		const start_width = null !== previewWidth ? previewWidth : Math.max(280, (bounds.width - 3) / 2)
+		const start_width = null !== previewWidth
+			? previewWidth
+			: showChatPanel
+				? Math.max(280, (bounds.width - 3) / 2)
+				: Math.max(0, bounds.width - 3)
 
 		const onMouseMove = (move_event: MouseEvent) => {
 			const next_width = start_width - (move_event.clientX - start_x)
-			const max_width = Math.max(320, bounds.width - 280)
-			setPreviewWidth(Math.min(max_width, Math.max(280, next_width)))
+			const max_width = Math.max(0, bounds.width - 3)
+			setPreviewWidth(Math.min(max_width, Math.max(0, next_width)))
 		}
 
 		const onMouseUp = () => {
 			window.removeEventListener('mousemove', onMouseMove)
 			window.removeEventListener('mouseup', onMouseUp)
+			setIsPreviewResizing(false)
 		}
 
 		window.addEventListener('mousemove', onMouseMove)
@@ -1050,8 +1050,33 @@ export function EditorPane(props: EditorPaneProps) {
 
 	if (!note) {
 		return (
-			<section className="editor empty-editor">
-				<p>Select a note or create a new one.</p>
+			<section className="editor empty-editor home-screen">
+				<div className="home-screen-card">
+					<p className="home-screen-kicker">Welcome to Strata</p>
+					<h2>Start with the next useful thing.</h2>
+					<p className="home-screen-copy">
+						Create a note, find something you already saved, or tune the workspace before you dive in.
+					</p>
+					<div className="home-tile-grid">
+						{resolvedHomeTiles.map((tile) => {
+							const option = get_home_tile_option(tile.action)
+							return (
+								<button
+									key={tile.action}
+									type="button"
+									className="home-tile"
+									onClick={() => onHomeTileAction(tile.action)}
+								>
+									<span className="home-tile-icon">{renderHomeTileIcon(tile.action)}</span>
+									<span className="home-tile-body">
+										<span className="home-tile-title">{option.label}</span>
+										<span className="home-tile-description">{option.description}</span>
+									</span>
+								</button>
+							)
+						})}
+					</div>
+				</div>
 			</section>
 		)
 	}
@@ -1402,7 +1427,13 @@ export function EditorPane(props: EditorPaneProps) {
 					<button className={`icon-button ${showPreview ? 'chip-active' : ''}`} onClick={() => {
 						setShowPreview((value) => {
 							const next = !value
-							if (next) setShowChatPanel(false)
+							setIsPreviewResizing(false)
+							if (next) {
+								setShowChatPanel(false)
+								setPreviewWidth(null)
+							} else {
+								setPreviewWidth(null)
+							}
 							return next
 						})
 					}} title="Preview"><EyeIcon /></button>
@@ -1416,7 +1447,7 @@ export function EditorPane(props: EditorPaneProps) {
 				</div>
 				{copyToast && <span className="copy-toast">Copied!</span>}
 			</header>
-			<div className="editor-body" ref={editorBodyRef} style={{ gridTemplateColumns: showSidePanel ? (null === previewWidth ? 'minmax(0, 1fr) 3px minmax(0, 1fr)' : `minmax(0, 1fr) 3px minmax(280px, ${previewWidth}px)`) : 'minmax(0, 1fr)' }}
+			<div className={`editor-body ${isPreviewResizing ? 'editor-body-resizing' : ''}`} ref={editorBodyRef} style={{ gridTemplateColumns: editorBodyColumns }}
 				onClick={(event) => {
 					// Handle wiki link clicks in the CodeMirror editor
 					const view = editorViewRef.current
@@ -1738,25 +1769,37 @@ export function EditorPane(props: EditorPaneProps) {
 				)}
 				<button className="icon-button" onClick={() => setShowDocStats(true)} title="Document Statistics"><FileDescriptionIcon /></button>
 				</span>
-				<div className="editor-footer-actions">
-					<button className={`icon-button ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
-						setFindReplaceStatus('')
-						setShowFindReplace(true)
-					}} title="Find and Replace"><FileSearchIcon /></button>
-					<button className="icon-button" onClick={() => setShowPublish(true)} title="Export / Publish Note"><UploadIcon /></button>
-					<button className="icon-button" onClick={onShowRelatedNotes} title="Related Notes"><CirclesRelationIcon /></button>
-					<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
-					<button className="icon-button" onClick={openTtsModal} title="Listen to Note"><EarIcon /></button>
-					<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
-					<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
-					<button className="icon-button" onClick={async () => {
-						if (!note) return
-						try {
-							const edits = await window.strata.ai.listEdits(note.id)
-							setAiEdits(edits)
-							setShowAiHistory(true)
-						} catch { setAiEdits([]); setShowAiHistory(true) }
-					}} title="AI Edit History"><FileTextAiIcon /></button>
+				<div className={`editor-footer-actions ${footerActionsCollapsed ? 'editor-footer-actions-collapsed' : ''}`}>
+					{!footerActionsCollapsed && (
+						<>
+							<button className={`icon-button ${showFindReplace ? 'chip-active' : ''}`} onClick={() => {
+								setFindReplaceStatus('')
+								setShowFindReplace(true)
+							}} title="Find and Replace"><FileSearchIcon /></button>
+							<button className="icon-button" onClick={() => setShowPublish(true)} title="Export / Publish Note"><UploadIcon /></button>
+							<button className="icon-button" onClick={onShowRelatedNotes} title="Related Notes"><CirclesRelationIcon /></button>
+							<button className="icon-button" onClick={() => void printNote()} title="Print Note"><PrinterIcon /></button>
+							<button className="icon-button" onClick={openTtsModal} title="Listen to Note"><EarIcon /></button>
+							<button className="icon-button" onClick={() => onToggleArchive(note.id)} title="Toggle Archive"><ArchiveIcon /></button>
+							<button className="icon-button" onClick={() => onDelete(note.id)} title="Delete Note"><TrashIcon /></button>
+							<button className="icon-button" onClick={async () => {
+								if (!note) return
+								try {
+									const edits = await window.strata.ai.listEdits(note.id)
+									setAiEdits(edits)
+									setShowAiHistory(true)
+								} catch { setAiEdits([]); setShowAiHistory(true) }
+							}} title="AI Edit History"><FileTextAiIcon /></button>
+						</>
+					)}
+					<button
+						className="icon-button editor-footer-toggle"
+						onClick={() => setFooterActionsCollapsed((value) => !value)}
+						title={footerActionsCollapsed ? 'Open note actions' : 'Close note actions'}
+						aria-label={footerActionsCollapsed ? 'Open note actions' : 'Close note actions'}
+					>
+						{footerActionsCollapsed ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+					</button>
 				</div>
 			</footer>
 			{showFindReplace && (

@@ -11,6 +11,7 @@ const notes: Note[] = [
 		starred: false,
 		archived: false,
 		tags: ['work'],
+		projectId: null,
 		deletedAt: null,
 	},
 	{
@@ -21,6 +22,7 @@ const notes: Note[] = [
 		starred: true,
 		archived: true,
 		tags: ['ideas'],
+		projectId: null,
 		deletedAt: null,
 	},
 	{
@@ -31,6 +33,7 @@ const notes: Note[] = [
 		starred: true,
 		archived: false,
 		tags: [],
+		projectId: null,
 		deletedAt: null,
 	},
 ]

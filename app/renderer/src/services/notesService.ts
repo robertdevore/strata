@@ -10,6 +10,16 @@ export const notesService = {
 	create(): Promise<Note> {
 		return window.strata.notes.create()
 	},
+	createWithPayload(payload: {
+		content?: string
+		tags?: string[]
+		starred?: boolean
+		archived?: boolean
+		projectId?: string | null
+		projectName?: string
+	}): Promise<Note> {
+		return window.strata.notes.create(payload)
+	},
 	update(id: string, patch: NoteUpdatePatch): Promise<Note | null> {
 		return window.strata.notes.update(id, patch)
 	},

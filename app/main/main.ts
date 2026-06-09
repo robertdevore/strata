@@ -12,6 +12,7 @@ import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerBackupHandlers } from './ipc/backupHandlers'
 import { registerLinksHandlers } from './ipc/linksHandlers'
 import { registerPublishHandlers } from './ipc/publishHandlers'
+import { registerProjectsHandlers } from './ipc/projectsHandlers'
 import { startNotesApiServer } from './api/notesApiServer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -246,6 +247,7 @@ app.whenReady().then(async () => {
 	registerBackupHandlers(backup_manager)
 	registerLinksHandlers(db)
 	registerPublishHandlers()
+	registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
 	backup_manager.start()
 
 	try {

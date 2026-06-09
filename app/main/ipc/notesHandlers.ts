@@ -9,6 +9,7 @@ const list_schema = z
 		starred: z.boolean().optional(),
 		archived: z.boolean().optional(),
 		tag: z.string().optional(),
+		projectId: z.string().uuid().optional(),
 		includeDeleted: z.boolean().optional(),
 	})
 	.optional()
@@ -22,8 +23,18 @@ const update_schema = z.object({
 		starred: z.boolean().optional(),
 		archived: z.boolean().optional(),
 		tags: z.array(z.string()).optional(),
+		projectId: z.string().uuid().nullable().optional(),
 	}),
 })
+
+const create_schema = z.object({
+	content: z.string().optional(),
+	starred: z.boolean().optional(),
+	archived: z.boolean().optional(),
+	tags: z.array(z.string()).optional(),
+	projectId: z.string().uuid().nullable().optional(),
+	projectName: z.string().trim().min(1).max(120).optional(),
+}).optional()
 
 const archive_schema = z.object({ id: z.string().uuid(), archived: z.boolean() })
 const star_schema = z.object({ id: z.string().uuid(), starred: z.boolean() })
@@ -39,11 +50,42 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
 		return db.getNote(id)
 	})
 
-	ipcMain.handle(IPC_CHANNELS.notesCreate, () => db.createNote())
+	ipcMain.handle(IPC_CHANNELS.notesCreate, (_event, payload) => {
+		const parsed = create_schema.parse(payload)
+		let project_id: string | null = null
+		if (parsed?.projectName) {
+			project_id = db.createProject(parsed.projectName).id
+		} else if ('string' === typeof parsed?.projectId) {
+			const project = db.getProject(parsed.projectId)
+			if (project) project_id = project.id
+		} else if (null === parsed?.projectId) {
+			project_id = null
+		}
+		return db.createNote({
+			content: parsed?.content,
+			starred: parsed?.starred,
+			archived: parsed?.archived,
+			tags: parsed?.tags,
+			projectId: project_id,
+		})
+	})
 
 	ipcMain.handle(IPC_CHANNELS.notesUpdate, (_event, payload) => {
 		const { id, patch } = update_schema.parse(payload)
-		return db.updateNote(id, patch)
+		let project_id: string | null | undefined = undefined
+		if (Object.prototype.hasOwnProperty.call(patch, 'projectId')) {
+			if (null === patch.projectId) {
+				project_id = null
+			} else if ('string' === typeof patch.projectId) {
+				const project = db.getProject(patch.projectId)
+				if (!project) return null
+				project_id = project.id
+			}
+		}
+		return db.updateNote(id, {
+			...patch,
+			...(undefined !== project_id ? { projectId: project_id } : {}),
+		})
 	})
 
 	ipcMain.handle(IPC_CHANNELS.notesDelete, (_event, payload) => {

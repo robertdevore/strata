@@ -34,6 +34,7 @@ const SYSTEM_PROMPT = [
 	'OPEN NOTES CONTEXT: If the user has notes open in tabs, they are listed below. Read through ALL open notes first before responding to requests involving synthesis, review, or analysis of notes. The open notes are the most likely subject of the conversation.',
 	'',
 	'TAG SEARCH: When the user mentions a tag (e.g., "notes tagged review", "my dev notes", "security notes"), use search_notes_by_tag with that tag name to find the relevant notes before responding. Do not ask for note titles — search for them yourself using the tools available.',
+	'PROJECT SEARCH: When the user mentions a project or category, use list_projects to find the project first, then use search_notes_by_project to gather the notes in that project before responding.',
 	'---',
 ].join('\n')
 
