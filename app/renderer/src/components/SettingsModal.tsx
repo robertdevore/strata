@@ -347,7 +347,6 @@ export function SettingsModal({
 									const option = get_home_tile_option(tile.action)
 									return (
 										<label key={`home-tile-${index}`} className="home-settings-card">
-											<span className="home-settings-card-index">Tile {index + 1}</span>
 											<select value={tile.action} onChange={(event) => update_home_tile(index, event.target.value as HomeTileAction)}>
 												{HOME_TILE_OPTIONS.map((choice) => (
 													<option key={choice.action} value={choice.action}>{choice.label}</option>
