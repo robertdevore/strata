@@ -34,6 +34,28 @@ const collect_values = (value: string, previous: string[] = []): string[] => {
 	return previous
 }
 
+const normalize_project_name = (value: string): string => value.trim().replace(/\s+/g, ' ')
+
+const resolve_project_id = async (
+	client: StrataApiClient,
+	project_id?: string,
+	project_name?: string,
+): Promise<string | null> => {
+	if (project_id) return project_id
+	if (!project_name) return null
+	const projects = await client.listProjects()
+	const normalized = normalize_project_name(project_name).toLowerCase()
+	const match = projects.find((project) => project.name.toLowerCase() === normalized)
+	if (!match) {
+		throw new CliError({
+			message: `Project not found: ${project_name}`,
+			exitCode: ExitCode.ValidationError,
+			code: 'PROJECT_NOT_FOUND',
+		})
+	}
+	return match.id
+}
+
 export const register_notes_commands = (
 	program: Command,
 	get_context: (command: Command) => RuntimeContext,
@@ -45,6 +67,8 @@ export const register_notes_commands = (
 		.description('List notes with optional filters.')
 		.option('--query <query>', 'Search query')
 		.option('--tag <tag>', 'Filter by tag')
+		.option('--project <name>', 'Filter by project name')
+		.option('--project-id <id>', 'Filter by project ID')
 		.option('--starred', 'Show only starred notes')
 		.option('--archived <bool>', 'Filter archived true|false')
 		.option('--include-deleted', 'Include soft-deleted notes')
@@ -52,6 +76,8 @@ export const register_notes_commands = (
 		.action(async function (command_options: {
 			query?: string
 			tag?: string
+			project?: string
+			projectId?: string
 			starred?: boolean
 			archived?: string
 			includeDeleted?: boolean
@@ -59,9 +85,23 @@ export const register_notes_commands = (
 		}) {
 			const { options, client } = get_context(this)
 			const limit = Math.max(1, Math.min(500, Number.parseInt(command_options.limit, 10) || 50))
+			const projects = command_options.project ? await client.listProjects() : []
+			const project_id = command_options.projectId
+				? command_options.projectId
+				: (command_options.project
+					? projects.find((project) => project.name.toLowerCase() === normalize_project_name(command_options.project ?? '').toLowerCase())?.id
+					: undefined)
+			if (command_options.project && !project_id) {
+				throw new CliError({
+					message: `Project not found: ${command_options.project}`,
+					exitCode: ExitCode.ValidationError,
+					code: 'PROJECT_NOT_FOUND',
+				})
+			}
 			const filters = notes_filter_schema.parse({
 				query: command_options.query,
 				tag: command_options.tag,
+				projectId: project_id,
 				starred: command_options.starred ? true : undefined,
 				archived: parse_optional_boolean(command_options.archived),
 				includeDeleted: command_options.includeDeleted,
@@ -79,13 +119,15 @@ export const register_notes_commands = (
 				notes: result,
 			}
 			if ('pretty' === options.outputMode && !options.quiet) {
+				const project_names = new Map((await client.listProjects()).map((project) => [project.id, project.name]))
 				const rows = result.map((note) => [
 					note.id.slice(0, 8),
 					note.updatedAt,
+					note.projectId ? (project_names.get(note.projectId) ?? note.projectId.slice(0, 8)) : '',
 					note.tags.join(','),
 					derive_title_from_markdown(note.content),
 				])
-				print_success(options, data, { prettyText: format_table(['ID', 'Updated', 'Tags', 'Title'], rows) })
+				print_success(options, data, { prettyText: format_table(['ID', 'Updated', 'Project', 'Tags', 'Title'], rows) })
 				return
 			}
 			print_success(options, data)
@@ -117,6 +159,8 @@ export const register_notes_commands = (
 		.option('--tag <tag>', 'Tag to apply (repeat)', collect_values, [])
 		.option('--starred', 'Set note starred')
 		.option('--archived', 'Set note archived')
+		.option('--project <name>', 'Attach note to an existing project by name')
+		.option('--project-id <id>', 'Attach note to a project by ID')
 		.action(async function (command_options: {
 			content?: string
 			file?: string
@@ -124,6 +168,8 @@ export const register_notes_commands = (
 			tag: string[]
 			starred?: boolean
 			archived?: boolean
+			project?: string
+			projectId?: string
 		}) {
 			const { options, client } = get_context(this)
 			const content = await read_content_input({
@@ -131,11 +177,13 @@ export const register_notes_commands = (
 				file: command_options.file,
 				stdin: command_options.stdin,
 			})
+			const project_id = await resolve_project_id(client, command_options.projectId, command_options.project)
 			const payload = note_create_patch_schema.parse({
 				content,
 				tags: normalize_tags(command_options.tag || []),
 				starred: Boolean(command_options.starred),
 				archived: Boolean(command_options.archived),
+				projectId: project_id,
 			})
 
 			if (options.dryRun) {
@@ -167,6 +215,9 @@ export const register_notes_commands = (
 		.option('--tag <tag>', 'Set tags (repeat for full set)', collect_values, [])
 		.option('--starred <bool>', 'Set starred true|false')
 		.option('--archived <bool>', 'Set archived true|false')
+		.option('--project <name>', 'Move note to an existing project by name')
+		.option('--project-id <id>', 'Move note to a project by ID')
+		.option('--clear-project', 'Remove note from its project')
 		.action(async function (note_id: string, command_options: {
 			content?: string
 			file?: string
@@ -175,6 +226,9 @@ export const register_notes_commands = (
 			tag: string[]
 			starred?: string
 			archived?: string
+			project?: string
+			projectId?: string
+			clearProject?: boolean
 		}) {
 			const { options, client } = get_context(this)
 			note_id_schema.parse(note_id)
@@ -193,12 +247,16 @@ export const register_notes_commands = (
 				? append_markdown(current_note.content, command_options.append)
 				: content_from_source
 
+			const next_project_id = command_options.clearProject
+				? null
+				: await resolve_project_id(client, command_options.projectId, command_options.project)
 			const has_tags = (command_options.tag || []).length > 0
 			const payload = note_update_patch_schema.parse({
 				content: next_content,
 				tags: has_tags ? normalize_tags(command_options.tag || []) : undefined,
 				starred: parse_optional_boolean(command_options.starred),
 				archived: parse_optional_boolean(command_options.archived),
+				projectId: command_options.clearProject || command_options.project || command_options.projectId ? next_project_id : undefined,
 			})
 
 			if (0 === Object.keys(payload).length) {
@@ -217,6 +275,8 @@ export const register_notes_commands = (
 				newLength: (payload.content ?? current_note.content).length,
 				oldTags: current_note.tags,
 				newTags: payload.tags ?? current_note.tags,
+				oldProject: current_note.projectId,
+				newProject: payload.projectId ?? current_note.projectId,
 				oldPreview: truncate_preview(current_note.content),
 				newPreview: truncate_preview(payload.content ?? current_note.content),
 			}

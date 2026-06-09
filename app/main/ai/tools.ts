@@ -48,6 +48,89 @@ export const AI_TOOLS: AiToolDefinition[] = [
 	},
 	{
 		type: 'function',
+		name: 'list_projects',
+		description: 'List all projects for organization and categorization.',
+		parameters: {
+			type: 'object',
+			properties: {},
+		},
+	},
+	{
+		type: 'function',
+		name: 'get_project',
+		description: 'Get a project by id or by exact project name.',
+		parameters: {
+			type: 'object',
+			properties: {
+				project_id: { type: 'string' },
+				project_name: { type: 'string' },
+			},
+		},
+	},
+	{
+		type: 'function',
+		name: 'search_notes_by_project',
+		description: 'List notes that belong to a specific project or category.',
+		parameters: {
+			type: 'object',
+			properties: {
+				project_id: { type: 'string' },
+				project_name: { type: 'string' },
+				limit: { type: 'number', minimum: 1, maximum: 200 },
+			},
+		},
+	},
+	{
+		type: 'function',
+		name: 'create_project',
+		description: 'Create a new project/category.',
+		parameters: {
+			type: 'object',
+			properties: {
+				name: { type: 'string' },
+			},
+			required: ['name'],
+		},
+	},
+	{
+		type: 'function',
+		name: 'update_project',
+		description: 'Rename an existing project.',
+		parameters: {
+			type: 'object',
+			properties: {
+				project_id: { type: 'string' },
+				project_name: { type: 'string' },
+				name: { type: 'string' },
+			},
+		},
+	},
+	{
+		type: 'function',
+		name: 'delete_project',
+		description: 'Delete a project and unassign its notes.',
+		parameters: {
+			type: 'object',
+			properties: {
+				project_id: { type: 'string' },
+			},
+			required: ['project_id'],
+		},
+	},
+	{
+		type: 'function',
+		name: 'reorder_projects',
+		description: 'Reorder projects by supplying the desired project id sequence.',
+		parameters: {
+			type: 'object',
+			properties: {
+				project_ids: { type: 'array', items: { type: 'string' } },
+			},
+			required: ['project_ids'],
+		},
+	},
+	{
+		type: 'function',
 		name: 'get_note',
 		description: 'Get one note by note id for deep analysis.',
 		parameters: {
@@ -82,6 +165,8 @@ export const AI_TOOLS: AiToolDefinition[] = [
 				tags: { type: 'array', items: { type: 'string' } },
 				starred: { type: 'boolean' },
 				archived: { type: 'boolean' },
+				project_id: { type: 'string' },
+				project_name: { type: 'string' },
 			},
 		},
 	},
@@ -98,6 +183,8 @@ export const AI_TOOLS: AiToolDefinition[] = [
 				tags: { type: 'array', items: { type: 'string' } },
 				starred: { type: 'boolean' },
 				archived: { type: 'boolean' },
+				project_id: { type: 'string' },
+				project_name: { type: 'string' },
 			},
 			required: ['note_id'],
 		},
@@ -115,6 +202,8 @@ export const AI_TOOLS: AiToolDefinition[] = [
 				tags: { type: 'array', items: { type: 'string' } },
 				starred: { type: 'boolean' },
 				archived: { type: 'boolean' },
+				project_id: { type: 'string' },
+				project_name: { type: 'string' },
 			},
 			required: ['title'],
 		},
@@ -197,6 +286,39 @@ const derive_note_title = (content: string): string => {
 
 const normalize_note_title = (title: string): string => title.replace(/\s+/g, ' ').trim().toLowerCase()
 
+const normalize_project_name = (name: string): string => name.replace(/\s+/g, ' ').trim().toLowerCase()
+
+const resolve_project = (
+	db: StrataDatabase,
+	project_id?: string,
+	project_name?: string,
+): { project: ReturnType<StrataDatabase['getProject']> } => {
+	if (project_id) {
+		return { project: db.getProject(project_id) }
+	}
+	if (project_name && project_name.trim()) {
+		const target = normalize_project_name(project_name)
+		const project = db.listProjects().find((item) => normalize_project_name(item.name) === target) ?? null
+		return { project }
+	}
+	return { project: null }
+}
+
+const resolve_project_for_write = (
+	db: StrataDatabase,
+	project_id?: string,
+	project_name?: string,
+): { project: ReturnType<StrataDatabase['getProject']>; error: string | null } => {
+	if (project_id) {
+		const project = db.getProject(project_id)
+		return project ? { project, error: null } : { project: null, error: 'project not found' }
+	}
+	if (project_name && project_name.trim()) {
+		return { project: db.createProject(project_name), error: null }
+	}
+	return { project: null, error: null }
+}
+
 const format_title_matches = (items: Array<{ note: Note; title: string }>): Array<{ id: string; title: string; updatedAt: string }> => {
 	return items
 		.slice(0, 10)
@@ -239,13 +361,14 @@ const resolve_note_by_title = (
 }
 
 const summarize_notes = (notes: ReturnType<StrataDatabase['aiListNotes']>) => {
-	return notes.map((note: { id: string; content: string; updatedAt: string; starred: boolean; archived: boolean; tags: string[] }) => ({
+	return notes.map((note: { id: string; content: string; updatedAt: string; starred: boolean; archived: boolean; tags: string[]; projectId: string | null }) => ({
 		id: note.id,
 		title: derive_note_title(note.content),
 		updatedAt: note.updatedAt,
 		starred: note.starred,
 		archived: note.archived,
 		tags: note.tags,
+		projectId: note.projectId,
 		excerpt: note.content.slice(0, 500),
 	}))
 }
@@ -290,6 +413,88 @@ export const execute_tool_call = (
 		}
 	}
 
+	if ('list_projects' === tool_name) {
+		return {
+			output: JSON.stringify({ projects: db.listProjects() }),
+			notesChanged: false,
+		}
+	}
+
+	if ('get_project' === tool_name) {
+		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
+		const project_name = 'string' === typeof args.project_name ? args.project_name : ''
+		const resolved = resolve_project(db, project_id, project_name)
+		if (!resolved.project) {
+			return { output: JSON.stringify({ project: null }), notesChanged: false }
+		}
+		return {
+			output: JSON.stringify({
+				project: resolved.project,
+				notes: summarize_notes(db.listNotes({ projectId: resolved.project.id, includeDeleted: false })),
+			}),
+			notesChanged: false,
+		}
+	}
+
+	if ('search_notes_by_project' === tool_name) {
+		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
+		const project_name = 'string' === typeof args.project_name ? args.project_name : ''
+		const limit = 'number' === typeof args.limit ? args.limit : 50
+		const resolved = resolve_project(db, project_id, project_name)
+		if (!resolved.project) {
+			return { output: JSON.stringify({ project: null, notes: [] }), notesChanged: false }
+		}
+		const matched = db.listNotes({ projectId: resolved.project.id, includeDeleted: false }).slice(0, Math.max(1, Math.min(200, limit)))
+		return {
+			output: JSON.stringify({ project: resolved.project, notes: summarize_notes(matched) }),
+			notesChanged: false,
+		}
+	}
+
+	if ('create_project' === tool_name) {
+		const name = 'string' === typeof args.name ? args.name.trim() : ''
+		if (!name) return { output: JSON.stringify({ error: 'name is required', project: null }), notesChanged: false }
+		const project = db.createProject(name)
+		return {
+			output: JSON.stringify({ project }),
+			notesChanged: false,
+		}
+	}
+
+	if ('update_project' === tool_name) {
+		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
+		const project_name = 'string' === typeof args.project_name ? args.project_name : ''
+		const name = 'string' === typeof args.name ? args.name.trim() : ''
+		const project = resolve_project(db, project_id, project_name).project
+		if (!project) return { output: JSON.stringify({ error: 'project not found', project: null }), notesChanged: false }
+		if (!name) return { output: JSON.stringify({ error: 'name is required', project: null }), notesChanged: false }
+		const updated = db.renameProject(project.id, name)
+		return {
+			output: JSON.stringify({ project: updated }),
+			notesChanged: Boolean(updated),
+		}
+	}
+
+	if ('delete_project' === tool_name) {
+		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
+		if (!project_id) return { output: JSON.stringify({ error: 'project_id is required' }), notesChanged: false }
+		const deleted = db.deleteProject(project_id)
+		return {
+			output: JSON.stringify({ deleted }),
+			notesChanged: deleted,
+		}
+	}
+
+	if ('reorder_projects' === tool_name) {
+		const project_ids = Array.isArray(args.project_ids) ? args.project_ids.filter((id): id is string => 'string' === typeof id) : []
+		if (0 === project_ids.length) return { output: JSON.stringify({ error: 'project_ids is required', projects: [] }), notesChanged: false }
+		const projects = db.reorderProjects(project_ids)
+		return {
+			output: JSON.stringify({ projects }),
+			notesChanged: false,
+		}
+	}
+
 	if ('get_note' === tool_name) {
 		const note_id = 'string' === typeof args.note_id ? args.note_id : ''
 		const include_deleted = true === args.include_deleted
@@ -330,13 +535,25 @@ export const execute_tool_call = (
 		if ('read_only' === settings.aiEditMode) {
 			return { output: JSON.stringify({ error: 'AI note editing is disabled (aiEditMode: read_only)' }), notesChanged: false }
 		}
-		const created = db.createNote()
+		const project_resolution = resolve_project_for_write(
+			db,
+			'string' === typeof args.project_id ? args.project_id : '',
+			'string' === typeof args.project_name ? args.project_name : '',
+		)
+		if (project_resolution.error) {
+			return { output: JSON.stringify({ error: project_resolution.error, note: null }), notesChanged: false }
+		}
+		const project = project_resolution.project
+		const created = db.createNote({
+			projectId: project?.id ?? null,
+		})
 		const patch: Record<string, unknown> = {}
 		if ('string' === typeof args.content) patch.content = args.content
 		if ('boolean' === typeof args.starred) patch.starred = args.starred
 		if ('boolean' === typeof args.archived) patch.archived = args.archived
 		const tags = normalize_tags(args.tags)
 		if (tags.length) patch.tags = tags
+		if (project?.id) patch.projectId = project.id
 		const updated = Object.keys(patch).length ? db.updateNote(created.id, patch) : created
 		const final_note = updated ?? created
 
@@ -348,6 +565,7 @@ export const execute_tool_call = (
 			action: 'create',
 			afterContent: final_note.content,
 			afterTags: final_note.tags,
+			afterProjectId: final_note.projectId,
 			model: ctx?.model ?? null,
 			promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
 		})
@@ -378,6 +596,17 @@ export const execute_tool_call = (
 		if ('boolean' === typeof args.starred) patch.starred = args.starred
 		if ('boolean' === typeof args.archived) patch.archived = args.archived
 		if (Array.isArray(args.tags)) patch.tags = normalize_tags(args.tags)
+		const project_resolution = resolve_project_for_write(
+			db,
+			'string' === typeof args.project_id ? args.project_id : '',
+			'string' === typeof args.project_name ? args.project_name : '',
+		)
+		if (project_resolution.error) {
+			return { output: JSON.stringify({ error: project_resolution.error, note: null }), notesChanged: false }
+		}
+		if (project_resolution.project) {
+			patch.projectId = project_resolution.project.id
+		}
 
 		if (0 === Object.keys(patch).length) {
 			return { output: JSON.stringify({ note: current, unchanged: true }), notesChanged: false }
@@ -385,6 +614,7 @@ export const execute_tool_call = (
 
 		const before_content = current.content
 		const before_tags = current.tags
+		const before_project_id = current.projectId
 
 		const updated = db.updateNote(note_id, patch)
 
@@ -399,6 +629,8 @@ export const execute_tool_call = (
 				afterContent: updated.content,
 				beforeTags: before_tags,
 				afterTags: updated.tags,
+				beforeProjectId: before_project_id,
+				afterProjectId: updated.projectId,
 				model: ctx?.model ?? null,
 				promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
 			})
@@ -446,6 +678,17 @@ export const execute_tool_call = (
 		if ('boolean' === typeof args.starred) patch.starred = args.starred
 		if ('boolean' === typeof args.archived) patch.archived = args.archived
 		if (Array.isArray(args.tags)) patch.tags = normalize_tags(args.tags)
+		const project_resolution = resolve_project_for_write(
+			db,
+			'string' === typeof args.project_id ? args.project_id : '',
+			'string' === typeof args.project_name ? args.project_name : '',
+		)
+		if (project_resolution.error) {
+			return { output: JSON.stringify({ error: project_resolution.error, note: null }), notesChanged: false }
+		}
+		if (project_resolution.project) {
+			patch.projectId = project_resolution.project.id
+		}
 
 		if (0 === Object.keys(patch).length) {
 			return { output: JSON.stringify({ note: current, unchanged: true }), notesChanged: false }
@@ -453,6 +696,7 @@ export const execute_tool_call = (
 
 		const before_content = current.content
 		const before_tags = current.tags
+		const before_project_id = current.projectId
 		const updated = db.updateNote(note_id, patch)
 
 		if (updated) {
@@ -465,6 +709,8 @@ export const execute_tool_call = (
 				afterContent: updated.content,
 				beforeTags: before_tags,
 				afterTags: updated.tags,
+				beforeProjectId: before_project_id,
+				afterProjectId: updated.projectId,
 				model: ctx?.model ?? null,
 				promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
 			})

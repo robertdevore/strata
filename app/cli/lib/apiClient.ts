@@ -4,6 +4,9 @@ import { ExitCode } from '../types'
 import {
 	delete_response_schema,
 	health_response_schema,
+	project_schema,
+	project_list_response_schema,
+	project_response_schema,
 	note_list_response_schema,
 	note_response_schema,
 	note_schema,
@@ -187,6 +190,7 @@ export class StrataApiClient {
 	async listNotes(filters: {
 		query?: string
 		tag?: string
+		projectId?: string
 		starred?: boolean
 		archived?: boolean
 		includeDeleted?: boolean
@@ -224,6 +228,8 @@ export class StrataApiClient {
 		tags?: string[]
 		starred?: boolean
 		archived?: boolean
+		projectId?: string | null
+		projectName?: string
 	}): Promise<z.infer<typeof note_schema>> {
 		const response = await this.request<z.infer<typeof note_response_schema>>('POST', '/notes', {
 			body: payload,
@@ -237,6 +243,8 @@ export class StrataApiClient {
 		tags?: string[]
 		starred?: boolean
 		archived?: boolean
+		projectId?: string | null
+		projectName?: string
 	}): Promise<z.infer<typeof note_schema>> {
 		const response = await this.request<z.infer<typeof note_response_schema>>('PATCH', `/notes/${note_id}`, {
 			body: payload,
@@ -257,6 +265,44 @@ export class StrataApiClient {
 			allowRetry: true,
 		})
 		return response.tags
+	}
+
+	async listProjects(): Promise<Array<z.infer<typeof project_schema>>> {
+		const response = await this.request<z.infer<typeof project_list_response_schema>>('GET', '/projects', {
+			validate: project_list_response_schema,
+			allowRetry: true,
+		})
+		return response.projects
+	}
+
+	async createProject(payload: { name: string }): Promise<z.infer<typeof project_schema>> {
+		const response = await this.request<z.infer<typeof project_response_schema>>('POST', '/projects', {
+			body: payload,
+			validate: project_response_schema,
+		})
+		return response.project
+	}
+
+	async updateProject(id: string, payload: { name: string }): Promise<z.infer<typeof project_schema> | null> {
+		const response = await this.request<{ project: z.infer<typeof project_schema> | null }>('PATCH', `/projects/${id}`, {
+			body: payload,
+			validate: z.object({ project: project_schema.nullable() }),
+		})
+		return response.project
+	}
+
+	async deleteProject(id: string): Promise<{ deleted: boolean }> {
+		return await this.request<{ deleted: boolean }>('DELETE', `/projects/${id}`, {
+			validate: delete_response_schema,
+		})
+	}
+
+	async reorderProjects(project_ids: string[]): Promise<Array<z.infer<typeof project_schema>>> {
+		const response = await this.request<z.infer<typeof project_list_response_schema>>('POST', '/projects/reorder', {
+			body: { projectIds: project_ids },
+			validate: project_list_response_schema,
+		})
+		return response.projects
 	}
 
 	async listBacklinks(note_id: string): Promise<unknown[]> {

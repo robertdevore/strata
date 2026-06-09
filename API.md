@@ -21,6 +21,7 @@ CLI:
 npm run strata -- health
 npm run strata -- notes list --json
 npm run strata -- notes create --content "# Title\n\nBody"
+npm run strata -- projects list
 ```
 
 curl:
@@ -61,6 +62,12 @@ Header examples:
 - `PATCH /notes/:id`
 - `DELETE /notes/:id`
 - `GET /tags`
+- `GET /projects`
+- `POST /projects`
+- `POST /projects/reorder`
+- `PATCH /projects/:id`
+- `DELETE /projects/:id`
+- `GET /projects/:id/notes`
 - `GET /search`
 - `GET /notes/:id/backlinks`
 - `GET /notes/:id/related`
@@ -95,6 +102,7 @@ Optional query params:
 - `starred` (`true` or `false`)
 - `archived` (`true` or `false`)
 - `tag` (string)
+- `projectId` (string UUID)
 - `includeDeleted` (`true` or `false`)
 
 Examples:
@@ -118,6 +126,7 @@ Response shape:
       "starred": false,
       "archived": false,
       "tags": ["api"],
+      "projectId": null,
       "deletedAt": null
     }
   ]
@@ -146,6 +155,7 @@ Response:
     "starred": false,
     "archived": false,
     "tags": ["api"],
+    "projectId": null,
     "deletedAt": null
   }
 }
@@ -163,6 +173,8 @@ Body fields are optional:
 - `starred: boolean`
 - `archived: boolean`
 - `tags: string[]`
+- `projectId: string | null`
+- `projectName: string`
 
 Examples:
 
@@ -176,12 +188,17 @@ curl -X POST http://127.0.0.1:3939/notes \
 curl -X POST http://127.0.0.1:3939/notes \
   -H "Content-Type: application/json" \
   -d '{"content":"# New note\n\nCreated by API","tags":["api","agent"]}'
+
+# Create inside a project by name
+curl -X POST http://127.0.0.1:3939/notes \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# Project note\n\nBody","projectName":"Work"}'
 ```
 
 Response:
 
 ```json
-{"note": {"id": "uuid", "content": "...", "tags": ["api", "agent"], "starred": false, "archived": false, "createdAt": "...", "updatedAt": "...", "deletedAt": null}}
+{"note": {"id": "uuid", "content": "...", "tags": ["api", "agent"], "projectId": null, "starred": false, "archived": false, "createdAt": "...", "updatedAt": "...", "deletedAt": null}}
 ```
 
 ---
@@ -196,6 +213,8 @@ Body fields (any subset):
 - `starred: boolean`
 - `archived: boolean`
 - `tags: string[]`
+- `projectId: string | null`
+- `projectName: string`
 
 Examples:
 
@@ -209,12 +228,17 @@ curl -X PATCH http://127.0.0.1:3939/notes/<NOTE_ID> \
 curl -X PATCH http://127.0.0.1:3939/notes/<NOTE_ID> \
   -H "Content-Type: application/json" \
   -d '{"starred":true,"tags":["important","api"]}'
+
+# Move a note into a project
+curl -X PATCH http://127.0.0.1:3939/notes/<NOTE_ID> \
+  -H "Content-Type: application/json" \
+  -d '{"projectName":"Research"}'
 ```
 
 Response:
 
 ```json
-{"note": {"id": "uuid", "content": "...", "tags": ["important", "api"], "starred": true, "archived": false, "createdAt": "...", "updatedAt": "...", "deletedAt": null}}
+{"note": {"id": "uuid", "content": "...", "tags": ["important", "api"], "projectId": null, "starred": true, "archived": false, "createdAt": "...", "updatedAt": "...", "deletedAt": null}}
 ```
 
 ---
@@ -314,11 +338,74 @@ Response:
 
 ---
 
+### Projects
+
+`GET /projects`
+
+Returns all projects.
+
+```bash
+curl http://127.0.0.1:3939/projects
+```
+
+Response:
+
+```json
+{
+  "projects": [
+	{
+	  "id": "uuid",
+	  "name": "Work",
+	  "createdAt": "2026-03-03T22:57:50.032Z",
+	  "updatedAt": "2026-03-03T22:57:50.032Z",
+	  "sortOrder": 0
+	}
+  ]
+}
+```
+
+`POST /projects`
+
+Body:
+
+- `name: string`
+
+`POST /projects/reorder`
+
+Body:
+
+- `projectIds: string[]`
+
+Projects are reordered to match the supplied id sequence. Any omitted ids are appended in their existing order.
+
+`PATCH /projects/:id`
+
+Body:
+
+- `name: string`
+
+`DELETE /projects/:id`
+
+Returns `{ "deleted": true }`.
+
+`GET /projects/:id/notes`
+
+Returns the project plus its notes:
+
+```json
+{
+  "project": { "id": "uuid", "name": "Work", "createdAt": "...", "updatedAt": "..." },
+  "notes": [ { "id": "uuid", "content": "...", "projectId": "uuid", ... } ]
+}
+```
+
+---
+
 ### Search Notes
 
 `GET /search?q=...&limit=25`
 
-Full-text search across note content and tags.
+Full-text search across note content, tags, and project names.
 
 | Param | Description | Default |
 |-------|-------------|---------|

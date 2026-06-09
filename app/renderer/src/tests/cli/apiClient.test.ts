@@ -39,6 +39,7 @@ describe('cli API client', () => {
 						starred: false,
 						archived: false,
 						tags: ['cli'],
+						projectId: null,
 						deletedAt: null,
 					},
 				}),

@@ -7,6 +7,7 @@ import { register_health_command } from './commands/health'
 import { register_config_commands } from './commands/config'
 import { register_notes_commands } from './commands/notes'
 import { register_search_command } from './commands/search'
+import { register_projects_commands } from './commands/projects'
 import { register_tags_commands } from './commands/tags'
 import { register_tasks_commands } from './commands/tasks'
 import { register_ai_commands } from './commands/ai'
@@ -63,6 +64,7 @@ register_health_command(program, get_context)
 register_config_commands(program, get_context)
 register_notes_commands(program, get_context)
 register_search_command(program, get_context)
+register_projects_commands(program, get_context)
 register_tags_commands(program, get_context)
 register_tasks_commands(program, get_context)
 register_ai_commands(program, get_context)

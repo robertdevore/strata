@@ -71,6 +71,8 @@ npm run test
 ### Navigation and organization
 
 - Search and filtering by query, tags, and note state.
+- Projects as collapsible sidebar categories, with drag-and-drop note assignment, manual reordering, and folder-to-project import.
+- Sidebar sections can be hidden or reordered from Settings to match different workflows.
 - Quick Open and command palette.
 - Related notes + backlinks.
 - Pinned tags and customizable shortcuts.
@@ -97,9 +99,15 @@ Examples:
 npm run strata -- health
 npm run strata -- notes list --json
 npm run strata -- notes create --content "# Note\n\nCreated from CLI"
-
+npm run strata -- projects import ./my-notes-folder
 curl http://127.0.0.1:3939/health
 ```
+
+Drag-and-drop:
+
+- Drop a single `.md` file into Strata to create a note.
+- Drop a folder of `.md` files to create a project automatically and import each markdown file into that project.
+- Reorder projects from Settings or with the CLI/API so the sidebar can match your workflow.
 
 ## Security and data model
 

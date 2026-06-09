@@ -63,10 +63,13 @@ const list_schema = z.object({
 	starred: z.boolean().optional(),
 	archived: z.boolean().optional(),
 	tag: z.string().optional(),
+	projectId: z.string().uuid().optional(),
 	includeDeleted: z.boolean().optional(),
 })
 
 const id_schema = z.object({ id: z.string().uuid() })
+
+const project_id_schema = z.object({ id: z.string().uuid() })
 
 const create_schema = z
 	.object({
@@ -74,6 +77,8 @@ const create_schema = z
 		starred: z.boolean().optional(),
 		archived: z.boolean().optional(),
 		tags: z.array(z.string()).optional(),
+		projectId: z.string().uuid().nullable().optional(),
+		projectName: z.string().trim().min(1).max(120).optional(),
 	})
 	.optional()
 
@@ -82,6 +87,20 @@ const update_patch_schema = z.object({
 	starred: z.boolean().optional(),
 	archived: z.boolean().optional(),
 	tags: z.array(z.string()).optional(),
+	projectId: z.string().uuid().nullable().optional(),
+	projectName: z.string().trim().min(1).max(120).optional(),
+})
+
+const project_create_schema = z.object({
+	name: z.string().trim().min(1).max(120),
+})
+
+const project_update_schema = z.object({
+	name: z.string().trim().min(1).max(120),
+})
+
+const project_reorder_schema = z.object({
+	projectIds: z.array(z.string().uuid()).min(1),
 })
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS'
@@ -147,6 +166,23 @@ const parse_update_patch = (body: unknown): NoteUpdatePatch => {
 	return update_patch_schema.parse(body)
 }
 
+const resolve_project_id = (
+	db: StrataDatabase,
+	payload: { projectId?: string | null; projectName?: string | null | undefined },
+): { hasProjectId: boolean; projectId: string | null; valid: boolean } => {
+	if (Object.prototype.hasOwnProperty.call(payload, 'projectId')) {
+		if (null === payload.projectId) return { hasProjectId: true, projectId: null, valid: true }
+		if ('string' === typeof payload.projectId) {
+			const project = db.getProject(payload.projectId)
+			return { hasProjectId: true, projectId: project?.id ?? null, valid: Boolean(project) }
+		}
+	}
+	if ('string' === typeof payload.projectName && payload.projectName.trim()) {
+		return { hasProjectId: true, projectId: db.createProject(payload.projectName).id, valid: true }
+	}
+	return { hasProjectId: false, projectId: null, valid: true }
+}
+
 const resolve_api_token = (): string | null => {
 	const token = process.env.STRATA_API_TOKEN
 	if (!token) return null
@@ -199,6 +235,7 @@ const create_handler = (db: StrataDatabase, api_token: string | null, options: N
 				starred: parse_boolean(request_url.searchParams.get('starred')),
 				archived: parse_boolean(request_url.searchParams.get('archived')),
 				tag: request_url.searchParams.get('tag') ?? undefined,
+				projectId: request_url.searchParams.get('projectId') ?? undefined,
 				includeDeleted: parse_boolean(request_url.searchParams.get('includeDeleted')),
 			})
 			return { status: 200, body: { notes: db.listNotes(filters) } }
@@ -216,21 +253,34 @@ const create_handler = (db: StrataDatabase, api_token: string | null, options: N
 		if ('POST' === method && 1 === parts.length && 'notes' === parts[0]) {
 			const body = await get_request_body(request)
 			const parsed = create_schema.parse(body)
-			const created = db.createNote()
-			if (!parsed) {
-				options.onNotesChanged?.()
-				return { status: 201, body: { note: created } }
+			const project_resolution = parsed ? resolve_project_id(db, parsed) : { hasProjectId: false, projectId: null, valid: true }
+			if (project_resolution.hasProjectId && !project_resolution.valid) {
+				return { status: 404, body: { error: 'Project not found' } }
 			}
-			const updated = db.updateNote(created.id, parsed)
+			const created = db.createNote({
+				content: parsed?.content,
+				starred: parsed?.starred,
+				archived: parsed?.archived,
+				tags: parsed?.tags,
+				projectId: project_resolution.hasProjectId ? project_resolution.projectId : null,
+			})
 			options.onNotesChanged?.()
-			return { status: 201, body: { note: updated ?? created } }
+			return { status: 201, body: { note: created } }
 		}
 
 		if (('PUT' === method || 'PATCH' === method) && 2 === parts.length && 'notes' === parts[0]) {
 			const { id } = id_schema.parse({ id: parts[1] })
 			const body = await get_request_body(request)
 			const patch = parse_update_patch(body)
-			const updated = db.updateNote(id, patch)
+			const project_resolution = resolve_project_id(db, patch)
+			if (project_resolution.hasProjectId && !project_resolution.valid) {
+				return { status: 404, body: { error: 'Project not found' } }
+			}
+			const update_patch: NoteUpdatePatch = { ...patch }
+			if (project_resolution.hasProjectId) {
+				update_patch.projectId = project_resolution.projectId
+			}
+			const updated = db.updateNote(id, update_patch)
 			if (!updated) {
 				return { status: 404, body: { error: 'Note not found' } }
 			}
@@ -251,6 +301,56 @@ const create_handler = (db: StrataDatabase, api_token: string | null, options: N
 		// ---- Tags ----
 		if ('GET' === method && 1 === parts.length && 'tags' === parts[0]) {
 			return { status: 200, body: { tags: db.listTags() } }
+		}
+
+		// ---- Projects ----
+		if ('GET' === method && 1 === parts.length && 'projects' === parts[0]) {
+			return { status: 200, body: { projects: db.listProjects() } }
+		}
+
+		if ('POST' === method && 1 === parts.length && 'projects' === parts[0]) {
+			const body = await get_request_body(request)
+			const parsed = project_create_schema.parse(body)
+			const project = db.createProject(parsed.name)
+			options.onNotesChanged?.()
+			return { status: 201, body: { project } }
+		}
+
+		if ('POST' === method && 2 === parts.length && 'projects' === parts[0] && 'reorder' === parts[1]) {
+			const body = await get_request_body(request)
+			const parsed = project_reorder_schema.parse(body)
+			const projects = db.reorderProjects(parsed.projectIds)
+			options.onNotesChanged?.()
+			return { status: 200, body: { projects } }
+		}
+
+		if (('PUT' === method || 'PATCH' === method) && 2 === parts.length && 'projects' === parts[0]) {
+			const { id } = project_id_schema.parse({ id: parts[1] })
+			const body = await get_request_body(request)
+			const parsed = project_update_schema.parse(body)
+			const project = db.renameProject(id, parsed.name)
+			if (!project) {
+				return { status: 404, body: { error: 'Project not found' } }
+			}
+			options.onNotesChanged?.()
+			return { status: 200, body: { project } }
+		}
+
+		if ('DELETE' === method && 2 === parts.length && 'projects' === parts[0]) {
+			const { id } = project_id_schema.parse({ id: parts[1] })
+			const deleted = db.deleteProject(id)
+			if (!deleted) {
+				return { status: 404, body: { error: 'Project not found' } }
+			}
+			options.onNotesChanged?.()
+			return { status: 200, body: { deleted: true } }
+		}
+
+		if ('GET' === method && 3 === parts.length && 'projects' === parts[0] && 'notes' === parts[2]) {
+			const { id } = project_id_schema.parse({ id: parts[1] })
+			const project = db.getProject(id)
+			if (!project) return { status: 404, body: { error: 'Project not found' } }
+			return { status: 200, body: { project, notes: db.listNotes({ projectId: id, includeDeleted: false }) } }
 		}
 
 		// ---- Search ----

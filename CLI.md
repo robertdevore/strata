@@ -15,6 +15,7 @@ npm run strata -- health
 npm run strata -- notes list --json
 npm run strata -- notes create --content "# Test\n\nHello"
 npm run strata -- ai route "Create a note about provider routing"
+npm run strata -- projects import ./notes-folder
 ```
 
 Command format:
@@ -102,7 +103,9 @@ npm run strata -- config doctor
 npm run strata -- notes list --query "routing" --tag ai --limit 20
 npm run strata -- notes get <noteId>
 npm run strata -- notes create --content "# Title\n\nBody" --tag ai --tag routing
+npm run strata -- notes create --content "# Title\n\nBody" --project "Work"
 npm run strata -- notes update <noteId> --append "More text" --confirm
+npm run strata -- notes update <noteId> --project "Research" --confirm
 npm run strata -- notes delete <noteId> --confirm
 npm run strata -- notes archive <noteId> --confirm
 npm run strata -- notes unarchive <noteId> --confirm
@@ -116,10 +119,25 @@ Safety behavior:
 - `delete-many` also requires `--confirm-bulk-delete`
 - In `--agent` mode, destructive operations require `--allow-destructive`
 
+### Projects
+
+```bash
+npm run strata -- projects list
+npm run strata -- projects create "Work"
+npm run strata -- projects rename <projectId> "New name"
+npm run strata -- projects delete <projectId>
+npm run strata -- projects reorder <projectId1> <projectId2> <projectId3>
+npm run strata -- projects import ./folder-of-markdown
+```
+
+Projects are local categories. Importing a folder of markdown files creates a project named after the folder by default, then imports each markdown file as a note in that project.
+`projects reorder` persists the sidebar/project order so the same sequence shows up in the UI, API, and agent flows.
+
 ### Search
 
 ```bash
 npm run strata -- search "provider routing" --json
+npm run strata -- search "provider routing" --project "Work"
 ```
 
 ### Tags

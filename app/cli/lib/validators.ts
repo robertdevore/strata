@@ -1,6 +1,15 @@
 import { z } from 'zod'
 
 export const note_id_schema = z.string().uuid()
+export const project_id_schema = z.string().uuid()
+
+export const project_schema = z.object({
+	id: project_id_schema,
+	name: z.string(),
+	createdAt: z.string(),
+	updatedAt: z.string(),
+	sortOrder: z.number().int(),
+})
 
 export const note_schema = z.object({
 	id: note_id_schema,
@@ -10,6 +19,7 @@ export const note_schema = z.object({
 	starred: z.boolean(),
 	archived: z.boolean(),
 	tags: z.array(z.string()),
+	projectId: project_id_schema.nullable(),
 	deletedAt: z.string().nullable(),
 })
 
@@ -32,6 +42,14 @@ export const tag_stats_response_schema = z.object({
 	})),
 })
 
+export const project_list_response_schema = z.object({
+	projects: z.array(project_schema),
+})
+
+export const project_response_schema = z.object({
+	project: project_schema,
+})
+
 export const health_response_schema = z.object({
 	ok: z.boolean(),
 })
@@ -39,6 +57,7 @@ export const health_response_schema = z.object({
 export const notes_filter_schema = z.object({
 	query: z.string().trim().optional(),
 	tag: z.string().trim().optional(),
+	projectId: project_id_schema.optional(),
 	starred: z.boolean().optional(),
 	archived: z.boolean().optional(),
 	includeDeleted: z.boolean().optional(),
@@ -50,6 +69,8 @@ export const note_create_patch_schema = z.object({
 	tags: z.array(z.string().trim().min(1).max(64)).max(100).optional(),
 	starred: z.boolean().optional(),
 	archived: z.boolean().optional(),
+	projectId: project_id_schema.nullable().optional(),
+	projectName: z.string().trim().min(1).max(120).optional(),
 })
 
 export const note_update_patch_schema = z.object({
@@ -57,6 +78,12 @@ export const note_update_patch_schema = z.object({
 	tags: z.array(z.string().trim().min(1).max(64)).max(100).optional(),
 	starred: z.boolean().optional(),
 	archived: z.boolean().optional(),
+	projectId: project_id_schema.nullable().optional(),
+	projectName: z.string().trim().min(1).max(120).optional(),
+})
+
+export const project_create_patch_schema = z.object({
+	name: z.string().trim().min(1).max(120),
 })
 
 export const route_decision_schema = z.object({
