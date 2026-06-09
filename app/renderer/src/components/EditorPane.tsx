@@ -15,7 +15,7 @@ import { markdown_from_clipboard } from '@renderer/src/domain/markdownPaste'
 import { aiService } from '@renderer/src/services/aiService'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import { TagsEditor } from './TagsEditor'
-import { ArchiveIcon, ChatbotIcon, ChevronLeftIcon, ChevronRightIcon, CirclePlusIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EarIcon, EyeIcon, FileDescriptionIcon, FileSearchIcon, FileTextAiIcon, MenuIcon, MoonIcon, PrinterIcon, SearchIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
+import { ArchiveIcon, ChatbotIcon, ChevronLeftIcon, ChevronRightIcon, CirclePlusIcon, CirclesRelationIcon, CloseIcon, CopyIcon, EarIcon, EyeIcon, FileDescriptionIcon, FileSearchIcon, FileTextAiIcon, ListDetailsIcon, MenuIcon, MoonIcon, PrinterIcon, SearchIcon, SettingsIcon, StarFilledIcon, StarOutlineIcon, SunIcon, TagIcon, TrashIcon, UploadIcon } from './icons'
 import { ChatPanel } from './ChatPanel'
 import { PublishModal } from './PublishModal'
 
@@ -398,7 +398,10 @@ export function EditorPane(props: EditorPaneProps) {
 	const renderHomeTileIcon = (action: HomeTileAction) => {
 		if ('new_note' === action) return <CirclePlusIcon />
 		if ('quick_open' === action) return <SearchIcon />
+		if ('focus_search' === action) return <FileSearchIcon />
 		if ('open_tags' === action) return <TagIcon />
+		if ('toggle_filters' === action) return <ListDetailsIcon />
+		if ('new_project' === action) return <CirclesRelationIcon />
 		if ('toggle_sidebar' === action) return <MenuIcon />
 		return <SettingsIcon />
 	}

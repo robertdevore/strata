@@ -335,12 +335,23 @@ export function App() {
 	}, [onDelete, store])
 
 	const runHomeTileAction = useCallback((action: HomeTileAction) => {
+		const openSidebarAndDispatch = (event_name: string) => {
+			setSidebarCollapsed(false)
+			window.setTimeout(() => {
+				window.dispatchEvent(new CustomEvent(event_name))
+			}, 0)
+		}
+
 		if ('new_note' === action) {
 			void store.createNote()
 			return
 		}
 		if ('quick_open' === action) {
 			setPaletteMode('quick-open')
+			return
+		}
+		if ('focus_search' === action) {
+			openSidebarAndDispatch('strata:focus-search')
 			return
 		}
 		if ('open_tags' === action) {
@@ -351,10 +362,18 @@ export function App() {
 			store.setShowSettings(true)
 			return
 		}
+		if ('toggle_filters' === action) {
+			store.setShowFiltersPanel(!store.showFiltersPanel)
+			return
+		}
+		if ('new_project' === action) {
+			openSidebarAndDispatch('strata:open-project-create')
+			return
+		}
 		if ('toggle_sidebar' === action) {
 			setSidebarCollapsed((value) => !value)
 		}
-	}, [runCommand, store])
+	}, [store])
 
 	const startSidebarResize = (event: React.MouseEvent<HTMLDivElement>) => {
 		if (sidebarCollapsed) return

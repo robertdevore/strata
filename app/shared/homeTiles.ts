@@ -1,9 +1,12 @@
 export const HOME_TILE_ACTIONS = [
 	'new_note',
 	'quick_open',
+	'focus_search',
 	'open_tags',
 	'open_settings',
+	'toggle_filters',
 	'toggle_sidebar',
+	'new_project',
 ] as const
 
 export type HomeTileAction = typeof HOME_TILE_ACTIONS[number]
@@ -21,9 +24,12 @@ export interface HomeTileOption {
 export const HOME_TILE_OPTIONS: HomeTileOption[] = [
 	{ action: 'new_note', label: 'New Note', description: 'Start a blank note and begin typing immediately.' },
 	{ action: 'quick_open', label: 'Quick Open', description: 'Jump to an existing note with a fast search.' },
+	{ action: 'focus_search', label: 'Search', description: 'Jump to the sidebar search field and find notes fast.' },
 	{ action: 'open_tags', label: 'Browse Tags', description: 'Open the tag browser to organize and revisit topics.' },
 	{ action: 'open_settings', label: 'Settings', description: 'Customize Strata and tune it to your workflow.' },
+	{ action: 'toggle_filters', label: 'Toggle Filters', description: 'Show or hide the filters panel without leaving the editor.' },
 	{ action: 'toggle_sidebar', label: 'Toggle Sidebar', description: 'Clear the workspace or bring the note list back.' },
+	{ action: 'new_project', label: 'New Project', description: 'Create a project bucket before importing related notes.' },
 ]
 
 export const DEFAULT_HOME_TILES: HomeTileConfig[] = [

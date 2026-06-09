@@ -69,6 +69,7 @@ export function Sidebar(props: SidebarProps) {
 	const [visibleCountsByKey, setVisibleCountsByKey] = useState<Record<string, number>>({})
 	const [menuSubmenu, setMenuSubmenu] = useState<MenuSubmenu>(null)
 	const menuRef = useRef<HTMLDivElement>(null)
+	const searchInputRef = useRef<HTMLInputElement>(null)
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const visibleUnprojectedNotes = useMemo(() => props.notes.filter((note) => !note.projectId), [props.notes])
 	const selectedIndex = useMemo(() => visibleUnprojectedNotes.findIndex((note) => note.id === props.selectedId), [visibleUnprojectedNotes, props.selectedId])
@@ -121,6 +122,23 @@ export function Sidebar(props: SidebarProps) {
 		setProjectCreateStatus('')
 		setProjectCreateOpen(true)
 	}
+
+	useEffect(() => {
+		const focusSearch = () => {
+			window.setTimeout(() => {
+				searchInputRef.current?.focus()
+				searchInputRef.current?.select()
+			}, 0)
+		}
+		const openProjectCreate = () => openProjectCreateModal()
+
+		window.addEventListener('strata:focus-search', focusSearch)
+		window.addEventListener('strata:open-project-create', openProjectCreate)
+		return () => {
+			window.removeEventListener('strata:focus-search', focusSearch)
+			window.removeEventListener('strata:open-project-create', openProjectCreate)
+		}
+	}, [])
 
 	const closeProjectCreateModal = () => {
 		if (isProjectCreateBusy) return
@@ -284,12 +302,13 @@ export function Sidebar(props: SidebarProps) {
 					{props.sidebarLayout.showSearch && (
 						<div className="sidebar-search-row">
 							<input
+								ref={searchInputRef}
 								className="search-input sidebar-search-input"
 								type="search"
 								value={props.searchQuery}
 								onChange={(event) => props.onSearchChange(event.target.value)}
-								placeholder="Search sidebar..."
-								aria-label="Search sidebar"
+								placeholder="Search..."
+								aria-label="Search"
 							/>
 						</div>
 					)}
@@ -357,7 +376,11 @@ export function Sidebar(props: SidebarProps) {
 								</div>
 							</div>
 								{props.projects.map((project) => {
-								const visible_project_notes = visibleNotesByProject.get(project.id) ?? []
+								const project_notes = visibleNotesByProject.get(project.id) ?? []
+								const visible_project_notes = [
+									...project_notes.filter((note) => pinnedNoteIdSet.has(note.id)),
+									...project_notes.filter((note) => !pinnedNoteIdSet.has(note.id)),
+								]
 								const project_collapsed = undefined === projectsCollapsedById[project.id] ? true : projectsCollapsedById[project.id]
 								const project_expanded = hasSidebarSearch || !project_collapsed
 								const show_project = visible_project_notes.length > 0 || !hasSidebarSearch
