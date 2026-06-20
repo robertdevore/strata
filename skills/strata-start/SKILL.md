@@ -128,6 +128,16 @@ A good context packet should answer:
 
 ---
 
+## Agent Notes Storage Awareness
+
+Agent-created session memories, handoffs, decisions, TODOs, and rollups are stored in the Strata project named `Agent Notes` by default.
+
+When the user asks for context for a real work project such as Kujo, Strata, UDC SaaS, PackWrite, or Cinch, do not assume the Strata project assignment is the same thing as the semantic project scope. Search note text, headings, tags, session IDs, repository names, and metadata fields such as `Project: Kujo` or `project-kujo`.
+
+Use a Strata project-name filter only when the user explicitly asks to restrict results to that storage project, or when you know the relevant notes are stored there. For agent memory recall, include `Agent Notes` as a likely storage bucket while keeping the semantic scope tied to the user's requested project, repo, and task.
+
+---
+
 ## Core Rules
 
 1. **Read this skill before using it.**

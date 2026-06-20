@@ -111,6 +111,44 @@ If a companion skill is unavailable, perform the equivalent workflow directly th
 
 ---
 
+## Agent Note Storage Location
+
+All notes created by agents through this memory workflow must be stored in the Strata project named:
+
+```text
+Agent Notes
+```
+
+This applies to:
+
+- captures
+- decisions
+- TODOs and commitments
+- summaries and session handoffs
+- atomic durable memories
+- memory hubs, timelines, state snapshots, and rollups created by an agent
+- pending-memory bundles imported into Strata later
+
+Use the note body, tags, and metadata fields to record the actual work scope, such as `Project: Kujo`, `Project: Strata`, `Repository: packwrite`, or `Tags: project-kujo`. Do not use the Strata project assignment itself for the work scope unless the user explicitly asks for a different storage project.
+
+When creating notes through the CLI, pass:
+
+```bash
+--project "Agent Notes"
+```
+
+When creating notes through the local HTTP API, send:
+
+```json
+{ "projectName": "Agent Notes" }
+```
+
+If `Agent Notes` does not exist, use the supported Strata project-name create/reuse path or create the project before saving. Do not let agent-created memory fall back into the unprojected regular notes list, and do not default these notes into `Kujo` just because the current repository or task is Kujo-related.
+
+Read-side context searches should still search the real project, repository, tags, and entities named in the task. The `Agent Notes` project is the storage bucket for agent-created memory, not the semantic scope of every memory.
+
+---
+
 ## Core Mental Model
 
 Treat the memory system as four separate layers.
@@ -1292,15 +1330,15 @@ Use the standard template or a concise command-appropriate equivalent.
 Preferred agent capture commands:
 
 ```bash
-npm run strata -- --agent --json agent capture "CONCISE_DURABLE_MEMORY"
+npm run strata -- --agent --json agent capture "CONCISE_DURABLE_MEMORY" --project "Agent Notes"
 ```
 
 ```bash
-npm run strata -- --agent --json agent decision "DECISION_WITH_RATIONALE_AND_SCOPE"
+npm run strata -- --agent --json agent decision "DECISION_WITH_RATIONALE_AND_SCOPE" --project "Agent Notes"
 ```
 
 ```bash
-npm run strata -- --agent --json agent todo "COMMITMENT_WITH_OWNER_TRIGGER_AND_ACCEPTANCE_CRITERIA"
+npm run strata -- --agent --json agent todo "COMMITMENT_WITH_OWNER_TRIGGER_AND_ACCEPTANCE_CRITERIA" --project "Agent Notes"
 ```
 
 For a structured Markdown memory file when supported:
@@ -1311,6 +1349,7 @@ npm run strata -- notes create \
   --tag memory \
   --tag memory-TYPE \
   --tag project-PROJECT \
+  --project "Agent Notes" \
   --json
 ```
 
@@ -1321,7 +1360,7 @@ Use only flags supported by the local Strata version. Do not invent a dedicated 
 Create a Markdown handoff file using the session template, then save it:
 
 ```bash
-npm run strata -- --agent --json agent summary --file ./handoff.md
+npm run strata -- --agent --json agent summary --file ./handoff.md --project "Agent Notes"
 ```
 
 The handoff should list the atomic memory IDs or titles created during consolidation.
@@ -1656,25 +1695,25 @@ npm run strata -- search "QUERY" --json
 ### Capture
 
 ```bash
-npm run strata -- --agent --json agent capture "DURABLE_NOTE"
+npm run strata -- --agent --json agent capture "DURABLE_NOTE" --project "Agent Notes"
 ```
 
 ### Decision
 
 ```bash
-npm run strata -- --agent --json agent decision "DECISION_AND_RATIONALE"
+npm run strata -- --agent --json agent decision "DECISION_AND_RATIONALE" --project "Agent Notes"
 ```
 
 ### TODO / commitment
 
 ```bash
-npm run strata -- --agent --json agent todo "TASK_CONTEXT_AND_ACCEPTANCE_CRITERIA"
+npm run strata -- --agent --json agent todo "TASK_CONTEXT_AND_ACCEPTANCE_CRITERIA" --project "Agent Notes"
 ```
 
 ### Handoff summary
 
 ```bash
-npm run strata -- --agent --json agent summary --file ./handoff.md
+npm run strata -- --agent --json agent summary --file ./handoff.md --project "Agent Notes"
 ```
 
 ### Structured note from Markdown file
@@ -1682,7 +1721,7 @@ npm run strata -- --agent --json agent summary --file ./handoff.md
 When supported by the local CLI:
 
 ```bash
-npm run strata -- notes create --file ./memory.md --tag memory --json
+npm run strata -- notes create --file ./memory.md --tag memory --project "Agent Notes" --json
 ```
 
 The local HTTP API may be used when the CLI is unavailable and the API contract is known. Keep it bound to localhost and use configured authentication.
@@ -1728,11 +1767,12 @@ Strata health check or write operation failed.
 
 ### 1. TYPE · CLAIM
 
+- Target Strata project: Agent Notes
 - Proposed tags:
 - Scope:
 - Evidence:
 - Relationships:
-- Exact Strata command or supported save operation to use later:
+- Exact Strata command or supported save operation to use later, including `--project "Agent Notes"` or `projectName: "Agent Notes"`:
 
 ## Pending handoff
 
@@ -1868,8 +1908,8 @@ Inspect recent sessions and active memories. Find duplicates, orphan notes, stal
 - [ ] Assign type, status, scope, authority, confidence, and validity.
 - [ ] Create typed relationships.
 - [ ] Supersede rather than erase.
-- [ ] Save the session handoff.
-- [ ] Update state/timeline projections only when warranted.
+- [ ] Save all agent-created notes and the session handoff in the `Agent Notes` Strata project.
+- [ ] Update state/timeline projections only when warranted, and store agent-created projection notes in `Agent Notes`.
 - [ ] Run exact, conceptual, and partial-cue retrieval tests.
 - [ ] Report actual save results.
 - [ ] Create pending Markdown if Strata is unavailable.
@@ -1932,11 +1972,12 @@ Do this:
 2. select `RECALL`, `OBSERVE`, `CONSOLIDATE`, `REVIEW`, or the full `AUTO` lifecycle
 3. use `strata-context` for retrieval when available
 4. use `strata-start` or `strata-save` for supported writes and handoffs when available
-5. apply the memory-admission, trust, scope, deduplication, linking, and supersession rules in this skill
-6. preserve exact session/chat/run metadata without fabrication
-7. maintain atomic source memories beneath concise project hubs and timelines
-8. test retrieval for high-value memories
-9. report only actions that actually succeeded
+5. store every agent-created Strata note in the `Agent Notes` project unless the user explicitly says otherwise
+6. apply the memory-admission, trust, scope, deduplication, linking, and supersession rules in this skill
+7. preserve exact session/chat/run metadata without fabrication
+8. maintain atomic source memories beneath concise project hubs and timelines
+9. test retrieval for high-value memories
+10. report only actions that actually succeeded
 
 The final objective is not maximum storage.
 

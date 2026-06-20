@@ -168,10 +168,10 @@ npm run strata -- ai eval-routing
 ### Agent
 
 ```bash
-npm run strata -- agent capture "..."
-npm run strata -- agent decision "..."
-npm run strata -- agent todo "..."
-npm run strata -- agent summary --file ./summary.md
+npm run strata -- agent capture "..." --project "Agent Notes"
+npm run strata -- agent decision "..." --project "Agent Notes"
+npm run strata -- agent todo "..." --project "Agent Notes"
+npm run strata -- agent summary --file ./summary.md --project "Agent Notes"
 npm run strata -- agent context search "routing"
 ```
 
@@ -181,6 +181,7 @@ Agent-mode defaults:
 - Non-interactive safe behavior
 - No destructive defaults
 - Stable machine-readable error payloads
+- Agent-created notes should use `--project "Agent Notes"` so session memories stay out of the unprojected notes list
 
 ## JSON Error Shape
 
