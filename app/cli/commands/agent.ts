@@ -10,6 +10,11 @@ interface RuntimeContext {
 	client: StrataApiClient
 }
 
+interface AgentProjectTarget {
+	projectId?: string
+	projectName?: string
+}
+
 const build_agent_note = (text: string, extra_tags: string[]): { content: string; tags: string[] } => {
 	const trimmed = text.replace(/\r\n/g, '\n').trim()
 	const title = derive_title_from_markdown(trimmed)
@@ -19,12 +24,12 @@ const build_agent_note = (text: string, extra_tags: string[]): { content: string
 	return { content, tags }
 }
 
-const resolve_project_id = async (client: StrataApiClient, project_id?: string, project_name?: string): Promise<string | null> => {
-	if (project_id) return project_id
-	if (!project_name) return null
-	const projects = await client.listProjects()
-	const match = projects.find((project) => project.name.toLowerCase() === project_name.trim().toLowerCase())
-	return match?.id ?? null
+const normalize_project_name = (value: string): string => value.trim().replace(/\s+/g, ' ')
+
+const get_project_target = (project_id?: string, project_name?: string): AgentProjectTarget => {
+	if (project_id) return { projectId: project_id }
+	if (project_name?.trim()) return { projectName: normalize_project_name(project_name) }
+	return {}
 }
 
 const create_agent_note = async (
@@ -32,7 +37,7 @@ const create_agent_note = async (
 	action: string,
 	text: string,
 	extra_tags: string[],
-	project_id: string | null = null,
+	project: AgentProjectTarget = {},
 ): Promise<void> => {
 	const { options, client } = context
 	const payload = build_agent_note(text, extra_tags)
@@ -45,7 +50,7 @@ const create_agent_note = async (
 				path: '/notes',
 				payload: {
 					...payload,
-					projectId: project_id,
+					...project,
 				},
 			},
 		}, { dryRun: true })
@@ -54,7 +59,7 @@ const create_agent_note = async (
 
 	const note = await client.createNote({
 		...payload,
-		projectId: project_id,
+		...project,
 	})
 	print_success(options, {
 		ok: true,
@@ -78,15 +83,15 @@ export const register_agent_commands = (
 		.description('Capture raw implementation context into a tagged note.')
 		.option('--file <path>', 'Read text from file path')
 		.option('--stdin', 'Read text from STDIN')
-		.option('--project <name>', 'Attach note to an existing project by name')
+		.option('--project <name>', 'Attach note to a project by name, creating it if needed')
 		.option('--project-id <id>', 'Attach note to a project by ID')
 		.action(async function (text: string | undefined, command_options: { file?: string; stdin?: boolean; project?: string; projectId?: string }) {
 			const context = get_context(this)
 			const input = text?.trim()
 				? text
 				: await read_content_input({ file: command_options.file, stdin: command_options.stdin })
-			const project_id = await resolve_project_id(context.client, command_options.projectId, command_options.project)
-			await create_agent_note(context, 'agent.capture', input, ['capture', 'implementation'], project_id)
+			const project = get_project_target(command_options.projectId, command_options.project)
+			await create_agent_note(context, 'agent.capture', input, ['capture', 'implementation'], project)
 		})
 
 	agent
@@ -94,15 +99,15 @@ export const register_agent_commands = (
 		.description('Capture a decision record note from agent output.')
 		.option('--file <path>', 'Read text from file path')
 		.option('--stdin', 'Read text from STDIN')
-		.option('--project <name>', 'Attach note to an existing project by name')
+		.option('--project <name>', 'Attach note to a project by name, creating it if needed')
 		.option('--project-id <id>', 'Attach note to a project by ID')
 		.action(async function (text: string | undefined, command_options: { file?: string; stdin?: boolean; project?: string; projectId?: string }) {
 			const context = get_context(this)
 			const input = text?.trim()
 				? text
 				: await read_content_input({ file: command_options.file, stdin: command_options.stdin })
-			const project_id = await resolve_project_id(context.client, command_options.projectId, command_options.project)
-			await create_agent_note(context, 'agent.decision', input, ['decision'], project_id)
+			const project = get_project_target(command_options.projectId, command_options.project)
+			await create_agent_note(context, 'agent.decision', input, ['decision'], project)
 		})
 
 	agent
@@ -110,15 +115,15 @@ export const register_agent_commands = (
 		.description('Capture actionable TODO notes for agents/humans.')
 		.option('--file <path>', 'Read text from file path')
 		.option('--stdin', 'Read text from STDIN')
-		.option('--project <name>', 'Attach note to an existing project by name')
+		.option('--project <name>', 'Attach note to a project by name, creating it if needed')
 		.option('--project-id <id>', 'Attach note to a project by ID')
 		.action(async function (text: string | undefined, command_options: { file?: string; stdin?: boolean; project?: string; projectId?: string }) {
 			const context = get_context(this)
 			const input = text?.trim()
 				? text
 				: await read_content_input({ file: command_options.file, stdin: command_options.stdin })
-			const project_id = await resolve_project_id(context.client, command_options.projectId, command_options.project)
-			await create_agent_note(context, 'agent.todo', input, ['todo'], project_id)
+			const project = get_project_target(command_options.projectId, command_options.project)
+			await create_agent_note(context, 'agent.todo', input, ['todo'], project)
 		})
 
 	agent
@@ -126,13 +131,13 @@ export const register_agent_commands = (
 		.description('Capture summary note from file/stdin content.')
 		.option('--file <path>', 'Read text from file path')
 		.option('--stdin', 'Read text from STDIN')
-		.option('--project <name>', 'Attach note to an existing project by name')
+		.option('--project <name>', 'Attach note to a project by name, creating it if needed')
 		.option('--project-id <id>', 'Attach note to a project by ID')
 		.action(async function (command_options: { file?: string; stdin?: boolean; project?: string; projectId?: string }) {
 			const context = get_context(this)
 			const input = await read_content_input({ file: command_options.file, stdin: command_options.stdin })
-			const project_id = await resolve_project_id(context.client, command_options.projectId, command_options.project)
-			await create_agent_note(context, 'agent.summary', input, ['summary'], project_id)
+			const project = get_project_target(command_options.projectId, command_options.project)
+			await create_agent_note(context, 'agent.summary', input, ['summary'], project)
 		})
 
 	agent
