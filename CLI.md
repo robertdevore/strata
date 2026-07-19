@@ -184,6 +184,13 @@ Agent-mode defaults:
 - No destructive defaults
 - Stable machine-readable error payloads
 - Agent-created notes should use `--project "Agent Notes"` so session memories stay out of the unprojected notes list
+- Memory workflows should save the smallest useful delta; routine sessions may write nothing, and handoff summaries are milestone-driven rather than mandatory
+
+Recommended full-session instruction:
+
+```text
+Use $strata-memory in AUTO mode. Recall only what this task needs, hold durable candidates without interrupting work, and save only the smallest useful memory delta at the end. A no-write result is valid. Batch duplicate searches, avoid overlapping atomic/handoff prose, and verify only high-value memory with one exact and one conceptual lookup.
+```
 
 ## JSON Error Shape
 

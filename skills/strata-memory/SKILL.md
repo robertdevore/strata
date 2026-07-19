@@ -21,9 +21,11 @@ Choose one mode from the request:
 | `OBSERVE` | Work is ongoing; hold possible memories | Use the candidate rules below; read no reference unless saving now |
 | `CONSOLIDATE` | Finish a task or explicitly save/handoff | Read [references/consolidate.md](references/consolidate.md) completely |
 | `REVIEW` | Clean, reconcile, supersede, or audit memory | Read [references/review.md](references/review.md) completely |
-| `AUTO` | Skill invoked without a mode for a full session | Run `RECALL`, hold candidates, then run `CONSOLIDATE` |
+| `AUTO` | Skill invoked without a mode | Infer the current mode; for a full session, recall, observe, then evaluate whether a consolidation delta exists |
 
 Do not read every reference. Read only the reference required by the active mode. If the mode changes later, load that mode’s reference then.
+
+In `AUTO`, reaching session end does not mandate a write. Load the consolidation reference only when durable candidates exist, the user requests memory, or a handoff trigger is plausible. A confirmed no-write result is successful memory hygiene.
 
 ## Storage boundary
 
@@ -168,6 +170,26 @@ Keep user-facing output compact:
 - unresolved blocker or next recall cue.
 
 Do not echo full note bodies unless requested.
+
+## Calling examples
+
+Full session:
+
+```text
+Use $strata-memory in AUTO mode. Recall only the context needed for this task. Hold durable candidates while working. At the end, save only the smallest useful memory delta; a no-write result is valid. Create a handoff only when its trigger applies, batch deduplication searches, and run one exact plus one conceptual retrieval check only for high-value memory. Report confirmed results compactly.
+```
+
+Recall only:
+
+```text
+Use $strata-memory in RECALL mode. Search exact identifiers first with compact results capped at 5, inspect only promising notes, and stop when there is enough trustworthy context to start.
+```
+
+End of session:
+
+```text
+Use $strata-memory in CONSOLIDATE mode. Admit only the durable memory delta, batch duplicate checks, choose the minimum representation, and skip all writes when nothing future-useful survives.
+```
 
 ## Acceptance criteria
 

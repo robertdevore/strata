@@ -2,7 +2,7 @@
 
 ## Verdict
 
-partial
+success
 
 ## Completed
 
@@ -12,6 +12,7 @@ partial
 - line 6 [already-done] Batch deduplication, cap normal recall searches at 3–5 compact results, and stop once sufficient evidence is found.
 - line 7 [already-done] Limit retrieval verification to one exact and one conceptual query for genuinely high-value memories.
 - line 8 [already-done] Prevent atomic memories and handoffs from duplicating the same completed outcome without distinct retrieval value.
+- line 9 [already-done] Revise calling instructions and examples to request the smallest useful memory delta instead of mandatory detailed consolidation.
 
 ## Verification
 
@@ -25,7 +26,7 @@ partial
 
 ## Remaining
 
-- line 9 [local-fixable] Revise calling instructions and examples to request the smallest useful memory delta instead of mandatory detailed consolidation.
+- none
 
 ## External Blockers
 
@@ -33,4 +34,4 @@ partial
 
 ## Next Start
 
-- remaining checklist items require another iteration or external action
+- success: required gates passed
