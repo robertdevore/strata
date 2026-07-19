@@ -3,6 +3,6 @@ line	status	text	evidence
 4	already-done	Reduce the main memory skill to a compact policy router with mode-specific references loaded only when needed.	.loop-engineering/recommended-updates.md:4
 5	already-done	Make consolidation delta-based so routine or read-only sessions may produce no memory and handoffs are milestone-driven.	.loop-engineering/recommended-updates.md:5
 6	already-done	Batch deduplication, cap normal recall searches at 3–5 compact results, and stop once sufficient evidence is found.	.loop-engineering/recommended-updates.md:6
-7	local-fixable	Limit retrieval verification to one exact and one conceptual query for genuinely high-value memories.	.loop-engineering/recommended-updates.md:7
+7	already-done	Limit retrieval verification to one exact and one conceptual query for genuinely high-value memories.	.loop-engineering/recommended-updates.md:7
 8	local-fixable	Prevent atomic memories and handoffs from duplicating the same completed outcome without distinct retrieval value.	.loop-engineering/recommended-updates.md:8
 9	local-fixable	Revise calling instructions and examples to request the smallest useful memory delta instead of mandatory detailed consolidation.	.loop-engineering/recommended-updates.md:9

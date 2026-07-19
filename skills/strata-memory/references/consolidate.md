@@ -14,7 +14,7 @@ Persist only the durable memory delta from a completed session. A correct consol
 6. Save atomic memories through supported CLI/API commands in `Agent Notes`. Search-before-write is satisfied by the batch index when it covers that candidate’s claim and scope.
 7. Create a session episode/handoff only when a handoff trigger below applies. Point to atomic memory IDs or titles instead of repeating their bodies.
 8. Update a state snapshot, timeline, or project hub only when project state materially changed and a safe update path exists.
-9. Test each high-salience memory with an exact query, concept query, and partial cue.
+9. Test only genuinely high-value memories with one exact retrieval and one conceptual retrieval.
 10. Report only confirmed outcomes.
 
 ## Search budget
@@ -23,6 +23,19 @@ Persist only the durable memory delta from a completed session. A correct consol
 - Default consolidation deduplication: 1–3 compact searches for the whole candidate batch, not one search per candidate.
 - Inspect a full note only when its compact result may duplicate, contradict, or supersede an admitted candidate.
 - Stop when every admitted candidate has a supported outcome. Do not run broader searches “just in case.”
+
+## Retrieval verification
+
+A memory is high-value when it is a durable decision, correction, hard constraint, reusable procedure, costly lesson, or surviving commitment whose absence would materially change future action.
+
+For each high-value memory:
+
+1. Exact retrieval: use `notes get NOTE_ID --json`, or one exact identifier/title query when no note ID is available.
+2. Conceptual retrieval: run one compact natural-language paraphrase query with `--limit 5`.
+
+Pass when the exact lookup returns the saved note and the conceptual query returns that note or a directly connected handoff/hub. If the conceptual query fails, improve the heading, focused tags, or retrieval cues through a supported safe update and retry once.
+
+Do not run a separate partial-cue test. Do not test low-value handoffs or routine notes unless the user explicitly asks for retrieval validation.
 
 ## Concise atomic shape
 
@@ -54,7 +67,7 @@ Explicit source, artifact, command, test, commit, or user statement.
 
 - exact identifier
 - natural-language concept
-- partial cue
+- optional alias or partial cue for future recall
 
 ## Relationships
 
