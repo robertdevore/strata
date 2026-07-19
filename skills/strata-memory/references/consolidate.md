@@ -9,13 +9,20 @@ Persist only the durable memory delta from a completed session. A correct consol
 1. Inventory evidence pointers: user decisions/corrections, files, commits, issue/branch, commands/tests, artifacts, external sources, and exposed session/chat/run IDs.
 2. Extract independent candidates: decisions, facts, constraints, procedures, lessons, preferences, commitments, corrections, relationships, state changes, and timeline events.
 3. Apply the admission gate from `SKILL.md`. Reject transient, unsafe, unsupported, incorrectly scoped, or duplicated content. If no candidate survives, stop with a confirmed no-write result.
-4. Search before each write for the exact claim, key aliases, same session, conflicts, and superseded memory.
+4. Batch deduplication: group admitted candidates by scope and subject, then run 1–3 compact searches covering their exact claims, key aliases, session, conflicts, and possible supersession. Build one existing-memory index for the batch. Run a targeted follow-up only for an ambiguous candidate.
 5. Choose `save`, `merge`, `link`, `supersede`, `contest`, `defer`, or `reject`.
-6. Save atomic memories through supported CLI/API commands in `Agent Notes`.
+6. Save atomic memories through supported CLI/API commands in `Agent Notes`. Search-before-write is satisfied by the batch index when it covers that candidate’s claim and scope.
 7. Create a session episode/handoff only when a handoff trigger below applies. Point to atomic memory IDs or titles instead of repeating their bodies.
 8. Update a state snapshot, timeline, or project hub only when project state materially changed and a safe update path exists.
 9. Test each high-salience memory with an exact query, concept query, and partial cue.
 10. Report only confirmed outcomes.
+
+## Search budget
+
+- Default result limit: 5; use 3 for narrow exact lookups.
+- Default consolidation deduplication: 1–3 compact searches for the whole candidate batch, not one search per candidate.
+- Inspect a full note only when its compact result may duplicate, contradict, or supersede an admitted candidate.
+- Stop when every admitted candidate has a supported outcome. Do not run broader searches “just in case.”
 
 ## Concise atomic shape
 
