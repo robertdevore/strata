@@ -8,3 +8,4 @@ iteration	action	verdict	progress	evidence	justification
 001	configured-gates	success	1	iterations/001/eval.log	success: required gates passed
 001	configured-gates	success	1	iterations/001/eval.log	success: required gates passed
 001	configured-gates	success	1	iterations/001/eval.log	success: required gates passed
+001	configured-gates	success	1	iterations/001/eval.log	success: required gates passed

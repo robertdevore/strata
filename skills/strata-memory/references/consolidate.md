@@ -12,7 +12,7 @@ Persist only the durable memory delta from a completed session. A correct consol
 4. Batch deduplication: group admitted candidates by scope and subject, then run 1–3 compact searches covering their exact claims, key aliases, session, conflicts, and possible supersession. Build one existing-memory index for the batch. Run a targeted follow-up only for an ambiguous candidate.
 5. Choose `save`, `merge`, `link`, `supersede`, `contest`, `defer`, or `reject`.
 6. Save atomic memories through supported CLI/API commands in `Agent Notes`. Search-before-write is satisfied by the batch index when it covers that candidate’s claim and scope.
-7. Create a session episode/handoff only when a handoff trigger below applies. Point to atomic memory IDs or titles instead of repeating their bodies.
+7. Choose the minimum representation: atomic memory, handoff, or both only when each has distinct retrieval value. Create a handoff only when a trigger below applies, and point to atomic memory IDs or titles instead of repeating their bodies.
 8. Update a state snapshot, timeline, or project hub only when project state materially changed and a safe update path exists.
 9. Test only genuinely high-value memories with one exact retrieval and one conceptual retrieval.
 10. Report only confirmed outcomes.
@@ -85,9 +85,8 @@ Preserve uncertainty and validity dates when relevant. Volatile facts need sourc
 - Repository / branch / issue:
 - Platform / exposed IDs:
 - Goal:
-- Completed:
-- Verification:
-- Decisions/findings and atomic IDs:
+- Outcome: one sentence
+- Atomic memory IDs/titles:
 - Open commitments:
 - Risks/unknowns:
 - Next starting point:
@@ -109,6 +108,18 @@ Create a handoff when at least one applies:
 Do not create a handoff for routine chat, read-only inspection with no durable finding, a trivial completed edit already discoverable from committed artifacts, or a session whose only content duplicates existing memory.
 
 If neither an atomic memory nor a handoff is admitted, return `no durable memory delta` and perform no write, projection update, pending bundle, or retrieval test.
+
+## Representation choice and overlap check
+
+Before writing, compare the proposed atomic memories and handoff:
+
+- Use only atomic memory when one or more independent durable claims need future reuse but no session-level continuation is needed.
+- Use only a handoff when the durable value is the session episode or next starting point and there is no independent claim worth reusing elsewhere.
+- Use both only when the handoff indexes multiple atomic memories, preserves unfinished coordination, or provides a distinct chronological episode.
+- When both are used, the handoff contains one-line outcome and pointers. It must not restate atomic evidence, rationale, commands, file inventories, or full findings.
+- Skip the handoff when it would merely repeat a single completed atomic outcome.
+
+Count materially repeated claims across proposed notes before saving. Any repeated claim must be removed from one representation or justified as a pointer. “Detailed record” means durable evidence references and IDs, not duplicated prose.
 
 ## Supersession
 
