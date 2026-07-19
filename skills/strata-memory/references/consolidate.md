@@ -2,17 +2,17 @@
 
 ## Goal
 
-Turn a completed session into a small, durable, retrievable memory set.
+Persist only the durable memory delta from a completed session. A correct consolidation may write nothing.
 
 ## Workflow
 
 1. Inventory evidence pointers: user decisions/corrections, files, commits, issue/branch, commands/tests, artifacts, external sources, and exposed session/chat/run IDs.
 2. Extract independent candidates: decisions, facts, constraints, procedures, lessons, preferences, commitments, corrections, relationships, state changes, and timeline events.
-3. Apply the admission gate from `SKILL.md`. Reject transient, unsafe, unsupported, incorrectly scoped, or duplicated content.
+3. Apply the admission gate from `SKILL.md`. Reject transient, unsafe, unsupported, incorrectly scoped, or duplicated content. If no candidate survives, stop with a confirmed no-write result.
 4. Search before each write for the exact claim, key aliases, same session, conflicts, and superseded memory.
 5. Choose `save`, `merge`, `link`, `supersede`, `contest`, `defer`, or `reject`.
 6. Save atomic memories through supported CLI/API commands in `Agent Notes`.
-7. After a meaningful work session, create a session episode/handoff that points to atomic memory IDs or titles.
+7. Create a session episode/handoff only when a handoff trigger below applies. Point to atomic memory IDs or titles instead of repeating their bodies.
 8. Update a state snapshot, timeline, or project hub only when project state materially changed and a safe update path exists.
 9. Test each high-salience memory with an exact query, concept query, and partial cue.
 10. Report only confirmed outcomes.
@@ -74,7 +74,21 @@ Preserve uncertainty and validity dates when relevant. Volatile facts need sourc
 - Retrieval cues:
 ```
 
-A handoff is an episode, not a replacement for independent durable decisions, constraints, lessons, or commitments.
+A handoff is an episode, not a mandatory receipt for every task and not a replacement for independent durable decisions, constraints, lessons, or commitments.
+
+## Handoff triggers
+
+Create a handoff when at least one applies:
+
+- the user explicitly requests one;
+- unfinished work, a blocker, or a commitment must survive the session;
+- another agent or future session needs an exact next starting point;
+- a multi-step milestone materially changed project state;
+- the session produced several related atomic memories that benefit from an episode index.
+
+Do not create a handoff for routine chat, read-only inspection with no durable finding, a trivial completed edit already discoverable from committed artifacts, or a session whose only content duplicates existing memory.
+
+If neither an atomic memory nor a handoff is admitted, return `no durable memory delta` and perform no write, projection update, pending bundle, or retrieval test.
 
 ## Supersession
 
@@ -86,5 +100,4 @@ Preserve admitted candidates in a pending Markdown bundle with the intended `Age
 
 ## Report
 
-Return counts and IDs/titles for saved, merged, linked, superseded, contested, deferred, rejected, failed, and pending items; handoff/state changes; retrieval results; and the next recall cue.
-
+Return counts and IDs/titles for saved, merged, linked, superseded, contested, deferred, rejected, failed, and pending items; handoff/state changes; retrieval results; and the next recall cue. For a no-write consolidation, return only the reason no durable delta was admitted.
