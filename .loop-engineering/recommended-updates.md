@@ -1,7 +1,7 @@
 # Strata Memory Token-Cost Updates
 
 - [x] Fix `agent context search` query parsing, honor `--limit`, and return compact results by default.
-- [ ] Reduce the main memory skill to a compact policy router with mode-specific references loaded only when needed.
+- [x] Reduce the main memory skill to a compact policy router with mode-specific references loaded only when needed.
 - [ ] Make consolidation delta-based so routine or read-only sessions may produce no memory and handoffs are milestone-driven.
 - [ ] Batch deduplication, cap normal recall searches at 3–5 compact results, and stop once sufficient evidence is found.
 - [ ] Limit retrieval verification to one exact and one conceptual query for genuinely high-value memories.

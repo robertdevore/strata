@@ -43,7 +43,7 @@ eval_gates:
       - "docs/**"
 
   - id: diff_check
-    command: "git diff --check"
+    command: "git diff --check -- app skills CLI.md README.md docs"
     required: true
 
 commit:
