@@ -18,6 +18,10 @@ blocked_actions:
   - release_actions
 
 eval_gates:
+  - id: completion_audit
+    command: "npm test -- --run && npx tsc -b --pretty false && npx eslint app/cli/commands/agent.ts app/renderer/src/tests/cli/agentMode.test.ts && npm run build"
+    required: true
+
   - id: unit_tests
     command: "npm test -- --run"
     required: true

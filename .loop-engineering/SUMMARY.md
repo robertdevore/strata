@@ -16,7 +16,7 @@ success
 
 ## Verification
 
-- passed: lint, diff_check
+- passed: completion_audit, diff_check
 - blocked: none
 - failed: none
 
