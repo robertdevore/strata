@@ -1,0 +1,150 @@
+diff --git a/CLI.md b/CLI.md
+index 579e174..60f6063 100644
+--- a/CLI.md
++++ b/CLI.md
+@@ -172,9 +172,11 @@ npm run strata -- agent capture "..." --project "Agent Notes"
+ npm run strata -- agent decision "..." --project "Agent Notes"
+ npm run strata -- agent todo "..." --project "Agent Notes"
+ npm run strata -- agent summary --file ./summary.md --project "Agent Notes"
+-npm run strata -- agent context search "routing"
++npm run strata -- agent context search "routing" --limit 5
+ ```
+ 
++Agent context search returns compact records (`id`, title, snippet, timestamps, project, and tags) by default. Use `--full` only when complete note bodies are required. The default limit is 5 and the accepted range is 1–50.
++
+ Agent-mode defaults:
+ 
+ - JSON-first output
+diff --git a/app/cli/commands/agent.ts b/app/cli/commands/agent.ts
+index 08d4868..c9a04ed 100644
+--- a/app/cli/commands/agent.ts
++++ b/app/cli/commands/agent.ts
+@@ -15,6 +15,30 @@ interface AgentProjectTarget {
+ 	projectName?: string
+ }
+ 
++interface AgentContextOptions {
++	limit: string
++	full?: boolean
++}
++
++const compact_context_note = (note: Awaited<ReturnType<StrataApiClient['searchNotes']>>[number]) => {
++	const title = derive_title_from_markdown(note.content)
++	const snippet = note.content
++		.replace(/^#\s+.*$/m, '')
++		.replace(/\s+/g, ' ')
++		.trim()
++		.slice(0, 280)
++
++	return {
++		id: note.id,
++		title,
++		snippet,
++		updatedAt: note.updatedAt,
++		projectId: note.projectId,
++		tags: note.tags,
++		archived: note.archived,
++	}
++}
++
+ const build_agent_note = (text: string, extra_tags: string[]): { content: string; tags: string[] } => {
+ 	const trimmed = text.replace(/\r\n/g, '\n').trim()
+ 	const title = derive_title_from_markdown(trimmed)
+@@ -140,19 +164,25 @@ export const register_agent_commands = (
+ 			await create_agent_note(context, 'agent.summary', input, ['summary'], project)
+ 		})
+ 
+-	agent
+-		.command('context search <query>')
++	const context = agent
++		.command('context')
+ 		.description('Search notes for relevant agent context (non-destructive).')
+-		.option('--limit <count>', 'Limit result count', '20')
+-		.action(async function (query: string, command_options: { limit: string }) {
++
++	context
++		.command('search <query>')
++		.description('Search notes and return compact context results.')
++		.option('--limit <count>', 'Limit result count', '5')
++		.option('--full', 'Return complete note records instead of compact results')
++		.action(async function (query: string, command_options: AgentContextOptions) {
+ 			const { options, client } = get_context(this)
+-			const limit = Math.max(1, Math.min(500, Number.parseInt(command_options.limit, 10) || 20))
++			const limit = Math.max(1, Math.min(50, Number.parseInt(command_options.limit, 10) || 5))
+ 			const notes = await client.searchNotes(query, limit)
+ 			print_success(options, {
+ 				action: 'search',
+ 				query,
+ 				count: notes.length,
+-				notes,
++				compact: !command_options.full,
++				notes: command_options.full ? notes : notes.map(compact_context_note),
+ 			})
+ 		})
+ }
+diff --git a/app/renderer/src/tests/cli/agentMode.test.ts b/app/renderer/src/tests/cli/agentMode.test.ts
+index b908fcf..e118a19 100644
+--- a/app/renderer/src/tests/cli/agentMode.test.ts
++++ b/app/renderer/src/tests/cli/agentMode.test.ts
+@@ -1,4 +1,7 @@
+-import { describe, expect, it } from 'vitest'
++import { Command } from 'commander'
++import { describe, expect, it, vi } from 'vitest'
++import { register_agent_commands } from '../../../../cli/commands/agent'
++import type { StrataApiClient } from '../../../../cli/lib/apiClient'
+ import { ensure_agent_destructive_allowed, ensure_confirm_or_dry_run } from '../../../../cli/lib/agentMode'
+ import { CliError } from '../../../../cli/lib/errors'
+ import type { CliRuntimeOptions } from '../../../../cli/types'
+@@ -29,3 +32,52 @@ describe('cli agent safety guards', () => {
+ 		expect(() => ensure_agent_destructive_allowed({ ...base_options, agentMode: true }, true, 'notes delete')).not.toThrow()
+ 	})
+ })
++
++describe('cli agent context search', () => {
++	const note = {
++		id: '00000000-0000-0000-0000-000000000001',
++		content: '# Durable title\n\nA compact body that should become the snippet.',
++		createdAt: '2026-01-01T00:00:00.000Z',
++		updatedAt: '2026-01-02T00:00:00.000Z',
++		starred: false,
++		archived: false,
++		tags: ['memory'],
++		projectId: null,
++		deletedAt: null,
++	}
++
++	it('passes the intended query and limit and returns compact results by default', async () => {
++		const search_notes = vi.fn().mockResolvedValue([note])
++		const client = { searchNotes: search_notes } as unknown as StrataApiClient
++		const program = new Command().exitOverride()
++		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
++		register_agent_commands(program, () => ({ options: { ...base_options, outputMode: 'json' }, client }))
++
++		await program.parseAsync(['node', 'strata', 'agent', 'context', 'search', 'needle', '--limit', '2'])
++
++		expect(search_notes).toHaveBeenCalledWith('needle', 2)
++		const output = JSON.parse(String(write.mock.calls.at(-1)?.[0]))
++		expect(output.data.compact).toBe(true)
++		expect(output.data.notes[0]).toMatchObject({
++			id: note.id,
++			title: 'Durable title',
++			snippet: 'A compact body that should become the snippet.',
++		})
++		expect(output.data.notes[0]).not.toHaveProperty('content')
++		write.mockRestore()
++	})
++
++	it('returns complete note records only when --full is explicit', async () => {
++		const client = { searchNotes: vi.fn().mockResolvedValue([note]) } as unknown as StrataApiClient
++		const program = new Command().exitOverride()
++		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
++		register_agent_commands(program, () => ({ options: { ...base_options, outputMode: 'json' }, client }))
++
++		await program.parseAsync(['node', 'strata', 'agent', 'context', 'search', 'needle', '--full'])
++
++		const output = JSON.parse(String(write.mock.calls.at(-1)?.[0]))
++		expect(output.data.compact).toBe(false)
++		expect(output.data.notes[0].content).toBe(note.content)
++		write.mockRestore()
++	})
++})

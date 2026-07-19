@@ -1,0 +1,59 @@
+objective: "Reduce Strata memory workflow token cost while preserving durable second-brain recall"
+checklist_file: ".loop-engineering/recommended-updates.md"
+max_iterations: 1
+max_no_progress: 1
+max_consecutive_failures: 1
+
+allowed_actions:
+  - read_files
+  - edit_files
+  - run_tests
+  - commit_local_changes
+  - push_commits
+
+blocked_actions:
+  - deploy
+  - destructive_cleanup
+  - production_config_change
+  - release_actions
+
+eval_gates:
+  - id: unit_tests
+    command: "npm test -- --run"
+    required: true
+    when_files_match:
+      - "app/**"
+      - "package.json"
+      - "vitest.config.ts"
+
+  - id: typecheck
+    command: "npx tsc -b --pretty false"
+    required: true
+    when_files_match:
+      - "app/**"
+      - "tsconfig*.json"
+
+  - id: lint
+    command: "npx eslint app/cli/commands/agent.ts app/renderer/src/tests/cli/agentMode.test.ts"
+    required: true
+    when_files_match:
+      - "app/**"
+      - "skills/**"
+      - "CLI.md"
+      - "docs/**"
+
+  - id: diff_check
+    command: "git diff --check"
+    required: true
+
+commit:
+  enabled: false
+  strategy: small_meaningful
+  push: false
+
+memory:
+  enabled: true
+  provider: strata
+  project: "Agent Notes"
+  mode: consolidate
+  retrieval_tests: true

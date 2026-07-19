@@ -172,8 +172,10 @@ npm run strata -- agent capture "..." --project "Agent Notes"
 npm run strata -- agent decision "..." --project "Agent Notes"
 npm run strata -- agent todo "..." --project "Agent Notes"
 npm run strata -- agent summary --file ./summary.md --project "Agent Notes"
-npm run strata -- agent context search "routing"
+npm run strata -- agent context search "routing" --limit 5
 ```
+
+Agent context search returns compact records (`id`, title, snippet, timestamps, project, and tags) by default. Use `--full` only when complete note bodies are required. The default limit is 5 and the accepted range is 1–50.
 
 Agent-mode defaults:
 

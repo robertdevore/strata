@@ -15,6 +15,30 @@ interface AgentProjectTarget {
 	projectName?: string
 }
 
+interface AgentContextOptions {
+	limit: string
+	full?: boolean
+}
+
+const compact_context_note = (note: Awaited<ReturnType<StrataApiClient['searchNotes']>>[number]) => {
+	const title = derive_title_from_markdown(note.content)
+	const snippet = note.content
+		.replace(/^#\s+.*$/m, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 280)
+
+	return {
+		id: note.id,
+		title,
+		snippet,
+		updatedAt: note.updatedAt,
+		projectId: note.projectId,
+		tags: note.tags,
+		archived: note.archived,
+	}
+}
+
 const build_agent_note = (text: string, extra_tags: string[]): { content: string; tags: string[] } => {
 	const trimmed = text.replace(/\r\n/g, '\n').trim()
 	const title = derive_title_from_markdown(trimmed)
@@ -140,19 +164,25 @@ export const register_agent_commands = (
 			await create_agent_note(context, 'agent.summary', input, ['summary'], project)
 		})
 
-	agent
-		.command('context search <query>')
+	const context = agent
+		.command('context')
 		.description('Search notes for relevant agent context (non-destructive).')
-		.option('--limit <count>', 'Limit result count', '20')
-		.action(async function (query: string, command_options: { limit: string }) {
+
+	context
+		.command('search <query>')
+		.description('Search notes and return compact context results.')
+		.option('--limit <count>', 'Limit result count', '5')
+		.option('--full', 'Return complete note records instead of compact results')
+		.action(async function (query: string, command_options: AgentContextOptions) {
 			const { options, client } = get_context(this)
-			const limit = Math.max(1, Math.min(500, Number.parseInt(command_options.limit, 10) || 20))
+			const limit = Math.max(1, Math.min(50, Number.parseInt(command_options.limit, 10) || 5))
 			const notes = await client.searchNotes(query, limit)
 			print_success(options, {
 				action: 'search',
 				query,
 				count: notes.length,
-				notes,
+				compact: !command_options.full,
+				notes: command_options.full ? notes : notes.map(compact_context_note),
 			})
 		})
 }

@@ -1,0 +1,8 @@
+line	status	text	evidence
+3	already-done	Fix `agent context search` query parsing, honor `--limit`, and return compact results by default.	.loop-engineering/recommended-updates.md:3
+4	local-fixable	Reduce the main memory skill to a compact policy router with mode-specific references loaded only when needed.	.loop-engineering/recommended-updates.md:4
+5	local-fixable	Make consolidation delta-based so routine or read-only sessions may produce no memory and handoffs are milestone-driven.	.loop-engineering/recommended-updates.md:5
+6	local-fixable	Batch deduplication, cap normal recall searches at 3–5 compact results, and stop once sufficient evidence is found.	.loop-engineering/recommended-updates.md:6
+7	local-fixable	Limit retrieval verification to one exact and one conceptual query for genuinely high-value memories.	.loop-engineering/recommended-updates.md:7
+8	local-fixable	Prevent atomic memories and handoffs from duplicating the same completed outcome without distinct retrieval value.	.loop-engineering/recommended-updates.md:8
+9	local-fixable	Revise calling instructions and examples to request the smallest useful memory delta instead of mandatory detailed consolidation.	.loop-engineering/recommended-updates.md:9
