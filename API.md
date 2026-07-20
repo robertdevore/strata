@@ -12,6 +12,8 @@ Practical reference for tools and agents that create, read, update, and delete S
 - API is available only while Strata is running.
 - Data is local-only (SQLite in Strata `userData`).
 - Optional auth: set `STRATA_API_TOKEN` before launching Strata.
+- Paperclip/Chrome-extension compatibility bridge: `npm run paperclip:bridge`
+  exposes `http://127.0.0.1:7331/api/notes/upsert` and forwards to the Strata API.
 
 ## Quick Start
 
@@ -32,6 +34,26 @@ curl "http://127.0.0.1:3939/notes?query=project"
 ```
 
 For full CLI command coverage, see [CLI.md](CLI.md).
+
+## Paperclip Chrome Extension Bridge
+
+Strata's native API listens on `http://127.0.0.1:3939` and uses `/notes`.
+If a Chrome extension is configured for the older Paperclip bridge endpoint,
+start the compatibility bridge while Strata is open:
+
+```bash
+npm run paperclip:bridge
+```
+
+The bridge listens at `http://127.0.0.1:7331` and supports:
+
+- `GET /health`
+- `GET /api/health`
+- `POST /api/notes/upsert`
+
+It forwards writes to Strata and accepts flexible note payloads with fields such
+as `content`, `markdown`, `title`, `url`, `taskId`, `issueId`, `projectName`,
+`tags`, `starred`, and `archived`.
 
 ## Authentication and Headers
 

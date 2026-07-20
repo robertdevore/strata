@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "backup:notes": "./scripts/backup-notes.sh",
     "notes:api": "./scripts/notes-api.sh",
+    "paperclip:bridge": "node scripts/strata-paperclip-bridge.mjs",
     "strata": "tsx app/cli/index.ts",
     "strata:ai": "tsx app/cli/index.ts ai",
     "strata:notes": "tsx app/cli/index.ts notes",
