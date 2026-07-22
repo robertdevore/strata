@@ -3,8 +3,6 @@ import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/ipc'
 import type { AiChatResponse } from '../../shared/types'
 import type { StrataDatabase } from '../db/index'
-import { run_ai_turn, derive_chat_title, resolve_ai_settings } from '../ai/aiRunner'
-import { build_model_catalog } from '../ai/providers/providerRegistry'
 
 const thread_id_schema = z.object({ threadId: z.string().uuid() })
 const rename_thread_schema = z.object({ threadId: z.string().uuid(), title: z.string().trim().min(1).max(120) })
@@ -97,7 +95,7 @@ const build_open_notes_context = (open_notes: Array<{ id: string; title: string;
 }
 
 const resolve_chat_model = (db: StrataDatabase): string => {
-	const ai_settings = resolve_ai_settings(db)
+	const ai_settings = db.getSettings()
 	const mode = ai_settings.aiRoutingMode
 	if ('cheap_only' === mode) return ai_settings.aiCheapModel || 'deepseek-v4-flash'
 	return ai_settings.openAiModel || ai_settings.aiPremiumModel || 'gpt-4o'
@@ -134,6 +132,7 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 	})
 
 	ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
+		const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
 		const { threadId, message, openNotes } = send_schema.parse(payload)
 		const configured_model = resolve_chat_model(db)
 		const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
@@ -162,6 +161,7 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 	})
 
 	ipcMain.handle(IPC_CHANNELS.aiTranscribeAudio, async (_event, payload) => {
+		const { resolve_ai_settings } = await import('../ai/aiRunner')
 		const { base64Audio, mimeType, prompt, language } = transcribe_schema.parse(payload)
 		const ai_settings = resolve_ai_settings(db)
 		const api_key = ai_settings.openAiApiKey || process.env.STRATA_OPENAI_API_KEY?.trim()
@@ -222,7 +222,14 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
 
 	// AI model catalog
 	ipcMain.handle(IPC_CHANNELS.aiModelCatalog, () => {
-		const ai_settings = resolve_ai_settings(db)
-		return build_model_catalog(ai_settings)
+		const load_catalog = async () => {
+			const [{ resolve_ai_settings }, { build_model_catalog }] = await Promise.all([
+				import('../ai/aiRunner'),
+				import('../ai/providers/providerRegistry'),
+			])
+			const ai_settings = resolve_ai_settings(db)
+			return build_model_catalog(ai_settings)
+		}
+		return load_catalog()
 	})
 }
