@@ -5,6 +5,7 @@ import { IPC_CHANNELS } from '../shared/ipc'
 const api: StrataApi = {
 	notes: {
 		list: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesList, filters),
+		listSummaries: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesListSummaries, filters),
 		get: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesGet, { id }),
 		create: (payload) => ipcRenderer.invoke(IPC_CHANNELS.notesCreate, payload),
 		update: (id, patch) => ipcRenderer.invoke(IPC_CHANNELS.notesUpdate, { id, patch }),

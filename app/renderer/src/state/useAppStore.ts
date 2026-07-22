@@ -24,6 +24,14 @@ const is_effectively_untouched_content = (content: string): boolean => {
 /** Maximum number of in-memory drafts before evicting stale entries. */
 const MAX_DRAFTS = 50
 
+const upsert_note = (notes: Note[], note: Note): Note[] => {
+	const index = notes.findIndex((candidate) => candidate.id === note.id)
+	if (-1 === index) return [note, ...notes]
+	const next_notes = [...notes]
+	next_notes[index] = note
+	return next_notes
+}
+
 interface AppState {
 	notes: Note[]
 	projects: Project[]
@@ -52,6 +60,7 @@ interface AppState {
 	setSplitLayout: (layout: 'columns' | 'grid') => void
 	setSplitGridColumns: (cols: number) => void
 	load: () => Promise<void>
+	hydrateNote: (id: string) => Promise<void>
 	refreshTags: () => Promise<void>
 	setSearchQuery: (value: string) => void
 	setActiveFilter: (value: ActiveFilter) => void
@@ -176,9 +185,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 	},
 
 	async load() {
-		const [notes, projects, tags, settings] = await Promise.all([notesService.list(), projectsService.list(), notesService.listTags(), settingsService.get()])
+		const [notes, projects, tags, settings] = await Promise.all([
+			notesService.listSummaries(),
+			projectsService.list(),
+			notesService.listTags(),
+			settingsService.get(),
+		])
 		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
 		set((state) => {
+			const existing_notes_by_id = new Map(state.notes.map((note) => [note.id, note]))
 			const note_ids = new Set(notes.map((note) => note.id))
 			const project_ids = new Set(projects.map((project) => project.id))
 			const open_tabs = state.openTabs.filter((note_id) => note_ids.has(note_id))
@@ -202,9 +217,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 				: (split_note_ids.length > 0 ? Array(split_note_ids.length + 1).fill(1 / (split_note_ids.length + 1)) : [])
 
 			const filtered_projects = projects.filter((project) => project_ids.has(project.id))
+			const merged_notes = notes.map((note) => {
+				const existing_note = existing_notes_by_id.get(note.id)
+				return existing_note?.contentLoaded ? existing_note : note
+			})
 
 			return {
-				notes,
+				notes: merged_notes,
 				projects: filtered_projects,
 				tags,
 				settings,
@@ -217,6 +236,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 				splitRatios: split_ratios,
 			}
 		})
+		const state = get()
+		if (state.selectedNoteId) {
+			void state.hydrateNote(state.selectedNoteId)
+		}
+	},
+
+	async hydrateNote(id) {
+		const current = get().notes.find((note) => note.id === id)
+		if (!current || current.contentLoaded) return
+		const full_note = await notesService.get(id)
+		if (!full_note) return
+		set((state) => ({ notes: upsert_note(state.notes, full_note) }))
 	},
 
 	async refreshTags() {
@@ -237,6 +268,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	selectNote(selectedNoteId) {
 		set({ selectedNoteId })
+		if (selectedNoteId) void get().hydrateNote(selectedNoteId)
 	},
 
 	openNoteInTab(id) {
@@ -249,6 +281,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const already = state.openTabs.includes(id)
 		const tabs = already ? state.openTabs : [...state.openTabs, id]
 		set({ openTabs: tabs, selectedNoteId: id })
+		void get().hydrateNote(id)
 	},
 
 	closeTab(id) {
@@ -279,6 +312,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		} else {
 			set({ selectedNoteId: id })
 		}
+		void get().hydrateNote(id)
 	},
 
 	reorderTabs(from_id, to_id) {
@@ -304,6 +338,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const forward = [...state.navigationForwardStack, state.selectedNoteId!]
 		if (forward.length > 80) forward.shift()
 		set({ selectedNoteId: prev, navigationBackStack: back, navigationForwardStack: forward })
+		void get().hydrateNote(prev)
 	},
 
 	navigateForward() {
@@ -314,12 +349,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const back = [...state.navigationBackStack, state.selectedNoteId!]
 		if (back.length > 80) back.shift()
 		set({ selectedNoteId: next, navigationBackStack: back, navigationForwardStack: forward })
+		void get().hydrateNote(next)
 	},
 
 	async createNote() {
 		const note = await notesService.create()
 		set((state) => ({
-			notes: [note, ...state.notes],
+			notes: upsert_note(state.notes, note),
 			selectedNoteId: note.id, openTabs: [...state.openTabs, note.id],
 			drafts: { ...state.drafts, [note.id]: note.content },
 			untouchedNewNoteIds: { ...state.untouchedNewNoteIds, [note.id]: true },
@@ -405,7 +441,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 					delete untouched_new_note_ids[id]
 				}
 				return {
-					notes: current.notes.map((item) => (item.id === id ? updated : item)),
+					notes: upsert_note(current.notes, updated),
 					untouchedNewNoteIds: untouched_new_note_ids,
 					saveState: 'saved',
 					lastSavedAt: updated.updatedAt,
@@ -463,7 +499,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const restored = await notesService.restore(id)
 		if (!restored) return false
 		set((state) => ({
-			notes: [restored, ...state.notes.filter((note) => note.id !== restored.id)],
+			notes: upsert_note(state.notes.filter((note) => note.id !== restored.id), restored),
 			selectedNoteId: restored.id,
 			drafts: { ...state.drafts, [restored.id]: restored.content },
 			saveState: 'saved',

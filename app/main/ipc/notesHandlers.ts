@@ -45,6 +45,11 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
 		return db.listNotes(filters)
 	})
 
+	ipcMain.handle(IPC_CHANNELS.notesListSummaries, (_event, payload) => {
+		const filters = list_schema.parse(payload)
+		return db.listNoteSummaries(filters)
+	})
+
 	ipcMain.handle(IPC_CHANNELS.notesGet, (_event, payload) => {
 		const { id } = id_schema.parse(payload)
 		return db.getNote(id)

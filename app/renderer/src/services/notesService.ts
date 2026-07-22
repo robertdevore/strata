@@ -4,6 +4,9 @@ export const notesService = {
 	list(filters?: NotesFilter): Promise<Note[]> {
 		return window.strata.notes.list(filters)
 	},
+	listSummaries(filters?: NotesFilter): Promise<Note[]> {
+		return window.strata.notes.listSummaries(filters)
+	},
 	get(id: string): Promise<Note | null> {
 		return window.strata.notes.get(id)
 	},

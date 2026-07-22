@@ -9,6 +9,7 @@ export interface BackupListing {
 export interface StrataApi {
 	notes: {
 		list: (filters?: NotesFilter) => Promise<Note[]>
+		listSummaries: (filters?: NotesFilter) => Promise<Note[]>
 		get: (id: string) => Promise<Note | null>
 		create: (payload?: {
 			content?: string

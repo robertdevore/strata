@@ -20,6 +20,8 @@ interface DbNoteRow {
 	deleted_at: string | null
 }
 
+const NOTE_SUMMARY_CONTENT_LIMIT = 280
+
 interface DbProjectRow {
 	id: string
 	name: string
@@ -162,6 +164,22 @@ export class StrataDatabase {
 			tags: JSON.parse(row.tags) as string[],
 			projectId: row.project_id,
 			deletedAt: row.deleted_at,
+			contentLoaded: true,
+		}
+	}
+
+	private mapNoteSummary(row: DbNoteRow): Note {
+		return {
+			id: row.id,
+			content: row.content,
+			createdAt: row.created_at,
+			updatedAt: row.updated_at,
+			starred: Boolean(row.starred),
+			archived: Boolean(row.archived),
+			tags: JSON.parse(row.tags) as string[],
+			projectId: row.project_id,
+			deletedAt: row.deleted_at,
+			contentLoaded: false,
 		}
 	}
 
@@ -232,6 +250,54 @@ export class StrataDatabase {
 		`
 		const rows = this.db.prepare(query).all(...values) as DbNoteRow[]
 		return rows.map((row) => this.mapNote(row))
+	}
+
+	listNoteSummaries(filters?: NotesFilter): Note[] {
+		const values: unknown[] = [NOTE_SUMMARY_CONTENT_LIMIT]
+		const where: string[] = []
+
+		if (!filters?.includeDeleted) {
+			where.push('deleted_at IS NULL')
+		}
+		if (filters?.starred) {
+			where.push('starred = 1')
+		}
+		if (typeof filters?.archived === 'boolean') {
+			where.push('archived = ?')
+			values.push(filters.archived ? 1 : 0)
+		}
+		if (filters?.tag) {
+			where.push('tags LIKE ?')
+			values.push(`%"${filters.tag}"%`)
+		}
+		if (filters?.projectId) {
+			where.push('project_id = ?')
+			values.push(filters.projectId)
+		}
+		if (filters?.query) {
+			where.push('(content LIKE ? OR tags LIKE ? OR p.name LIKE ?)')
+			const wildcard = `%${filters.query}%`
+			values.push(wildcard, wildcard, wildcard)
+		}
+
+		const query = `
+			SELECT
+				n.id,
+				substr(n.content, 1, ?) AS content,
+				n.created_at,
+				n.updated_at,
+				n.starred,
+				n.archived,
+				n.tags,
+				n.project_id,
+				n.deleted_at
+			FROM notes n
+			LEFT JOIN projects p ON p.id = n.project_id
+			${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+			ORDER BY n.updated_at DESC
+		`
+		const rows = this.db.prepare(query).all(...values) as DbNoteRow[]
+		return rows.map((row) => this.mapNoteSummary(row))
 	}
 
 	getNote(id: string): Note | null {

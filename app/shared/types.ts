@@ -32,6 +32,7 @@ export interface Note {
 	tags: string[]
 	projectId: string | null
 	deletedAt: string | null
+	contentLoaded?: boolean
 }
 
 export interface NotesFilter {
