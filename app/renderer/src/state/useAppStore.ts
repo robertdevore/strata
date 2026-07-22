@@ -23,6 +23,10 @@ const is_effectively_untouched_content = (content: string): boolean => {
 
 /** Maximum number of in-memory drafts before evicting stale entries. */
 const MAX_DRAFTS = 50
+const NOTE_SUMMARY_LENGTH = 280
+const HYDRATED_NOTE_IDLE_MS = 2 * 60 * 1000
+
+const summarize_note_content = (content: string): string => content.slice(0, NOTE_SUMMARY_LENGTH)
 
 const upsert_note = (notes: Note[], note: Note): Note[] => {
 	const index = notes.findIndex((candidate) => candidate.id === note.id)
@@ -38,6 +42,8 @@ interface AppState {
 	selectedNoteId: string | null
 	drafts: Record<string, string>
 	untouchedNewNoteIds: Record<string, true>
+	noteSummaryCache: Record<string, string>
+	noteLastAccessedAt: Record<string, number>
 	tags: Array<{ name: string; count: number }>
 	activeFilter: ActiveFilter
 	selectedTag: string | null
@@ -61,6 +67,8 @@ interface AppState {
 	setSplitGridColumns: (cols: number) => void
 	load: () => Promise<void>
 	hydrateNote: (id: string) => Promise<void>
+	touchNote: (id: string) => void
+	evictInactiveNoteBodies: () => void
 	refreshTags: () => Promise<void>
 	setSearchQuery: (value: string) => void
 	setActiveFilter: (value: ActiveFilter) => void
@@ -128,6 +136,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 	selectedNoteId: null,
 	drafts: {},
 	untouchedNewNoteIds: {},
+	noteSummaryCache: {},
+	noteLastAccessedAt: {},
 	tags: [],
 	activeFilter: 'all',
 	selectedTag: null,
@@ -206,6 +216,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 				if (note_ids.has(note_id)) drafts[note_id] = draft
 			}
 
+			const note_summary_cache: Record<string, string> = {}
+			for (const note of notes) {
+				note_summary_cache[note.id] = summarize_note_content(note.content)
+			}
+			for (const note_id of Object.keys(state.noteSummaryCache)) {
+				if (note_ids.has(note_id) && !(note_id in note_summary_cache)) {
+					note_summary_cache[note_id] = state.noteSummaryCache[note_id]
+				}
+			}
+
+			const note_last_accessed_at: Record<string, number> = {}
+			for (const [note_id, last_accessed_at] of Object.entries(state.noteLastAccessedAt)) {
+				if (note_ids.has(note_id)) note_last_accessed_at[note_id] = last_accessed_at
+			}
+
 			const untouched_new_note_ids: Record<string, true> = {}
 			for (const note_id of Object.keys(state.untouchedNewNoteIds)) {
 				if (note_ids.has(note_id)) untouched_new_note_ids[note_id] = true
@@ -231,6 +256,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 				selectedNoteId: selected_note_id,
 				openTabs: open_tabs,
 				drafts,
+				noteSummaryCache: note_summary_cache,
+				noteLastAccessedAt: note_last_accessed_at,
 				untouchedNewNoteIds: untouched_new_note_ids,
 				splitNoteIds: split_note_ids,
 				splitRatios: split_ratios,
@@ -247,7 +274,53 @@ export const useAppStore = create<AppState>((set, get) => ({
 		if (!current || current.contentLoaded) return
 		const full_note = await notesService.get(id)
 		if (!full_note) return
-		set((state) => ({ notes: upsert_note(state.notes, full_note) }))
+		set((state) => ({
+			notes: upsert_note(state.notes, full_note),
+			noteSummaryCache: {
+				...state.noteSummaryCache,
+				[id]: state.noteSummaryCache[id] ?? summarize_note_content(current.content),
+			},
+			noteLastAccessedAt: {
+				...state.noteLastAccessedAt,
+				[id]: Date.now(),
+			},
+		}))
+	},
+
+	touchNote(id) {
+		set((state) => ({
+			noteLastAccessedAt: {
+				...state.noteLastAccessedAt,
+				[id]: Date.now(),
+			},
+		}))
+	},
+
+	evictInactiveNoteBodies() {
+		const state = get()
+		const now = Date.now()
+		const protected_ids = new Set(
+			[
+				state.selectedNoteId,
+				...state.openTabs,
+				...state.splitNoteIds,
+				...Object.keys(state.drafts),
+			].filter(Boolean) as string[],
+		)
+
+		set({
+			notes: state.notes.map((note) => {
+				if (!note.contentLoaded) return note
+				if (protected_ids.has(note.id)) return note
+				const last_accessed_at = state.noteLastAccessedAt[note.id] ?? 0
+				if (now - last_accessed_at < HYDRATED_NOTE_IDLE_MS) return note
+				return {
+					...note,
+					content: state.noteSummaryCache[note.id] ?? summarize_note_content(note.content),
+					contentLoaded: false,
+				}
+			}),
+		})
 	},
 
 	async refreshTags() {
@@ -268,7 +341,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	selectNote(selectedNoteId) {
 		set({ selectedNoteId })
-		if (selectedNoteId) void get().hydrateNote(selectedNoteId)
+		if (selectedNoteId) {
+			get().touchNote(selectedNoteId)
+			void get().hydrateNote(selectedNoteId)
+		}
 	},
 
 	openNoteInTab(id) {
@@ -281,6 +357,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const already = state.openTabs.includes(id)
 		const tabs = already ? state.openTabs : [...state.openTabs, id]
 		set({ openTabs: tabs, selectedNoteId: id })
+		get().touchNote(id)
 		void get().hydrateNote(id)
 	},
 
@@ -312,6 +389,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		} else {
 			set({ selectedNoteId: id })
 		}
+		get().touchNote(id)
 		void get().hydrateNote(id)
 	},
 
@@ -338,6 +416,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const forward = [...state.navigationForwardStack, state.selectedNoteId!]
 		if (forward.length > 80) forward.shift()
 		set({ selectedNoteId: prev, navigationBackStack: back, navigationForwardStack: forward })
+		get().touchNote(prev)
 		void get().hydrateNote(prev)
 	},
 
@@ -349,6 +428,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const back = [...state.navigationBackStack, state.selectedNoteId!]
 		if (back.length > 80) back.shift()
 		set({ selectedNoteId: next, navigationBackStack: back, navigationForwardStack: forward })
+		get().touchNote(next)
 		void get().hydrateNote(next)
 	},
 
@@ -358,6 +438,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 			notes: upsert_note(state.notes, note),
 			selectedNoteId: note.id, openTabs: [...state.openTabs, note.id],
 			drafts: { ...state.drafts, [note.id]: note.content },
+			noteSummaryCache: { ...state.noteSummaryCache, [note.id]: summarize_note_content(note.content) },
+			noteLastAccessedAt: { ...state.noteLastAccessedAt, [note.id]: Date.now() },
 			untouchedNewNoteIds: { ...state.untouchedNewNoteIds, [note.id]: true },
 			saveState: 'saved',
 			lastSavedAt: note.updatedAt,
@@ -389,6 +471,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 			return {
 				drafts,
+				noteLastAccessedAt: {
+					...state.noteLastAccessedAt,
+					[id]: Date.now(),
+				},
 				untouchedNewNoteIds: untouched_new_note_ids,
 				saveState: 'saving',
 			}
@@ -442,6 +528,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 				}
 				return {
 					notes: upsert_note(current.notes, updated),
+					noteSummaryCache: {
+						...current.noteSummaryCache,
+						[id]: summarize_note_content(updated.content),
+					},
+					noteLastAccessedAt: {
+						...current.noteLastAccessedAt,
+						[id]: Date.now(),
+					},
 					untouchedNewNoteIds: untouched_new_note_ids,
 					saveState: 'saved',
 					lastSavedAt: updated.updatedAt,
@@ -457,7 +551,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 		if (!current) return
 		const updated = await notesService.star(id, !current.starred)
 		if (!updated) return
-		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+		set((state) => ({
+			notes: state.notes.map((note) => (note.id === id ? updated : note)),
+			noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
+		}))
 	},
 
 	async toggleArchive(id) {
@@ -465,7 +562,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 		if (!current) return
 		const updated = await notesService.archive(id, !current.archived)
 		if (!updated) return
-		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+		set((state) => ({
+			notes: state.notes.map((note) => (note.id === id ? updated : note)),
+			noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
+		}))
 		await get().refreshTags()
 	},
 
@@ -502,6 +602,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 			notes: upsert_note(state.notes.filter((note) => note.id !== restored.id), restored),
 			selectedNoteId: restored.id,
 			drafts: { ...state.drafts, [restored.id]: restored.content },
+			noteSummaryCache: {
+				...state.noteSummaryCache,
+				[restored.id]: summarize_note_content(restored.content),
+			},
+			noteLastAccessedAt: {
+				...state.noteLastAccessedAt,
+				[restored.id]: Date.now(),
+			},
 			saveState: 'saved',
 			lastSavedAt: restored.updatedAt,
 		}))
@@ -519,14 +627,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const normalized = [...new Set(tags.map((tag) => normalizeTag(tag)).filter(Boolean))]
 		const updated = await notesService.update(id, { tags: normalized })
 		if (!updated) return
-		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+		set((state) => ({
+			notes: state.notes.map((note) => (note.id === id ? updated : note)),
+			noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
+		}))
 		await get().refreshTags()
 	},
 
 	async setProjectForNote(id, projectId) {
 		const updated = await notesService.update(id, { projectId })
 		if (!updated) return
-		set((state) => ({ notes: state.notes.map((note) => (note.id === id ? updated : note)) }))
+		set((state) => ({
+			notes: state.notes.map((note) => (note.id === id ? updated : note)),
+			noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
+		}))
 	},
 
 	setShowSettings(showSettings) {
