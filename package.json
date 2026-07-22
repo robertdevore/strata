@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "backup:notes": "./scripts/backup-notes.sh",
-    "notes:api": "./scripts/notes-api.sh",
+    "notes:api": "tsx app/cli/index.ts server",
     "paperclip:bridge": "node scripts/strata-paperclip-bridge.mjs",
     "strata": "tsx app/cli/index.ts",
     "strata:ai": "tsx app/cli/index.ts ai",

@@ -12,6 +12,7 @@ import { register_tags_commands } from './commands/tags'
 import { register_tasks_commands } from './commands/tasks'
 import { register_ai_commands } from './commands/ai'
 import { register_agent_commands } from './commands/agent'
+import { register_server_command } from './commands/server'
 
 const program = new Command()
 
@@ -69,6 +70,7 @@ register_tags_commands(program, get_context)
 register_tasks_commands(program, get_context)
 register_ai_commands(program, get_context)
 register_agent_commands(program, get_context)
+register_server_command(program, get_context)
 
 const run = async (): Promise<void> => {
 	try {
