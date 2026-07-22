@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Children, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView, keymap } from '@codemirror/view'
@@ -47,8 +47,14 @@ import {
   TrashIcon,
   UploadIcon,
 } from './icons'
-import { ChatPanel } from './ChatPanel'
-import { PublishModal } from './PublishModal'
+const ChatPanel = lazy(async () => {
+  const module = await import('./ChatPanel')
+  return { default: module.ChatPanel }
+})
+const PublishModal = lazy(async () => {
+  const module = await import('./PublishModal')
+  return { default: module.PublishModal }
+})
 
 interface EditorPaneProps {
   note: Note | null
@@ -1850,60 +1856,62 @@ export function EditorPane(props: EditorPaneProps) {
               aria-label={showChatPanel ? 'Resize chat panel' : 'Resize preview panel'}
             />
             {showChatPanel ? (
-              <ChatPanel
-                threads={chatThreads}
-                activeThreadId={chatThreadId}
-                messages={chatMessages}
-                modelName={active_chat_model}
-                threadModel={chatThreadModel}
-                modelCatalog={chatModelCatalog}
-                noteTitlesById={note_titles_by_id}
-                noteLinkOptions={note_link_options}
-                searchQuery={chatSearchQuery}
-                searchResults={chatSearchResults}
-                loadingThreads={chatLoadingThreads}
-                loadingMessages={chatLoadingMessages}
-                sending={chatSending}
-                assistantTyping={chatAssistantTyping}
-                deleting={chatDeleting}
-                errorMessage={chatErrorMessage}
-                chatUsageSummary={chatUsageSummary}
-                chatUsageLoading={chatUsageLoading}
-                onSelectThread={(thread_id) => {
-                  stopAssistantTypingAnimation()
-                  if (!thread_id) {
+              <Suspense fallback={<aside className="preview-panel preview-markdown" />}>
+                <ChatPanel
+                  threads={chatThreads}
+                  activeThreadId={chatThreadId}
+                  messages={chatMessages}
+                  modelName={active_chat_model}
+                  threadModel={chatThreadModel}
+                  modelCatalog={chatModelCatalog}
+                  noteTitlesById={note_titles_by_id}
+                  noteLinkOptions={note_link_options}
+                  searchQuery={chatSearchQuery}
+                  searchResults={chatSearchResults}
+                  loadingThreads={chatLoadingThreads}
+                  loadingMessages={chatLoadingMessages}
+                  sending={chatSending}
+                  assistantTyping={chatAssistantTyping}
+                  deleting={chatDeleting}
+                  errorMessage={chatErrorMessage}
+                  chatUsageSummary={chatUsageSummary}
+                  chatUsageLoading={chatUsageLoading}
+                  onSelectThread={(thread_id) => {
+                    stopAssistantTypingAnimation()
+                    if (!thread_id) {
+                      setChatThreadId(null)
+                      setChatMessages([])
+                      setChatUsageSummary(null)
+                      setChatUsageLoading(false)
+                      return
+                    }
+                    setChatThreadId(thread_id)
+                    setChatSearchResults([])
+                  }}
+                  onCreateThread={() => {
+                    stopAssistantTypingAnimation()
                     setChatThreadId(null)
                     setChatMessages([])
                     setChatUsageSummary(null)
                     setChatUsageLoading(false)
-                    return
-                  }
-                  setChatThreadId(thread_id)
-                  setChatSearchResults([])
-                }}
-                onCreateThread={() => {
-                  stopAssistantTypingAnimation()
-                  setChatThreadId(null)
-                  setChatMessages([])
-                  setChatUsageSummary(null)
-                  setChatUsageLoading(false)
-                  setChatSearchResults([])
-                  setChatErrorMessage('')
-                }}
-                onDeleteThread={deleteSelectedChatThread}
-                onRenameThread={renameChatThread}
-                onSearchQueryChange={setChatSearchQuery}
-                onRunSearch={(query) => void runChatSearch(query)}
-                onClearSearch={() => {
-                  setChatSearchQuery('')
-                  setChatSearchResults([])
-                }}
-                onSendMessage={sendChatMessage}
-                onOpenNote={(note_id, new_tab) => {
-                  void onOpenNoteFromChat(note_id, new_tab)
-                }}
-                onSetThreadModel={(model) => void setChatThreadModel(model)}
-              />
+                    setChatSearchResults([])
+                    setChatErrorMessage('')
+                  }}
+                  onDeleteThread={deleteSelectedChatThread}
+                  onRenameThread={renameChatThread}
+                  onSearchQueryChange={setChatSearchQuery}
+                  onRunSearch={(query) => void runChatSearch(query)}
+                  onClearSearch={() => {
+                    setChatSearchQuery('')
+                    setChatSearchResults([])
+                  }}
+                  onSendMessage={sendChatMessage}
+                  onOpenNote={(note_id, new_tab) => {
+                    void onOpenNoteFromChat(note_id, new_tab)
+                  }}
+                  onSetThreadModel={(model) => void setChatThreadModel(model)}
+                />
+              </Suspense>
             ) : (
               <article className="preview-panel preview-markdown">
                 <ReactMarkdown
@@ -2274,13 +2282,17 @@ export function EditorPane(props: EditorPaneProps) {
         onClose={() => setShowTagsEditor(false)}
         onApply={onSetTags}
       />
-      <PublishModal
-        key={showPublish ? `publish-open-${note.id}` : `publish-closed-${note.id}`}
-        open={showPublish}
-        noteTitle={deriveNoteTitle(content)}
-        noteContent={content}
-        onClose={() => setShowPublish(false)}
-      />
+      {showPublish && (
+        <Suspense fallback={null}>
+          <PublishModal
+            key={showPublish ? `publish-open-${note.id}` : `publish-closed-${note.id}`}
+            open={showPublish}
+            noteTitle={deriveNoteTitle(content)}
+            noteContent={content}
+            onClose={() => setShowPublish(false)}
+          />
+        </Suspense>
+      )}
       {showAiHistory && (
         <div className="modal-overlay" onClick={() => setShowAiHistory(false)}>
           <div className="modal-card related-notes-modal" onClick={(event) => event.stopPropagation()}>

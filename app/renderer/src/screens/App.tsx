@@ -1,12 +1,9 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorPane } from '@renderer/src/components/EditorPane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
 import { TabBar } from '@renderer/src/components/TabBar'
-import { SettingsModal } from '@renderer/src/components/SettingsModal'
 import { CommandPalette, type PaletteMode } from '@renderer/src/components/CommandPalette'
-import { TagsModal } from '@renderer/src/components/TagsModal'
-import { RelatedNotesModal } from '@renderer/src/components/RelatedNotesModal'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import type { UiCommand } from '@renderer/src/utils/commands'
 import { deriveNoteTitle } from '@renderer/src/domain/noteUtils'
@@ -16,6 +13,18 @@ import type { HotkeysSettings } from '@shared/hotkeys'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
 
 const isMac = navigator.userAgent.includes('Mac')
+const SettingsModal = lazy(async () => {
+  const module = await import('@renderer/src/components/SettingsModal')
+  return { default: module.SettingsModal }
+})
+const TagsModal = lazy(async () => {
+  const module = await import('@renderer/src/components/TagsModal')
+  return { default: module.TagsModal }
+})
+const RelatedNotesModal = lazy(async () => {
+  const module = await import('@renderer/src/components/RelatedNotesModal')
+  return { default: module.RelatedNotesModal }
+})
 
 interface ParsedHotkey {
   useCmd: boolean
@@ -1076,28 +1085,32 @@ export function App() {
           )}
         </div>
       </div>
-      <SettingsModal
-        open={store.showSettings}
-        settings={store.settings}
-        projects={store.projects}
-        projectNoteCounts={projectNoteCounts}
-        onClose={() => store.setShowSettings(false)}
-        onUpdate={(patch) => void store.updateSettings(patch)}
-        onProjectsChanged={async () => {
-          await store.load()
-        }}
-        onCreateBackup={async () => {
-          const result = await window.strata.backups.createNow()
-          await store.updateSettings({ lastAutoBackupAt: result.createdAt })
-          return result
-        }}
-        onOpenBackupsFolder={async () => {
-          await window.strata.backups.openFolder()
-        }}
-        onListBackups={async () => {
-          return await window.strata.backups.listRecent()
-        }}
-      />
+      {store.showSettings && (
+        <Suspense fallback={null}>
+          <SettingsModal
+            open={store.showSettings}
+            settings={store.settings}
+            projects={store.projects}
+            projectNoteCounts={projectNoteCounts}
+            onClose={() => store.setShowSettings(false)}
+            onUpdate={(patch) => void store.updateSettings(patch)}
+            onProjectsChanged={async () => {
+              await store.load()
+            }}
+            onCreateBackup={async () => {
+              const result = await window.strata.backups.createNow()
+              await store.updateSettings({ lastAutoBackupAt: result.createdAt })
+              return result
+            }}
+            onOpenBackupsFolder={async () => {
+              await window.strata.backups.openFolder()
+            }}
+            onListBackups={async () => {
+              return await window.strata.backups.listRecent()
+            }}
+          />
+        </Suspense>
+      )}
       {paletteMode && (
         <CommandPalette
           mode={paletteMode}
@@ -1115,32 +1128,40 @@ export function App() {
           onOpenSettings={() => store.setShowSettings(true)}
         />
       )}
-      <RelatedNotesModal
-        open={showRelatedNotes}
-        relatedNotes={relatedNotes}
-        onClose={() => setShowRelatedNotes(false)}
-        onOpenNote={(note_id, new_tab) => {
-          void openNoteFromChat(note_id, new_tab)
-          setShowRelatedNotes(false)
-        }}
-      />
-      <TagsModal
-        key={showTagsModal ? 'tags-modal-open' : 'tags-modal-closed'}
-        open={showTagsModal}
-        tags={store.tags}
-        pinnedTags={store.settings.pinnedTags ?? []}
-        selectedTag={store.selectedTag}
-        onClose={() => setShowTagsModal(false)}
-        onSelectTag={(tag) => store.setSelectedTag(tag)}
-        onPinTag={(tag) => {
-          const current = store.settings.pinnedTags ?? []
-          if (!current.includes(tag)) store.updateSettings({ pinnedTags: [...current, tag] })
-        }}
-        onUnpinTag={(tag) => {
-          const current = store.settings.pinnedTags ?? []
-          store.updateSettings({ pinnedTags: current.filter((t) => t !== tag) })
-        }}
-      />
+      {showRelatedNotes && (
+        <Suspense fallback={null}>
+          <RelatedNotesModal
+            open={showRelatedNotes}
+            relatedNotes={relatedNotes}
+            onClose={() => setShowRelatedNotes(false)}
+            onOpenNote={(note_id, new_tab) => {
+              void openNoteFromChat(note_id, new_tab)
+              setShowRelatedNotes(false)
+            }}
+          />
+        </Suspense>
+      )}
+      {showTagsModal && (
+        <Suspense fallback={null}>
+          <TagsModal
+            key={showTagsModal ? 'tags-modal-open' : 'tags-modal-closed'}
+            open={showTagsModal}
+            tags={store.tags}
+            pinnedTags={store.settings.pinnedTags ?? []}
+            selectedTag={store.selectedTag}
+            onClose={() => setShowTagsModal(false)}
+            onSelectTag={(tag) => store.setSelectedTag(tag)}
+            onPinTag={(tag) => {
+              const current = store.settings.pinnedTags ?? []
+              if (!current.includes(tag)) store.updateSettings({ pinnedTags: [...current, tag] })
+            }}
+            onUnpinTag={(tag) => {
+              const current = store.settings.pinnedTags ?? []
+              store.updateSettings({ pinnedTags: current.filter((t) => t !== tag) })
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

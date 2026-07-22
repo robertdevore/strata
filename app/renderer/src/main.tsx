@@ -1,4 +1,4 @@
-import { Component, StrictMode, type ReactNode } from 'react'
+import { Component, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as StrataApp } from './screens/App'
 import './styles/theme.css'
@@ -53,9 +53,7 @@ window.addEventListener('error', (event) => {
 })
 
 createRoot(root_element).render(
-	<StrictMode>
-		<RootErrorBoundary>
-			<StrataApp />
-		</RootErrorBoundary>
-	</StrictMode>,
+	<RootErrorBoundary>
+		<StrataApp />
+	</RootErrorBoundary>,
 )
