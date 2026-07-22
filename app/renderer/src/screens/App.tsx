@@ -1,6 +1,6 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { EditorPane } from '@renderer/src/components/EditorPane'
+import { HomePane } from '@renderer/src/components/HomePane'
 import { Sidebar } from '@renderer/src/components/Sidebar'
 import { TabBar } from '@renderer/src/components/TabBar'
 import { CommandPalette, type PaletteMode } from '@renderer/src/components/CommandPalette'
@@ -13,6 +13,10 @@ import type { HotkeysSettings } from '@shared/hotkeys'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
 
 const isMac = navigator.userAgent.includes('Mac')
+const EditorPane = lazy(async () => {
+  const module = await import('@renderer/src/components/EditorPane')
+  return { default: module.EditorPane }
+})
 const SettingsModal = lazy(async () => {
   const module = await import('@renderer/src/components/SettingsModal')
   return { default: module.SettingsModal }
@@ -485,6 +489,13 @@ export function App() {
   }, [load])
 
   useEffect(() => {
+    const interval_id = window.setInterval(() => {
+      store.evictInactiveNoteBodies()
+    }, 30_000)
+    return () => window.clearInterval(interval_id)
+  }, [store])
+
+  useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
       if (!event.metaKey && !event.ctrlKey) {
         if ('Escape' === event.key) {
@@ -837,7 +848,8 @@ export function App() {
               >
                 {splitNotes.map((pinned) => (
                   <div className="split-pane" key={`pinned-${pinned.id}`}>
-                    <EditorPane
+                    <Suspense fallback={<section className="editor" />}>
+                      <EditorPane
                       note={pinned.note}
                       notes={store.notes}
                       allNotes={store.notes}
@@ -879,11 +891,13 @@ export function App() {
                       onHomeScreenModeChange={setHomeScreenMode}
                       onCreateProjectNote={createProjectNote}
                       onOpenProjectNote={openLatestProjectNote}
-                    />
+                      />
+                    </Suspense>
                   </div>
                 ))}
                 <div className="split-pane">
-                  <EditorPane
+                  <Suspense fallback={<section className="editor" />}>
+                    <EditorPane
                     note={store.selectedNote()}
                     notes={store.notes}
                     allNotes={store.notes}
@@ -923,7 +937,8 @@ export function App() {
                     onHomeScreenModeChange={setHomeScreenMode}
                     onCreateProjectNote={createProjectNote}
                     onOpenProjectNote={openLatestProjectNote}
-                  />
+                    />
+                  </Suspense>
                 </div>
               </div>
             ) : (
@@ -942,7 +957,8 @@ export function App() {
                 {splitNotes.map((pinned, i) => (
                   <Fragment key={`pinned-${pinned.id}`}>
                     <div className="split-pane">
-                    <EditorPane
+                    <Suspense fallback={<section className="editor" />}>
+                      <EditorPane
                       note={pinned.note}
                       notes={store.notes}
                       allNotes={store.notes}
@@ -985,6 +1001,7 @@ export function App() {
                         onCreateProjectNote={createProjectNote}
                         onOpenProjectNote={openLatestProjectNote}
                       />
+                    </Suspense>
                     </div>
                     <div
                       className="panel-resizer panel-resizer-split"
@@ -996,7 +1013,8 @@ export function App() {
                   </Fragment>
                 ))}
                 <div className="split-pane">
-                  <EditorPane
+                  <Suspense fallback={<section className="editor" />}>
+                    <EditorPane
                     note={store.selectedNote()}
                     notes={store.notes}
                     allNotes={store.notes}
@@ -1036,52 +1054,69 @@ export function App() {
                     onHomeScreenModeChange={setHomeScreenMode}
                     onCreateProjectNote={createProjectNote}
                     onOpenProjectNote={openLatestProjectNote}
-                  />
+                    />
+                  </Suspense>
                 </div>
               </div>
             )
           ) : (
-                  <EditorPane
-                    note={store.selectedNote()}
-                    notes={store.notes}
-                    allNotes={store.notes}
-                    openTabIds={store.openTabs}
-              drafts={store.drafts}
-              openAiModel={store.settings.openAiModel}
-              content={store.effectiveContent()}
-              tags={store.tags}
-              saveState={store.saveState}
-              lastSavedAt={store.lastSavedAt}
-              sidebarCollapsed={sidebarCollapsed}
-              theme={store.settings.theme}
-              onChangeDraft={store.setDraft}
-              onFlush={store.flushDraft}
-              onToggleStar={(id) => void store.toggleStar(id)}
-              onToggleArchive={(id) => void store.toggleArchive(id)}
-              onDelete={(id) => void onDelete(id)}
-              onSetTags={(tags) => void store.setTagsForSelected(tags)}
-              onOpenNoteFromChat={openNoteFromChat}
-              onShowRelatedNotes={() => {
-                if (store.selectedNoteId) {
-                  window.strata.links
-                    .relatedNotes(store.selectedNoteId)
-                    .then(setRelatedNotes)
-                    .catch(() => setRelatedNotes([]))
-                  setShowRelatedNotes(true)
-                }
-              }}
-              onOpenSettings={() => store.setShowSettings(true)}
-              onThemeToggle={() =>
-                void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })
-              }
-              homeTiles={homeTiles}
-              onHomeTileAction={runHomeTileAction}
-              projects={store.projects}
-              homeScreenMode={homeScreenMode}
-              onHomeScreenModeChange={setHomeScreenMode}
-              onCreateProjectNote={createProjectNote}
-              onOpenProjectNote={openLatestProjectNote}
-            />
+            store.selectedNote() ? (
+              <Suspense fallback={<section className="editor" />}>
+                <EditorPane
+                  note={store.selectedNote()}
+                  notes={store.notes}
+                  allNotes={store.notes}
+                  openTabIds={store.openTabs}
+                  drafts={store.drafts}
+                  openAiModel={store.settings.openAiModel}
+                  content={store.effectiveContent()}
+                  tags={store.tags}
+                  saveState={store.saveState}
+                  lastSavedAt={store.lastSavedAt}
+                  sidebarCollapsed={sidebarCollapsed}
+                  theme={store.settings.theme}
+                  onChangeDraft={store.setDraft}
+                  onFlush={store.flushDraft}
+                  onToggleStar={(id) => void store.toggleStar(id)}
+                  onToggleArchive={(id) => void store.toggleArchive(id)}
+                  onDelete={(id) => void onDelete(id)}
+                  onSetTags={(tags) => void store.setTagsForSelected(tags)}
+                  onOpenNoteFromChat={openNoteFromChat}
+                  onShowRelatedNotes={() => {
+                    if (store.selectedNoteId) {
+                      window.strata.links
+                        .relatedNotes(store.selectedNoteId)
+                        .then(setRelatedNotes)
+                        .catch(() => setRelatedNotes([]))
+                      setShowRelatedNotes(true)
+                    }
+                  }}
+                  onOpenSettings={() => store.setShowSettings(true)}
+                  onThemeToggle={() =>
+                    void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })
+                  }
+                  homeTiles={homeTiles}
+                  onHomeTileAction={runHomeTileAction}
+                  projects={store.projects}
+                  homeScreenMode={homeScreenMode}
+                  onHomeScreenModeChange={setHomeScreenMode}
+                  onCreateProjectNote={createProjectNote}
+                  onOpenProjectNote={openLatestProjectNote}
+                />
+              </Suspense>
+            ) : (
+              <HomePane
+                notes={store.notes}
+                projects={store.projects}
+                homeScreenMode={homeScreenMode}
+                homeTiles={homeTiles}
+                onHomeScreenModeChange={setHomeScreenMode}
+                onHomeTileAction={runHomeTileAction}
+                onCreateProjectNote={createProjectNote}
+                onOpenProjectNote={openLatestProjectNote}
+                onOpenNote={openNoteFromChat}
+              />
+            )
           )}
         </div>
       </div>
