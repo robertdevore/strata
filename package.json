@@ -51,7 +51,7 @@
     "@types/turndown": "^5.0.6",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.1.1",
-    "concurrently": "^9.2.1",
+    "concurrently": "^9.2.4",
     "cross-env": "^10.1.0",
     "electron": "^40.8.5",
     "electron-builder": "^26.8.1",
