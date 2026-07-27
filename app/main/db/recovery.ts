@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { StrataDatabase } from './index'
 
 export interface DatabaseRecoveryResult {
@@ -50,7 +51,43 @@ const quarantine_database_files = (user_data_path: string): string => {
 	return backup_dir
 }
 
+const preflight_database_error = (user_data_path: string): Error | null => {
+	const db_path = path.join(user_data_path, 'data', 'strata.sqlite')
+	if (!fs.existsSync(db_path)) return null
+
+	const result = spawnSync('/usr/bin/sqlite3', [db_path, 'PRAGMA quick_check;'], {
+		encoding: 'utf8',
+		timeout: 5000,
+	})
+
+	if (result.error) {
+		if ('ENOENT' === result.error.name || result.error.message.includes('ENOENT')) return null
+		return result.error
+	}
+
+	if (result.status !== 0) {
+		return new Error((result.stderr || result.stdout || `sqlite3 exited with status ${result.status}`).trim())
+	}
+
+	if (result.stdout.trim() !== 'ok') {
+		return new Error(result.stdout.trim() || 'sqlite3 quick_check did not return ok')
+	}
+
+	return null
+}
+
 export const openStrataDatabaseWithRecovery = (user_data_path: string): DatabaseRecoveryResult => {
+	const preflight_error = preflight_database_error(user_data_path)
+	if (preflight_error) {
+		const backup_dir = quarantine_database_files(user_data_path)
+		return {
+			db: new StrataDatabase(user_data_path),
+			recovered: true,
+			backupDir: backup_dir,
+			originalError: preflight_error,
+		}
+	}
+
 	try {
 		return {
 			db: new StrataDatabase(user_data_path),

@@ -233,9 +233,11 @@ const createWindow = () => {
 }
 
 void app.whenReady().then(async () => {
+	console.info('[strata-startup] app ready')
 	setCspHeaders()
 
 	const user_data_path = app.getPath('userData')
+	console.info(`[strata-startup] opening database at ${user_data_path}`)
 	try {
 		database_recovery = openStrataDatabaseWithRecovery(user_data_path)
 		db = database_recovery.db
@@ -245,7 +247,9 @@ void app.whenReady().then(async () => {
 		app.quit()
 		return
 	}
+	console.info('[strata-startup] database open')
 	current_settings = db.getSettings()
+	console.info('[strata-startup] settings loaded')
 	const db_file_path = path.join(user_data_path, 'data', 'strata.sqlite')
 	const backup_directory = process.env.VITE_DEV_SERVER_URL
 		? path.join(process.cwd(), 'backups')
@@ -259,6 +263,7 @@ void app.whenReady().then(async () => {
 			db!.setSettings({ lastAutoBackupAt: created_at })
 		},
 	})
+	console.info('[strata-startup] backup manager ready')
 
 	registerNotesHandlers(db)
 	registerSettingsHandlers(db, (settings) => {
@@ -272,8 +277,11 @@ void app.whenReady().then(async () => {
 	registerPublishHandlers()
 	registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
 	backup_manager.start()
+	console.info('[strata-startup] ipc registered')
 
+	console.info('[strata-startup] creating window')
 	createWindow()
+	console.info('[strata-startup] window created')
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow()
 	})
