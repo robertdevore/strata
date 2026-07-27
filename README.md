@@ -1,11 +1,6 @@
 # Strata
 
-[![Release](https://img.shields.io/github/v/release/robertdevore/strata?label=release&color=2f6feb)](https://github.com/robertdevore/strata/releases)
-[![License](https://img.shields.io/github/license/robertdevore/strata?color=0e8a16)](LICENSE)
-[![Electron](https://img.shields.io/badge/electron-40.8.5-47848F?logo=electron)](https://www.electronjs.org/)
-[![TypeScript](https://img.shields.io/badge/typescript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/react-19-149ECA?logo=react&logoColor=white)](https://react.dev/)
-[![SQLite](https://img.shields.io/badge/sqlite-local--first-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Release](https://img.shields.io/github/v/release/robertdevore/strata?label=release&color=2f6feb)](https://github.com/robertdevore/strata/releases) [![License](https://img.shields.io/github/license/robertdevore/strata?color=0e8a16)](LICENSE) [![Electron](https://img.shields.io/badge/electron-40.8.5-47848F?logo=electron)](https://www.electronjs.org/) [![TypeScript](https://img.shields.io/badge/typescript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![React](https://img.shields.io/badge/react-19-149ECA?logo=react&logoColor=white)](https://react.dev/) [![SQLite](https://img.shields.io/badge/sqlite-local--first-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 
 Local-first Markdown notes app with optional AI, keyboard-first workflows, and a scriptable local API.
 
