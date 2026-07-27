@@ -21,7 +21,7 @@ Evidence status: confirmed.
 ## What Strata Is
 
 - Confirmed: Strata is described by its README as a "Local-first Markdown notes app with optional AI, keyboard-first workflows, and a scriptable local API." Source: [S1].
-- Confirmed: Package metadata names the project `strata`, marks it private, sets version `0.6.0`, uses MIT licensing, and describes it as a local-first minimalist Markdown notes app. Source: [S4].
+- Confirmed: Package metadata names the project `strata`, marks it private, sets version `0.7.0`, uses MIT licensing, and describes it as a local-first minimalist Markdown notes app. Source: [S4].
 - Confirmed: The app uses Electron main process code, a preload bridge exposed as `window.strata`, and a React renderer. Sources: [S1], [S5], [S8], [S15].
 - Confirmed: Data is stored locally in SQLite under Electron `userData`, with WAL mode and migrations for notes, settings, AI chat, wiki links, AI edit history, route logs, projects, and project ordering. Sources: [S6], [S16].
 - Confirmed: The local HTTP API listens on `127.0.0.1:3939` by default and exposes note, tag, project, search, backlink, related-note, and AI edit history/revert endpoints while Strata is running. Sources: [S3], [S7].
@@ -408,4 +408,3 @@ Evidence status: confirmed.
   Detail: backup manager and backup script.  
   Supports: backup workflow existence.  
   Evidence status: confirmed.
-

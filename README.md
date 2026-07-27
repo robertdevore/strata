@@ -17,12 +17,12 @@ Local-first Markdown notes app with optional AI, keyboard-first workflows, and a
 - Local HTTP API + CLI for automation and agent workflows.
 - Security-hardened desktop architecture (sandbox + context isolation).
 
-## What is new in 0.6.0
+## What is new in 0.7.0
 
-- Multi-pinned split panes (pin multiple notes at once).
-- Grid layout mode for pinned notes (2/3/4-column workflows).
-- Memory/performance improvements across renderer and main process.
-- Cleaner split-pane behavior and tab-level pin controls.
+- Hardened startup so the app window opens before the local API finishes booting.
+- Rebuilt the packaged app with Electron-compatible SQLite native bindings.
+- Added corrupt-database recovery that preserves damaged files and restores the newest healthy backup when available.
+- Shows the current app version in the sidebar header from package metadata.
 
 ## Install
 

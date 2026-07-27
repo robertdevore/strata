@@ -324,7 +324,10 @@ export function Sidebar(props: SidebarProps) {
         <div className="app-title-row">
           {!props.sidebarCollapsed && (
             <div className="app-title-left">
-              <p className="app-title">STRATA</p>
+              <div className="app-title-group">
+                <p className="app-title">STRATA</p>
+                <p className="app-version">{__APP_VERSION__}</p>
+              </div>
             </div>
           )}
           <div className="app-title-actions">
