@@ -1,9 +1,11 @@
 import path from 'node:path'
-import { app, BrowserWindow, Menu, session } from 'electron'
+import { app, BrowserWindow, dialog, Menu, session } from 'electron'
 import { fileURLToPath } from 'node:url'
 import type { Settings } from '../shared/types'
 import { DEFAULT_HOTKEYS } from '../shared/hotkeys'
 import { StrataDatabase } from './db/index'
+import type { DatabaseRecoveryResult } from './db/recovery'
+import { openStrataDatabaseWithRecovery } from './db/recovery'
 import { BackupManager } from './backup/backupManager'
 import { registerNotesHandlers } from './ipc/notesHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
@@ -22,6 +24,7 @@ let notes_api_server: { close: () => Promise<void> } | null = null
 let backup_manager: BackupManager | null = null
 let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
+let database_recovery: DatabaseRecoveryResult | null = null
 
 const hotkey_to_electron_accelerator = (hotkey: string): string | undefined => {
 	const value = hotkey.trim()
@@ -215,13 +218,33 @@ const createWindow = () => {
 	} else {
 		main_window.loadFile(path.join(__dirname, '../renderer/index.html'))
 	}
+
+	if (database_recovery?.recovered && database_recovery.backupDir) {
+		const backup_dir = database_recovery.backupDir
+		main_window.webContents.once('did-finish-load', () => {
+			void dialog.showMessageBox(main_window!, {
+				type: 'warning',
+				title: 'Strata Recovered Its Database',
+				message: 'Strata found a damaged local database and started with a fresh one.',
+				detail: `The damaged database files were preserved here:\n${backup_dir}`,
+			})
+		})
+	}
 }
 
-app.whenReady().then(async () => {
+void app.whenReady().then(async () => {
 	setCspHeaders()
 
 	const user_data_path = app.getPath('userData')
-	db = new StrataDatabase(user_data_path)
+	try {
+		database_recovery = openStrataDatabaseWithRecovery(user_data_path)
+		db = database_recovery.db
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		dialog.showErrorBox('Strata Could Not Start', `Strata could not open its local database.\n\n${message}`)
+		app.quit()
+		return
+	}
 	current_settings = db.getSettings()
 	const db_file_path = path.join(user_data_path, 'data', 'strata.sqlite')
 	const backup_directory = process.env.VITE_DEV_SERVER_URL
@@ -262,6 +285,10 @@ app.whenReady().then(async () => {
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow()
 	})
+}).catch((error: unknown) => {
+	const message = error instanceof Error ? error.message : String(error)
+	dialog.showErrorBox('Strata Could Not Start', message)
+	app.quit()
 })
 
 app.on('before-quit', () => {

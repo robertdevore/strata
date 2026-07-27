@@ -1,6 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
-import { StrataDatabase } from '../main/db/index'
+import { openStrataDatabaseWithRecovery } from '../main/db/recovery'
 import { startNotesApiServer } from '../main/api/notesApiServer'
 
 const default_user_data_dir = (): string => {
@@ -15,7 +15,8 @@ const default_user_data_dir = (): string => {
 
 const run = async (): Promise<void> => {
 	const user_data_dir = (process.env.STRATA_USER_DATA_DIR || default_user_data_dir()).trim()
-	const db = new StrataDatabase(user_data_dir)
+	const database_recovery = openStrataDatabaseWithRecovery(user_data_dir)
+	const db = database_recovery.db
 
 	const shutdown = async (server: { close: () => Promise<void> }) => {
 		process.off('SIGINT', on_sigint)
@@ -40,6 +41,9 @@ const run = async (): Promise<void> => {
 	process.on('SIGTERM', on_sigterm)
 
 	active_server = await startNotesApiServer(db)
+	if (database_recovery.recovered && database_recovery.backupDir) {
+		console.warn(`[strata-server] Recovered damaged database files to ${database_recovery.backupDir}`)
+	}
 	console.info(`[strata-server] Using data from ${user_data_dir}`)
 
 	await new Promise<void>(() => {
