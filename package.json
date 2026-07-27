@@ -98,8 +98,10 @@
   },
   "overrides": {
     "tmp": "0.2.7",
-    "postcss": "8.5.15",
-    "axios": "1.16.1",
+    "postcss": "8.5.23",
+    "axios": "1.18.1",
+    "brace-expansion": "5.0.8",
+    "minimatch": "10.2.5",
     "ip-address": "10.2.0",
     "@xmldom/xmldom": "0.8.13",
     "follow-redirects": "1.16.0",
