@@ -1,7 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
+import { Worker } from 'node:worker_threads'
 import { StrataDatabase } from './index'
+
+const require = createRequire(import.meta.url)
 
 export interface DatabaseRecoveryResult {
 	db: StrataDatabase
@@ -51,59 +54,74 @@ const quarantine_database_files = (user_data_path: string): string => {
 	return backup_dir
 }
 
-const preflight_database_error = async (user_data_path: string): Promise<Error | null> => {
-	const db_path = path.join(user_data_path, 'data', 'strata.sqlite')
-	if (!fs.existsSync(db_path)) return null
+const probe_database_in_worker = async (db_path: string): Promise<Error | null> => {
+	const better_sqlite3_path = require.resolve('better-sqlite3')
+	const worker_source = `
+		const { parentPort, workerData } = require('node:worker_threads')
+		try {
+			const Database = require(workerData.betterSqlite3Path)
+			const db = new Database(workerData.dbPath, { readonly: true, fileMustExist: true })
+			const row = db.prepare('PRAGMA quick_check').get()
+			db.close()
+			const value = String(Object.values(row ?? {})[0] ?? '')
+			parentPort.postMessage({ ok: value === 'ok', message: value || 'sqlite quick_check returned no result' })
+		} catch (error) {
+			parentPort.postMessage({
+				ok: false,
+				message: error instanceof Error ? error.message : String(error),
+				code: error && typeof error === 'object' && 'code' in error ? String(error.code) : '',
+			})
+		}
+	`
 
 	return await new Promise<Error | null>((resolve) => {
-		let stdout = ''
-		let stderr = ''
 		let settled = false
-		const child = spawn('/usr/bin/sqlite3', [db_path, 'PRAGMA quick_check;'], {
-			stdio: ['ignore', 'pipe', 'pipe'],
+		const worker = new Worker(worker_source, {
+			eval: true,
+			workerData: {
+				betterSqlite3Path: better_sqlite3_path,
+				dbPath: db_path,
+			},
 		})
 
 		const settle = (error: Error | null) => {
 			if (settled) return
 			settled = true
 			clearTimeout(timer)
+			void worker.terminate()
 			resolve(error)
 		}
 
 		const timer = setTimeout(() => {
-			child.kill()
-			settle(new Error('sqlite3 quick_check timed out'))
+			settle(new Error('database quick_check timed out'))
 		}, 5000)
 
-		child.stdout.setEncoding('utf8')
-		child.stdout.on('data', (chunk: string) => {
-			stdout += chunk
-		})
-		child.stderr.setEncoding('utf8')
-		child.stderr.on('data', (chunk: string) => {
-			stderr += chunk
-		})
-
-		child.once('error', (error) => {
-			if ('code' in error && error.code === 'ENOENT') {
+		worker.once('message', (result: { ok?: boolean; message?: string; code?: string }) => {
+			if (result.ok) {
 				settle(null)
 				return
 			}
+			const error = new Error(result.message || 'database quick_check failed')
+			if (result.code) Object.assign(error, { code: result.code })
 			settle(error)
 		})
 
-		child.once('close', (code) => {
-			if (0 !== code) {
-				settle(new Error((stderr || stdout || `sqlite3 exited with status ${code ?? 'null'}`).trim()))
-				return
+		worker.once('error', (error) => {
+			settle(error)
+		})
+
+		worker.once('exit', (code) => {
+			if (!settled && code !== 0) {
+				settle(new Error(`database quick_check worker exited with code ${code}`))
 			}
-			if (stdout.trim() !== 'ok') {
-				settle(new Error(stdout.trim() || 'sqlite3 quick_check did not return ok'))
-				return
-			}
-			settle(null)
 		})
 	})
+}
+
+const preflight_database_error = async (user_data_path: string): Promise<Error | null> => {
+	const db_path = path.join(user_data_path, 'data', 'strata.sqlite')
+	if (!fs.existsSync(db_path)) return null
+	return await probe_database_in_worker(db_path)
 }
 
 export const openStrataDatabaseWithRecovery = async (user_data_path: string): Promise<DatabaseRecoveryResult> => {
