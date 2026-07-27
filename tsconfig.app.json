@@ -9,6 +9,7 @@
     "skipLibCheck": true,
     "paths": {
       "@renderer/*": ["./app/renderer/*"],
+      "@main/*": ["./app/main/*"],
       "@shared/*": ["./app/shared/*"],
       "@preload/*": ["./app/preload/*"]
     },
