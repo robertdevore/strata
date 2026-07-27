@@ -15,7 +15,7 @@ const default_user_data_dir = (): string => {
 
 const run = async (): Promise<void> => {
 	const user_data_dir = (process.env.STRATA_USER_DATA_DIR || default_user_data_dir()).trim()
-	const database_recovery = openStrataDatabaseWithRecovery(user_data_dir)
+	const database_recovery = await openStrataDatabaseWithRecovery(user_data_dir)
 	const db = database_recovery.db
 
 	const shutdown = async (server: { close: () => Promise<void> }) => {

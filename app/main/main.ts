@@ -239,7 +239,7 @@ void app.whenReady().then(async () => {
 	const user_data_path = app.getPath('userData')
 	console.info(`[strata-startup] opening database at ${user_data_path}`)
 	try {
-		database_recovery = openStrataDatabaseWithRecovery(user_data_path)
+		database_recovery = await openStrataDatabaseWithRecovery(user_data_path)
 		db = database_recovery.db
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)

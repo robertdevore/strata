@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { StrataDatabase } from './index'
 
 export interface DatabaseRecoveryResult {
@@ -51,33 +51,63 @@ const quarantine_database_files = (user_data_path: string): string => {
 	return backup_dir
 }
 
-const preflight_database_error = (user_data_path: string): Error | null => {
+const preflight_database_error = async (user_data_path: string): Promise<Error | null> => {
 	const db_path = path.join(user_data_path, 'data', 'strata.sqlite')
 	if (!fs.existsSync(db_path)) return null
 
-	const result = spawnSync('/usr/bin/sqlite3', [db_path, 'PRAGMA quick_check;'], {
-		encoding: 'utf8',
-		timeout: 5000,
+	return await new Promise<Error | null>((resolve) => {
+		let stdout = ''
+		let stderr = ''
+		let settled = false
+		const child = spawn('/usr/bin/sqlite3', [db_path, 'PRAGMA quick_check;'], {
+			stdio: ['ignore', 'pipe', 'pipe'],
+		})
+
+		const settle = (error: Error | null) => {
+			if (settled) return
+			settled = true
+			clearTimeout(timer)
+			resolve(error)
+		}
+
+		const timer = setTimeout(() => {
+			child.kill()
+			settle(new Error('sqlite3 quick_check timed out'))
+		}, 5000)
+
+		child.stdout.setEncoding('utf8')
+		child.stdout.on('data', (chunk: string) => {
+			stdout += chunk
+		})
+		child.stderr.setEncoding('utf8')
+		child.stderr.on('data', (chunk: string) => {
+			stderr += chunk
+		})
+
+		child.once('error', (error) => {
+			if ('code' in error && error.code === 'ENOENT') {
+				settle(null)
+				return
+			}
+			settle(error)
+		})
+
+		child.once('close', (code) => {
+			if (0 !== code) {
+				settle(new Error((stderr || stdout || `sqlite3 exited with status ${code ?? 'null'}`).trim()))
+				return
+			}
+			if (stdout.trim() !== 'ok') {
+				settle(new Error(stdout.trim() || 'sqlite3 quick_check did not return ok'))
+				return
+			}
+			settle(null)
+		})
 	})
-
-	if (result.error) {
-		if ('ENOENT' === result.error.name || result.error.message.includes('ENOENT')) return null
-		return result.error
-	}
-
-	if (result.status !== 0) {
-		return new Error((result.stderr || result.stdout || `sqlite3 exited with status ${result.status}`).trim())
-	}
-
-	if (result.stdout.trim() !== 'ok') {
-		return new Error(result.stdout.trim() || 'sqlite3 quick_check did not return ok')
-	}
-
-	return null
 }
 
-export const openStrataDatabaseWithRecovery = (user_data_path: string): DatabaseRecoveryResult => {
-	const preflight_error = preflight_database_error(user_data_path)
+export const openStrataDatabaseWithRecovery = async (user_data_path: string): Promise<DatabaseRecoveryResult> => {
+	const preflight_error = await preflight_database_error(user_data_path)
 	if (preflight_error) {
 		const backup_dir = quarantine_database_files(user_data_path)
 		return {
