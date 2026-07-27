@@ -17,7 +17,7 @@
     "strata:notes": "tsx app/cli/index.ts notes",
     "strata:ai:legacy": "node scripts/strata-ai.mjs",
     "clean:release": "rm -rf release",
-    "dist": "npm run clean:release && npm run build && electron-builder",
+    "dist": "npm run clean:release && npm run build && electron-rebuild -f -w better-sqlite3 && electron-builder",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",

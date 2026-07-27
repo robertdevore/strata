@@ -242,6 +242,7 @@ void app.whenReady().then(async () => {
 		database_recovery = await openStrataDatabaseWithRecovery(user_data_path)
 		db = database_recovery.db
 	} catch (error) {
+		console.error('[strata-startup] failed to open database', error)
 		const message = error instanceof Error ? error.message : String(error)
 		dialog.showErrorBox('Strata Could Not Start', `Strata could not open its local database.\n\n${message}`)
 		app.quit()
