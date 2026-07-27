@@ -273,17 +273,17 @@ void app.whenReady().then(async () => {
 	registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
 	backup_manager.start()
 
-	try {
-		notes_api_server = await startNotesApiServer(db, {
-			onNotesChanged: () => main_window?.webContents.send('notes:changed'),
-		})
-	} catch (error) {
-		console.error('[strata-api] Failed to start notes API server', error)
-	}
-
 	createWindow()
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow()
+	})
+
+	void startNotesApiServer(db, {
+		onNotesChanged: () => main_window?.webContents.send('notes:changed'),
+	}).then((server) => {
+		notes_api_server = server
+	}).catch((error: unknown) => {
+		console.error('[strata-api] Failed to start notes API server', error)
 	})
 }).catch((error: unknown) => {
 	const message = error instanceof Error ? error.message : String(error)
