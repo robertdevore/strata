@@ -10,6 +10,7 @@ export interface DatabaseRecoveryResult {
 	db: StrataDatabase
 	recovered: boolean
 	backupDir: string | null
+	restoredFromBackupPath: string | null
 	originalError: unknown | null
 }
 
@@ -52,6 +53,16 @@ const quarantine_database_files = (user_data_path: string): string => {
 	move_if_exists(`${db_path}-wal`, backup_dir)
 	move_if_exists(`${db_path}-shm`, backup_dir)
 	return backup_dir
+}
+
+const list_backup_database_paths = (user_data_path: string): string[] => {
+	const backups_dir = path.join(user_data_path, 'backups')
+	if (!fs.existsSync(backups_dir)) return []
+	return fs.readdirSync(backups_dir)
+		.sort()
+		.reverse()
+		.map((entry) => path.join(backups_dir, entry, 'strata.sqlite'))
+		.filter((backup_path) => fs.existsSync(backup_path))
 }
 
 const probe_database_in_worker = async (db_path: string): Promise<Error | null> => {
@@ -124,16 +135,35 @@ const preflight_database_error = async (user_data_path: string): Promise<Error |
 	return await probe_database_in_worker(db_path)
 }
 
+const restore_latest_healthy_backup = async (user_data_path: string): Promise<string | null> => {
+	const data_dir = path.join(user_data_path, 'data')
+	const db_path = path.join(data_dir, 'strata.sqlite')
+	for (const backup_path of list_backup_database_paths(user_data_path)) {
+		const backup_error = await probe_database_in_worker(backup_path)
+		if (backup_error) continue
+		fs.mkdirSync(data_dir, { recursive: true })
+		fs.copyFileSync(backup_path, db_path)
+		return backup_path
+	}
+	return null
+}
+
+const recover_from_corruption = async (user_data_path: string, error: unknown): Promise<DatabaseRecoveryResult> => {
+	const backup_dir = quarantine_database_files(user_data_path)
+	const restored_backup_path = await restore_latest_healthy_backup(user_data_path)
+	return {
+		db: new StrataDatabase(user_data_path),
+		recovered: true,
+		backupDir: backup_dir,
+		restoredFromBackupPath: restored_backup_path,
+		originalError: error,
+	}
+}
+
 export const openStrataDatabaseWithRecovery = async (user_data_path: string): Promise<DatabaseRecoveryResult> => {
 	const preflight_error = await preflight_database_error(user_data_path)
 	if (preflight_error) {
-		const backup_dir = quarantine_database_files(user_data_path)
-		return {
-			db: new StrataDatabase(user_data_path),
-			recovered: true,
-			backupDir: backup_dir,
-			originalError: preflight_error,
-		}
+		return await recover_from_corruption(user_data_path, preflight_error)
 	}
 
 	try {
@@ -141,16 +171,11 @@ export const openStrataDatabaseWithRecovery = async (user_data_path: string): Pr
 			db: new StrataDatabase(user_data_path),
 			recovered: false,
 			backupDir: null,
+			restoredFromBackupPath: null,
 			originalError: null,
 		}
 	} catch (error) {
 		if (!is_database_corruption_error(error)) throw error
-		const backup_dir = quarantine_database_files(user_data_path)
-		return {
-			db: new StrataDatabase(user_data_path),
-			recovered: true,
-			backupDir: backup_dir,
-			originalError: error,
-		}
+		return await recover_from_corruption(user_data_path, error)
 	}
 }

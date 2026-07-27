@@ -221,12 +221,18 @@ const createWindow = () => {
 
 	if (database_recovery?.recovered && database_recovery.backupDir) {
 		const backup_dir = database_recovery.backupDir
+		const restored_from = database_recovery.restoredFromBackupPath
 		main_window.webContents.once('did-finish-load', () => {
 			void dialog.showMessageBox(main_window!, {
 				type: 'warning',
 				title: 'Strata Recovered Its Database',
-				message: 'Strata found a damaged local database and started with a fresh one.',
-				detail: `The damaged database files were preserved here:\n${backup_dir}`,
+				message: restored_from
+					? 'Strata found a damaged local database and restored the latest healthy backup.'
+					: 'Strata found a damaged local database and started with a fresh one because no healthy backup was available.',
+				detail: [
+					`Damaged database files were preserved here:\n${backup_dir}`,
+					restored_from ? `Restored backup:\n${restored_from}` : null,
+				].filter(Boolean).join('\n\n'),
 			})
 		})
 	}

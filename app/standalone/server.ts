@@ -43,6 +43,9 @@ const run = async (): Promise<void> => {
 	active_server = await startNotesApiServer(db)
 	if (database_recovery.recovered && database_recovery.backupDir) {
 		console.warn(`[strata-server] Recovered damaged database files to ${database_recovery.backupDir}`)
+		if (database_recovery.restoredFromBackupPath) {
+			console.warn(`[strata-server] Restored latest healthy backup from ${database_recovery.restoredFromBackupPath}`)
+		}
 	}
 	console.info(`[strata-server] Using data from ${user_data_dir}`)
 
