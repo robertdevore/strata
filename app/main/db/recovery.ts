@@ -65,6 +65,12 @@ const list_backup_database_paths = (user_data_path: string): string[] => {
 		.filter((backup_path) => fs.existsSync(backup_path))
 }
 
+const database_bundle_paths = (db_path: string): string[] => [
+	db_path,
+	`${db_path}-wal`,
+	`${db_path}-shm`,
+]
+
 const probe_database_in_worker = async (db_path: string): Promise<Error | null> => {
 	const better_sqlite3_path = require.resolve('better-sqlite3')
 	const worker_source = `
@@ -137,12 +143,18 @@ const preflight_database_error = async (user_data_path: string): Promise<Error |
 
 const restore_latest_healthy_backup = async (user_data_path: string): Promise<string | null> => {
 	const data_dir = path.join(user_data_path, 'data')
-	const db_path = path.join(data_dir, 'strata.sqlite')
 	for (const backup_path of list_backup_database_paths(user_data_path)) {
 		const backup_error = await probe_database_in_worker(backup_path)
 		if (backup_error) continue
 		fs.mkdirSync(data_dir, { recursive: true })
-		fs.copyFileSync(backup_path, db_path)
+		for (const source_path of database_bundle_paths(backup_path)) {
+			const destination_path = path.join(data_dir, path.basename(source_path))
+			if (fs.existsSync(source_path)) {
+				fs.copyFileSync(source_path, destination_path)
+			} else if (fs.existsSync(destination_path)) {
+				fs.rmSync(destination_path)
+			}
+		}
 		return backup_path
 	}
 	return null

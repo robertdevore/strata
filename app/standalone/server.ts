@@ -5,12 +5,12 @@ import { startNotesApiServer } from '../main/api/notesApiServer'
 
 const default_user_data_dir = (): string => {
 	if ('darwin' === process.platform) {
-		return path.join(os.homedir(), 'Library', 'Application Support', 'strata')
+		return path.join(os.homedir(), 'Library', 'Application Support', 'Strata')
 	}
 	if ('win32' === process.platform) {
-		return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'strata')
+		return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Strata')
 	}
-	return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'strata')
+	return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'Strata')
 }
 
 const run = async (): Promise<void> => {
