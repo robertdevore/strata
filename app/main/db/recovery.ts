@@ -71,8 +71,17 @@ const database_bundle_paths = (db_path: string): string[] => [
 	`${db_path}-shm`,
 ]
 
-const probe_database_in_worker = async (db_path: string): Promise<Error | null> => {
-	const better_sqlite3_path = require.resolve('better-sqlite3')
+const resolve_better_sqlite3_entry = (): string => {
+	const packaged_directory = process.resourcesPath
+		? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'better-sqlite3')
+		: ''
+	const packaged_entry = packaged_directory ? path.join(packaged_directory, 'lib', 'index.js') : ''
+	if (packaged_entry && fs.existsSync(packaged_entry)) return packaged_entry
+	return require.resolve('better-sqlite3')
+}
+
+export const probeDatabase = async (db_path: string): Promise<Error | null> => {
+	const better_sqlite3_path = resolve_better_sqlite3_entry()
 	const worker_source = `
 		const { parentPort, workerData } = require('node:worker_threads')
 		try {
@@ -138,13 +147,14 @@ const probe_database_in_worker = async (db_path: string): Promise<Error | null> 
 const preflight_database_error = async (user_data_path: string): Promise<Error | null> => {
 	const db_path = path.join(user_data_path, 'data', 'strata.sqlite')
 	if (!fs.existsSync(db_path)) return null
-	return await probe_database_in_worker(db_path)
+	const probe_error = await probeDatabase(db_path)
+	return probe_error && is_database_corruption_error(probe_error) ? probe_error : null
 }
 
-const restore_latest_healthy_backup = async (user_data_path: string): Promise<string | null> => {
+const restore_first_healthy_database = async (user_data_path: string, candidates: string[]): Promise<string | null> => {
 	const data_dir = path.join(user_data_path, 'data')
-	for (const backup_path of list_backup_database_paths(user_data_path)) {
-		const backup_error = await probe_database_in_worker(backup_path)
+	for (const backup_path of candidates) {
+		const backup_error = await probeDatabase(backup_path)
 		if (backup_error) continue
 		fs.mkdirSync(data_dir, { recursive: true })
 		for (const source_path of database_bundle_paths(backup_path)) {
@@ -162,7 +172,11 @@ const restore_latest_healthy_backup = async (user_data_path: string): Promise<st
 
 const recover_from_corruption = async (user_data_path: string, error: unknown): Promise<DatabaseRecoveryResult> => {
 	const backup_dir = quarantine_database_files(user_data_path)
-	const restored_backup_path = await restore_latest_healthy_backup(user_data_path)
+	const quarantined_database_path = path.join(backup_dir, 'strata.sqlite')
+	const restored_backup_path = await restore_first_healthy_database(user_data_path, [
+		quarantined_database_path,
+		...list_backup_database_paths(user_data_path),
+	])
 	return {
 		db: new StrataDatabase(user_data_path),
 		recovered: true,

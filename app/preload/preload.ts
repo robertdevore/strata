@@ -37,6 +37,8 @@ const api: StrataApi = {
 		createNow: () => ipcRenderer.invoke(IPC_CHANNELS.backupCreateNow),
 		openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.backupOpenFolder),
 		listRecent: () => ipcRenderer.invoke(IPC_CHANNELS.backupListRecent),
+		restoreSelect: () => ipcRenderer.invoke(IPC_CHANNELS.backupRestoreSelect),
+		restoreNamed: (name) => ipcRenderer.invoke(IPC_CHANNELS.backupRestoreNamed, { name }),
 	},
 	ai: {
 		listThreads: () => ipcRenderer.invoke(IPC_CHANNELS.aiThreadsList),

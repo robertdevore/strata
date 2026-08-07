@@ -1143,6 +1143,12 @@ export function App() {
             onListBackups={async () => {
               return await window.strata.backups.listRecent()
             }}
+            onRestoreSelectedBackup={async () => {
+              return await window.strata.backups.restoreSelect()
+            }}
+            onRestoreBackup={async (name) => {
+              return await window.strata.backups.restoreNamed(name)
+            }}
           />
         </Suspense>
       )}

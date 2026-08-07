@@ -48,6 +48,8 @@ export interface StrataApi {
 		createNow: () => Promise<BackupResult>
 		openFolder: () => Promise<boolean>
 		listRecent: () => Promise<BackupListing[]>
+		restoreSelect: () => Promise<{ canceled: boolean }>
+		restoreNamed: (name: string) => Promise<{ canceled: boolean }>
 	}
 	ai: {
 		listThreads: () => Promise<AiThreadSummary[]>

@@ -1,12 +1,22 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import Database from 'better-sqlite3'
+import { createRequire } from 'node:module'
 import { v4 as uuidv4 } from 'uuid'
 import type { AiMessage, AiNoteEdit, AiRouteLog, AiThread, AiThreadSummary, Note, NoteLink, NoteUpdatePatch, NotesFilter, Project, Settings } from '../../shared/types'
 import { DEFAULT_HOTKEYS } from '../../shared/hotkeys'
 import { DEFAULT_HOME_TILES } from '../../shared/homeTiles'
 import { DEFAULT_SIDEBAR_LAYOUT } from '../../shared/sidebarLayout'
 import { migrations } from './migrations/index'
+
+const require = createRequire(import.meta.url)
+const packaged_database_directory = process.resourcesPath
+	? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'better-sqlite3')
+	: ''
+const Database = require(
+	packaged_database_directory && fs.existsSync(path.join(packaged_database_directory, 'package.json'))
+		? packaged_database_directory
+		: 'better-sqlite3',
+) as typeof import('better-sqlite3')
 
 interface DbNoteRow {
 	id: string
@@ -108,7 +118,7 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 export class StrataDatabase {
-	private db: Database.Database
+	private db: import('better-sqlite3').Database
 	constructor(user_data_path: string) {
 		const data_dir = path.join(user_data_path, 'data')
 		if (!fs.existsSync(data_dir)) fs.mkdirSync(data_dir, { recursive: true })
@@ -129,6 +139,10 @@ export class StrataDatabase {
 			this.db.exec('PRAGMA optimize')
 		} catch { /* ignore — db may already be in bad state */ }
 		this.db.close()
+	}
+
+	async backupTo(destination_path: string): Promise<void> {
+		await this.db.backup(destination_path)
 	}
 
 	private runMigrations() {
@@ -213,6 +227,25 @@ export class StrataDatabase {
 		}
 	}
 
+	/**
+	 * Build the WHERE-fragment for an exact tag match against a tag-array column
+	 * aliased as `n.tags` (used by `listNotes` and `listNoteSummaries`).
+	 *
+	 * Tags are stored as a JSON array string (e.g. `["foo","bar"]`). The previous
+	 * implementation matched them with a LIKE pattern, which had two problems:
+	 *   1. SQL LIKE wildcards (`%`, `_`) inside the filter tag were interpreted as
+	 *      wildcards, so a filter like `bar%` matched `bar`, `bar2`, `bar3`, etc.
+	 *   2. The pattern had no anchor at the start of an array element, so a
+	 *      malformed or unusual JSON shape could surface as a false positive.
+	 *
+	 * The fix uses SQLite's JSON1 `json_each` to iterate the array and compare
+	 * each element to the filter value, so the match is exact and special
+	 * characters are not interpreted as wildcards.
+	 */
+	private tagWhereFragment(): string {
+		return "EXISTS (SELECT 1 FROM json_each(n.tags) WHERE json_each.value = ?)"
+	}
+
 	listNotes(filters?: NotesFilter): Note[] {
 		const values: unknown[] = []
 		const where: string[] = []
@@ -228,8 +261,8 @@ export class StrataDatabase {
 			values.push(filters.archived ? 1 : 0)
 		}
 		if (filters?.tag) {
-			where.push("tags LIKE ?")
-			values.push(`%"${filters.tag}"%`)
+			where.push(this.tagWhereFragment())
+			values.push(filters.tag)
 		}
 		if (filters?.projectId) {
 			where.push('project_id = ?')
@@ -267,8 +300,8 @@ export class StrataDatabase {
 			values.push(filters.archived ? 1 : 0)
 		}
 		if (filters?.tag) {
-			where.push('tags LIKE ?')
-			values.push(`%"${filters.tag}"%`)
+			where.push(this.tagWhereFragment())
+			values.push(filters.tag)
 		}
 		if (filters?.projectId) {
 			where.push('project_id = ?')

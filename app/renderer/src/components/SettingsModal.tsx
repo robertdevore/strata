@@ -29,6 +29,8 @@ interface SettingsModalProps {
   onCreateBackup: () => Promise<{ directory: string; createdAt: string }>
   onOpenBackupsFolder: () => Promise<void>
   onListBackups: () => Promise<Array<{ name: string; createdAt: string; sizeBytes: number }>>
+  onRestoreSelectedBackup: () => Promise<{ canceled: boolean }>
+  onRestoreBackup: (name: string) => Promise<{ canceled: boolean }>
 }
 
 type SettingsTab = 'general' | 'home' | 'sidebar' | 'projects' | 'ai' | 'backups' | 'hotkeys'
@@ -89,11 +91,14 @@ export function SettingsModal({
   onCreateBackup,
   onOpenBackupsFolder,
   onListBackups,
+  onRestoreSelectedBackup,
+  onRestoreBackup,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>('general')
   const [backup_status, set_backup_status] = useState('')
   const [is_creating_backup, set_is_creating_backup] = useState(false)
   const [is_opening_backup_folder, set_is_opening_backup_folder] = useState(false)
+  const [is_restoring_backup, set_is_restoring_backup] = useState(false)
   const [show_advanced, set_show_advanced] = useState(false)
   const [backup_list, set_backup_list] = useState<
     Array<{ name: string; createdAt: string; sizeBytes: number }>
@@ -876,6 +881,10 @@ export function SettingsModal({
                 </select>
               </label>
               <p className="tags-label">Last auto backup: {format_backup_time(settings.lastAutoBackupAt)}</p>
+              <p className="tags-label" style={{ lineHeight: 1.4 }}>
+                Restore a complete SQLite backup. Strata saves the current database first, validates the selected
+                backup, and restarts with the restored data.
+              </p>
               <div className="modal-actions backup-actions">
                 <button
                   className="primary-button"
@@ -909,6 +918,24 @@ export function SettingsModal({
                 >
                   Open backups folder
                 </button>
+                <button
+                  className="ghost-button"
+                  disabled={is_restoring_backup}
+                  onClick={() => {
+                    set_is_restoring_backup(true)
+                    set_backup_status('Choose a Strata backup to restore…')
+                    void onRestoreSelectedBackup()
+                      .then((result) => {
+                        set_backup_status(result.canceled ? 'Restore canceled.' : 'Restoring backup and restarting Strata…')
+                      })
+                      .catch((error) =>
+                        set_backup_status(error instanceof Error ? error.message : 'Restore failed'),
+                      )
+                      .finally(() => set_is_restoring_backup(false))
+                  }}
+                >
+                  Restore backup…
+                </button>
               </div>
               {backup_status && <p className="tags-label">{backup_status}</p>}
               {backup_list.length > 0 && (
@@ -916,10 +943,29 @@ export function SettingsModal({
                   <p className="backup-list-title">Recent backups</p>
                   {backup_list.map((item) => (
                     <div key={item.name} className="backup-list-item">
-                      <span className="backup-list-item-name">{item.name}</span>
-                      <span className="backup-list-item-meta">
-                        {new Date(item.createdAt).toLocaleDateString()} · {format_backup_size(item.sizeBytes)}
-                      </span>
+                      <div>
+                        <span className="backup-list-item-name">{item.name}</span>
+                        <span className="backup-list-item-meta">
+                          {new Date(item.createdAt).toLocaleDateString()} · {format_backup_size(item.sizeBytes)}
+                        </span>
+                      </div>
+                      <button
+                        className="ghost-button"
+                        disabled={is_restoring_backup}
+                        onClick={() => {
+                          if (!window.confirm(`Restore backup “${item.name}”? Strata will restart after saving the current database.`)) return
+                          set_is_restoring_backup(true)
+                          set_backup_status(`Validating ${item.name}…`)
+                          void onRestoreBackup(item.name)
+                            .then(() => set_backup_status('Restoring backup and restarting Strata…'))
+                            .catch((error) =>
+                              set_backup_status(error instanceof Error ? error.message : 'Restore failed'),
+                            )
+                            .finally(() => set_is_restoring_backup(false))
+                        }}
+                      >
+                        Restore
+                      </button>
                     </div>
                   ))}
                 </div>

@@ -28,6 +28,7 @@
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.14",
+    "@types/three": "^0.185.3",
     "@uiw/react-codemirror": "^4.25.4",
     "better-sqlite3": "^12.6.2",
     "commander": "^14.0.3",
@@ -35,6 +36,7 @@
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "three": "^0.185.1",
     "turndown": "^7.2.2",
     "uuid": "^14.0.0",
     "zod": "^4.3.6",
@@ -81,7 +83,19 @@
     },
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**",
+      "node_modules/bindings/**",
+      "node_modules/file-uri-to-path/**"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+        "to": "app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+      }
     ],
     "mac": {
       "icon": "build/icons/icon.icns",
@@ -110,5 +124,6 @@
     "flatted": "3.4.2",
     "ws": "8.21.0",
     "esbuild": "0.28.1"
-  }
+  },
+  "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74a7a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23eb1b6a0"
 }

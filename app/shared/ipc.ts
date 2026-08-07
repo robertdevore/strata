@@ -22,6 +22,8 @@ export const IPC_CHANNELS = {
 	backupCreateNow: 'backup:create-now',
 	backupOpenFolder: 'backup:open-folder',
 	backupListRecent: 'backup:list-recent',
+	backupRestoreSelect: 'backup:restore-select',
+	backupRestoreNamed: 'backup:restore-named',
 	aiThreadsList: 'ai:threads:list',
 	aiThreadDelete: 'ai:thread:delete',
 	aiThreadRename: 'ai:thread:rename',

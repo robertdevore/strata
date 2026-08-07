@@ -7,6 +7,7 @@ import { StrataDatabase } from './db/index'
 import type { DatabaseRecoveryResult } from './db/recovery'
 import { openStrataDatabaseWithRecovery } from './db/recovery'
 import { BackupManager } from './backup/backupManager'
+import type { BackupRestorePreparation } from './backup/backupManager'
 import { registerNotesHandlers } from './ipc/notesHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerExportHandlers } from './ipc/exportHandlers'
@@ -25,6 +26,18 @@ let backup_manager: BackupManager | null = null
 let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
 let database_recovery: DatabaseRecoveryResult | null = null
+
+const restore_prepared_database = async (preparation: BackupRestorePreparation): Promise<void> => {
+	backup_manager?.stop()
+	await notes_api_server?.close()
+	notes_api_server = null
+	db?.close()
+	db = null
+	current_settings = null
+	backup_manager?.commitRestore(preparation)
+	app.relaunch()
+	app.exit(0)
+}
 
 const hotkey_to_electron_accelerator = (hotkey: string): string | undefined => {
 	const value = hotkey.trim()
@@ -266,6 +279,7 @@ void app.whenReady().then(async () => {
 		dbFilePath: db_file_path,
 		backupDir: backup_directory,
 		getSettings: () => db!.getSettings(),
+		backupDatabase: (destination_path) => db!.backupTo(destination_path),
 		onAutoBackupCreated: (created_at) => {
 			db!.setSettings({ lastAutoBackupAt: created_at })
 		},
@@ -279,7 +293,7 @@ void app.whenReady().then(async () => {
 	})
 	registerExportHandlers()
 	registerAiHandlers(db, () => main_window?.webContents.send('notes:changed'))
-	registerBackupHandlers(backup_manager)
+	registerBackupHandlers(backup_manager, restore_prepared_database)
 	registerLinksHandlers(db)
 	registerPublishHandlers()
 	registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
