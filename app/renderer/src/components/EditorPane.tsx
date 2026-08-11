@@ -653,10 +653,11 @@ export function EditorPane(props: EditorPaneProps) {
       const voices = window.speechSynthesis.getVoices()
       if (voices.length > 0) {
         setTtsVoices(voices)
-        if (!ttsVoice) {
+        setTtsVoice((currentVoice) => {
+          if (currentVoice) return currentVoice
           const preferred = voices.find((v) => v.name.includes('Samantha') || v.name.includes('Alex'))
-          setTtsVoice(preferred ? preferred.name : voices[0].name)
-        }
+          return preferred ? preferred.name : voices[0].name
+        })
       }
     }
     loadVoices()
