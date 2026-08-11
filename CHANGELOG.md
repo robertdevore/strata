@@ -8,6 +8,7 @@
 - Removed unused Three.js prototype dependencies from the production branch to reduce install and package weight.
 - Updated transitive security overrides and the Electron packaging toolchain.
 - Updated the SQLite native binding for compatibility with the release Electron runtime.
+- Corrected package-manager detection so release installers exclude development dependencies.
 - Reduced the README to install, usage, automation, development, and security essentials.
 
 ### Fixed
