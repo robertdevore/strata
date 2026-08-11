@@ -9,6 +9,7 @@
 - Updated transitive security overrides and the Electron packaging toolchain.
 - Updated the SQLite native binding for compatibility with the release Electron runtime.
 - Corrected package-manager detection so release installers exclude development dependencies.
+- Restricted packaged build inputs to runtime bundles so stale installer output cannot be nested into a new release.
 - Reduced the README to install, usage, automation, development, and security essentials.
 
 ### Fixed
