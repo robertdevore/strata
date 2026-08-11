@@ -22,6 +22,7 @@ export const parseWikiLinks = (content: string): ParsedWikiLink[] => {
 	WIKI_LINK_RE.lastIndex = 0
 	while ((match = WIKI_LINK_RE.exec(content)) !== null) {
 		const rawTarget = (match[1] ?? '').trim()
+		if (!rawTarget) continue
 		const heading = match[2]?.trim() ?? null
 		const label = match[3]?.trim() ?? null
 		links.push({

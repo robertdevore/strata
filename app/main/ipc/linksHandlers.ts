@@ -3,22 +3,11 @@ import { z } from 'zod'
 import type { Note } from '../../shared/types'
 import type { StrataDatabase } from '../db/index'
 import { IPC_CHANNELS } from '../../shared/ipc'
+import { deriveNoteTitle } from '../../shared/noteTitle'
 
 const id_schema = z.object({ id: z.string().uuid() })
 
 const create_missing_schema = z.object({ title: z.string().min(1).max(500) })
-
-/** Derive a note title from content — mirrors deriveNoteTitle in renderer. */
-const deriveTitle = (content: string): string => {
-	const lines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-	if (lines.length === 0) return 'Untitled'
-	const heading = lines.find((line) => line.startsWith('# '))
-	if (heading) {
-		const normalized = heading.replace(/^#\s*/, '').trim()
-		return normalized || 'Untitled'
-	}
-	return lines[0].slice(0, 80)
-}
 
 const tokenize = (text: string): string[] => {
 	return text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2)
@@ -37,7 +26,7 @@ const computeRelatedNotesMain = (
 	max_results = 8,
 ) => {
 	const scored = new Map<string, { note: Note; score: number; reasons: string[] }>()
-	const current_title = deriveTitle(current_note.content).toLowerCase()
+	const current_title = deriveNoteTitle(current_note.content).toLowerCase()
 	const current_words = new Set(tokenize(current_title + ' ' + current_note.content))
 	const current_tags = new Set(current_note.tags)
 
@@ -71,7 +60,7 @@ const computeRelatedNotesMain = (
 		}
 		if (shared_tags > 0) upsert(candidate, shared_tags * 10, `Shared tag${shared_tags > 1 ? 's' : ''}`)
 
-		const candidate_title = deriveTitle(candidate.content).toLowerCase()
+		const candidate_title = deriveNoteTitle(candidate.content).toLowerCase()
 		const candidate_words = new Set(tokenize(candidate_title + ' ' + candidate.content))
 		let overlap = 0
 		for (const word of current_words) {
@@ -109,10 +98,7 @@ export const registerLinksHandlers = (db: StrataDatabase) => {
 		const normalized = rawTarget.trim().toLowerCase().replace(/\s+/g, ' ')
 		const all_notes = db.listNotes({ includeDeleted: false })
 		const match = all_notes.find((note) => {
-			const lines = note.content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-			if (lines.length === 0) return false
-			const heading = lines.find((line) => line.startsWith('# '))
-			const title = heading ? heading.replace(/^#\s*/, '').trim() : lines[0].slice(0, 80)
+			const title = deriveNoteTitle(note.content)
 			return title.trim().toLowerCase().replace(/\s+/g, ' ') === normalized
 		})
 		return match ?? null

@@ -103,3 +103,66 @@ describe('listNotes tag filter exact match', () => {
 		expect(underscoreIds).not.toContain(otherUnderscore)
 	})
 })
+
+describe('database filtering and wiki-link indexing', () => {
+	it('honors starred=false for full notes and summaries', () => {
+		const starred = makeNote(['star-filter'])
+		const unstarred = makeNote(['star-filter'])
+		db.updateNote(starred, { starred: true })
+
+		for (const result of [
+			db.listNotes({ tag: 'star-filter', starred: false }),
+			db.listNoteSummaries({ tag: 'star-filter', starred: false }),
+		]) {
+			expect(result.map((note) => note.id)).toContain(unstarred)
+			expect(result.map((note) => note.id)).not.toContain(starred)
+		}
+	})
+
+	it('treats SQL wildcard characters as literal search text', () => {
+		const percent = db.createNote({ content: '# Percent\n\n100% complete' })
+		const underscore = db.createNote({ content: '# Underscore\n\na_b' })
+		const unrelated = db.createNote({ content: '# Other\n\nplain text' })
+		noteIds.push(percent.id, underscore.id, unrelated.id)
+
+		expect(db.listNotes({ query: '%' }).map((note) => note.id)).toEqual([percent.id])
+		expect(db.listNoteSummaries({ query: '_' }).map((note) => note.id)).toEqual([underscore.id])
+		expect(db.aiSearchNotes('%').map((note) => note.id)).toEqual([percent.id])
+	})
+
+	it('indexes wiki links supplied when a note is created', () => {
+		const target = db.createNote({ content: '# Direct Target' })
+		const source = db.createNote({ content: '# Direct Source\n\n[[Direct Target]]' })
+		noteIds.push(target.id, source.id)
+
+		expect(db.getBacklinks(target.id).map((entry) => entry.source.id)).toEqual([source.id])
+	})
+
+	it('resolves links to notes whose title is a lower-level heading', () => {
+		const target = db.createNote({ content: 'intro\n\n## Lower Heading' })
+		const source = db.createNote({ content: '# Heading Source\n\n[[Lower Heading]]' })
+		noteIds.push(target.id, source.id)
+
+		expect(db.getBacklinks(target.id).map((entry) => entry.source.id)).toEqual([source.id])
+	})
+
+	it('resolves previously missing link targets when the target is created later', () => {
+		const source = db.createNote({ content: '# Early Source\n\n[[Later Target]]' })
+		const target = db.createNote({ content: '# Later Target' })
+		noteIds.push(source.id, target.id)
+
+		expect(db.getBacklinks(target.id).map((entry) => entry.source.id)).toEqual([source.id])
+	})
+
+	it('removes stale inbound targets after a target note is renamed', () => {
+		const target = db.createNote({ content: '# Original Target' })
+		const source = db.createNote({ content: '# Rename Source\n\n[[Original Target]]' })
+		noteIds.push(target.id, source.id)
+		expect(db.getBacklinks(target.id)).toHaveLength(1)
+
+		db.updateNote(target.id, { content: '# Renamed Target' })
+
+		expect(db.getBacklinks(target.id)).toEqual([])
+		expect(db.getAllLinks().find((link) => link.sourceNoteId === source.id)?.targetNoteId).toBeNull()
+	})
+})

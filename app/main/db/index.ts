@@ -6,6 +6,7 @@ import type { AiMessage, AiNoteEdit, AiRouteLog, AiThread, AiThreadSummary, Note
 import { DEFAULT_HOTKEYS } from '../../shared/hotkeys'
 import { DEFAULT_HOME_TILES } from '../../shared/homeTiles'
 import { DEFAULT_SIDEBAR_LAYOUT } from '../../shared/sidebarLayout'
+import { deriveNoteTitle } from '../../shared/noteTitle'
 import { migrations } from './migrations/index'
 
 const require = createRequire(import.meta.url)
@@ -246,6 +247,10 @@ export class StrataDatabase {
 		return "EXISTS (SELECT 1 FROM json_each(n.tags) WHERE json_each.value = ?)"
 	}
 
+	private escapeLikePattern(value: string): string {
+		return value.replace(/[\\%_]/g, '\\$&')
+	}
+
 	listNotes(filters?: NotesFilter): Note[] {
 		const values: unknown[] = []
 		const where: string[] = []
@@ -253,8 +258,9 @@ export class StrataDatabase {
 		if (!filters?.includeDeleted) {
 			where.push('deleted_at IS NULL')
 		}
-		if (filters?.starred) {
-			where.push('starred = 1')
+		if (typeof filters?.starred === 'boolean') {
+			where.push('starred = ?')
+			values.push(filters.starred ? 1 : 0)
 		}
 		if (typeof filters?.archived === 'boolean') {
 			where.push('archived = ?')
@@ -269,8 +275,8 @@ export class StrataDatabase {
 			values.push(filters.projectId)
 		}
 		if (filters?.query) {
-			where.push('(content LIKE ? OR tags LIKE ? OR p.name LIKE ?)')
-			const wildcard = `%${filters.query}%`
+			where.push("(content LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')")
+			const wildcard = `%${this.escapeLikePattern(filters.query)}%`
 			values.push(wildcard, wildcard, wildcard)
 		}
 
@@ -292,8 +298,9 @@ export class StrataDatabase {
 		if (!filters?.includeDeleted) {
 			where.push('deleted_at IS NULL')
 		}
-		if (filters?.starred) {
-			where.push('starred = 1')
+		if (typeof filters?.starred === 'boolean') {
+			where.push('starred = ?')
+			values.push(filters.starred ? 1 : 0)
 		}
 		if (typeof filters?.archived === 'boolean') {
 			where.push('archived = ?')
@@ -308,8 +315,8 @@ export class StrataDatabase {
 			values.push(filters.projectId)
 		}
 		if (filters?.query) {
-			where.push('(content LIKE ? OR tags LIKE ? OR p.name LIKE ?)')
-			const wildcard = `%${filters.query}%`
+			where.push("(content LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')")
+			const wildcard = `%${this.escapeLikePattern(filters.query)}%`
 			values.push(wildcard, wildcard, wildcard)
 		}
 
@@ -357,6 +364,8 @@ export class StrataDatabase {
 				'INSERT INTO notes (id, content, created_at, updated_at, starred, archived, tags, project_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)',
 			)
 			.run(id, content, now, now, starred ? 1 : 0, archived ? 1 : 0, JSON.stringify(tags), project_id)
+		this.rebuildLinksForContent(id, content)
+		this.refreshLinkTargets()
 		const note = this.getNote(id)
 		if (!note) throw new Error('Failed to create note')
 		return note
@@ -395,6 +404,7 @@ export class StrataDatabase {
 		// Rebuild wiki links when content changes
 		if (typeof patch.content === 'string' && patch.content !== current.content) {
 			this.rebuildLinksForContent(id, next_content)
+			this.refreshLinkTargets()
 		}
 
 		return this.getNote(id)
@@ -656,14 +666,14 @@ export class StrataDatabase {
 	}
 
 	aiSearchNotes(query: string, limit = 20): Note[] {
-		const wildcard = `%${query}%`
+		const wildcard = `%${this.escapeLikePattern(query)}%`
 		const rows = this.db
 			.prepare(
 				`SELECT n.*
 				 FROM notes n
 				 LEFT JOIN projects p ON p.id = n.project_id
 				 WHERE deleted_at IS NULL
-				 AND (content LIKE ? OR tags LIKE ? OR p.name LIKE ?)
+					 AND (content LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')
 				 ORDER BY n.updated_at DESC
 				 LIMIT ?`,
 			)
@@ -966,6 +976,23 @@ export class StrataDatabase {
 		tx()
 	}
 
+	private refreshLinkTargets(): void {
+		const rows = this.db.prepare('SELECT id, raw_target FROM note_links').all() as Array<{ id: string; raw_target: string }>
+		const targets_by_title = new Map<string, string>()
+		for (const note of this.listNotes({ includeDeleted: false })) {
+			const normalized_title = this.deriveTitleFromContent(note.content).trim().toLowerCase().replace(/\s+/g, ' ')
+			if (!targets_by_title.has(normalized_title)) targets_by_title.set(normalized_title, note.id)
+		}
+		const update = this.db.prepare('UPDATE note_links SET target_note_id = ? WHERE id = ?')
+		const tx = this.db.transaction(() => {
+			for (const row of rows) {
+				const normalized_target = row.raw_target.trim().toLowerCase().replace(/\s+/g, ' ')
+				update.run(targets_by_title.get(normalized_target) ?? null, row.id)
+			}
+		})
+		tx()
+	}
+
 	/** Find the best-matching note for a wiki link target. Returns most-recently-updated match. */
 	private resolveLinkTarget(raw_target: string): Note | null {
 		const normalized = raw_target.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -982,14 +1009,7 @@ export class StrataDatabase {
 	}
 
 	private deriveTitleFromContent(content: string): string {
-		const lines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-		if (lines.length === 0) return 'Untitled'
-		const heading = lines.find((line) => line.startsWith('# '))
-		if (heading) {
-			const normalized = heading.replace(/^#\s*/, '').trim()
-			return normalized || 'Untitled'
-		}
-		return lines[0].slice(0, 80)
+		return deriveNoteTitle(content)
 	}
 
 	/** Get all notes that link TO the given note (backlinks). */

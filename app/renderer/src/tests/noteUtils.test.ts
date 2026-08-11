@@ -13,6 +13,11 @@ describe('deriveNoteTitle', () => {
 	it('returns Untitled when content is empty', () => {
 		expect(deriveNoteTitle('   ')).toBe('Untitled')
 	})
+
+	it('recognizes any Markdown heading level without treating hashtags as headings', () => {
+		expect(deriveNoteTitle('intro\n\n### Nested Title')).toBe('Nested Title')
+		expect(deriveNoteTitle('#hashtag\n\nbody')).toBe('#hashtag')
+	})
 })
 
 describe('normalizeTag', () => {

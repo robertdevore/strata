@@ -1,15 +1,7 @@
 import type { Note } from '@shared/types'
+import { deriveNoteTitle } from '@shared/noteTitle'
 
-export const deriveNoteTitle = (content: string): string => {
-	const lines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-	if (lines.length === 0) return 'Untitled'
-	const heading = lines.find((line) => line.startsWith('#'))
-	if (heading) {
-		const normalized = heading.replace(/^#+\s*/, '').trim()
-		return normalized || 'Untitled'
-	}
-	return lines[0].slice(0, 80)
-}
+export { deriveNoteTitle }
 
 export const normalizeTag = (tag: string): string => tag.trim().toLowerCase().replace(/\s+/g, '-')
 

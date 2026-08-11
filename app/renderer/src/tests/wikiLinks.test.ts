@@ -61,7 +61,7 @@ describe('parseWikiLinks', () => {
 	})
 
 	test('handles empty brackets', () => {
-		const links = parseWikiLinks('[[]]')
+		const links = parseWikiLinks('[[]] and [[   ]]')
 		expect(links).toHaveLength(0)
 		// Empty brackets don't create a link
 	})
