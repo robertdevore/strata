@@ -78,6 +78,7 @@
   "build": {
     "appId": "com.strata.notes",
     "productName": "Strata",
+    "afterPack": "scripts/after-pack.cjs",
     "icon": "build/icons/icon.png",
     "directories": {
       "output": "release"
