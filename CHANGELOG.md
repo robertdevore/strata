@@ -7,6 +7,7 @@
 - Preserved provider tool-call context across AI tool loops and emitted tool results with the required role and call identifier.
 - Removed unused Three.js prototype dependencies from the production branch to reduce install and package weight.
 - Updated transitive security overrides and the Electron packaging toolchain.
+- Updated the SQLite native binding for compatibility with the release Electron runtime.
 - Reduced the README to install, usage, automation, development, and security essentials.
 
 ### Fixed

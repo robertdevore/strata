@@ -8,7 +8,7 @@ Strata is a local-first Markdown notes app with keyboard-first navigation, an op
 
 Download the DMG, NSIS installer, or AppImage from [GitHub Releases](https://github.com/robertdevore/strata/releases).
 
-To run from source (Node.js 20+):
+To run from source (Node.js 22+):
 
 ```bash
 npm install

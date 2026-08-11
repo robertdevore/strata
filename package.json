@@ -4,6 +4,9 @@
   "version": "0.8.0",
   "license": "MIT",
   "description": "Strata - local-first minimalist markdown notes app",
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {
@@ -29,7 +32,7 @@
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.14",
     "@uiw/react-codemirror": "^4.25.4",
-    "better-sqlite3": "^12.6.2",
+		"better-sqlite3": "^13.0.3",
     "commander": "^14.0.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
