@@ -3,19 +3,11 @@ import type { IncomingMessage, Server } from 'node:http'
 import { z } from 'zod'
 import type { NoteUpdatePatch } from '../../shared/types'
 import type { StrataDatabase } from '../db/index'
+import { deriveNoteTitle } from '../../shared/noteTitle'
 
 const request_body_limit_bytes = 1024 * 1024
 const default_api_port = 3939
 const default_api_host = '127.0.0.1'
-
-/** Derive title for related-notes computation (mirrors deriveNoteTitle). */
-const derive_title = (content: string): string => {
-	const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-	if (lines.length === 0) return 'Untitled'
-	const h = lines.find((l) => l.startsWith('# '))
-	if (h) return h.replace(/^#\s*/, '').trim() || 'Untitled'
-	return lines[0].slice(0, 80)
-}
 
 const tokenize = (text: string): string[] =>
 	text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2)
@@ -28,7 +20,7 @@ const computeRelated = (
 	link_index: Array<{ sourceNoteId: string; targetNoteId: string | null; rawTarget: string }>,
 ): Array<{ note: Note; reason: string; score: number }> => {
 	const scored = new Map<string, { note: Note; score: number; reasons: string[] }>()
-	const ct = derive_title(current_note.content).toLowerCase()
+	const ct = deriveNoteTitle(current_note.content).toLowerCase()
 	const cw = new Set(tokenize(ct + ' ' + current_note.content))
 	const ctags = new Set(current_note.tags)
 	const lf = new Set(link_index.filter((l) => l.sourceNoteId === current_note.id && l.targetNoteId).map((l) => l.targetNoteId!))
@@ -45,7 +37,7 @@ const computeRelated = (
 		const ct2 = new Set(c.tags); let st = 0
 		for (const t of ctags) if (ct2.has(t)) st++
 		if (st > 0) upsert(c, st * 10, `Shared tag${st > 1 ? 's' : ''}`)
-		const cw2 = new Set(tokenize(derive_title(c.content).toLowerCase() + ' ' + c.content))
+		const cw2 = new Set(tokenize(deriveNoteTitle(c.content).toLowerCase() + ' ' + c.content))
 		let ov = 0
 		for (const w of cw) { if (w.length < 3) continue; if (cw2.has(w)) ov++ }
 		const ks = Math.min(50, ov * 2)
@@ -107,10 +99,13 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS'
 
 interface ApiServerInstance {
 	close: () => Promise<void>
+	port: number
 }
 
 interface NotesApiServerOptions {
 	onNotesChanged?: () => void
+	host?: string
+	port?: number
 }
 
 interface JsonResponse {
@@ -122,7 +117,12 @@ const parse_boolean = (value: string | null): boolean | undefined => {
 	if (null === value) return undefined
 	if ('true' === value) return true
 	if ('false' === value) return false
-	return undefined
+	throw new z.ZodError([{
+		code: 'invalid_value',
+		values: ['true', 'false'],
+		path: [],
+		message: 'Expected "true" or "false"',
+	}])
 }
 
 const get_request_body = async (request: IncomingMessage): Promise<unknown> => {
@@ -385,6 +385,7 @@ const create_handler = (db: StrataDatabase, api_token: string | null, options: N
 		// ---- AI Edit History ----
 		if ('GET' === method && 3 === parts.length && 'notes' === parts[0] && 'ai-edits' === parts[2]) {
 			const { id } = id_schema.parse({ id: parts[1] })
+			if (!db.getNote(id)) return { status: 404, body: { error: 'Note not found' } }
 			return { status: 200, body: { edits: db.listAiEdits(id) } }
 		}
 
@@ -428,8 +429,8 @@ const start_http_server = async (server: Server, port: number, host: string): Pr
 }
 
 export const startNotesApiServer = async (db: StrataDatabase, options: NotesApiServerOptions = {}): Promise<ApiServerInstance> => {
-	const host = resolve_api_host()
-	const port = resolve_api_port()
+	const host = options.host ?? resolve_api_host()
+	const requested_port = options.port ?? resolve_api_port()
 	const api_token = resolve_api_token()
 	const handler = create_handler(db, api_token, options)
 
@@ -461,7 +462,9 @@ export const startNotesApiServer = async (db: StrataDatabase, options: NotesApiS
 		}
 	})
 
-	await start_http_server(server, port, host)
+	await start_http_server(server, requested_port, host)
+	const address = server.address()
+	const port = address && 'object' === typeof address ? address.port : requested_port
 	if (api_token) {
 		console.info(`[strata-api] Notes API listening at http://${host}:${port} (token auth enabled)`)
 	} else {
@@ -469,6 +472,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: NotesApiS
 	}
 
 	return {
+		port,
 		close: () => {
 			return new Promise<void>((resolve, reject) => {
 				server.close((error) => {
