@@ -84,19 +84,10 @@
     },
     "files": [
       "dist/**/*",
-      "package.json",
-      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+      "package.json"
     ],
     "asarUnpack": [
-      "node_modules/better-sqlite3/**",
-      "node_modules/bindings/**",
-      "node_modules/file-uri-to-path/**"
-    ],
-    "extraResources": [
-      {
-        "from": "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-        "to": "app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
-      }
+      "node_modules/better-sqlite3/**"
     ],
     "mac": {
       "icon": "build/icons/icon.icns",
