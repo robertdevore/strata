@@ -1,10 +1,10 @@
 const fs = require('node:fs')
 const path = require('node:path')
-const { archToString } = require('builder-util')
+const { Arch } = require('builder-util')
 
 module.exports = async function trimNativePrebuilds(context) {
   const platform = context.electronPlatformName
-  const arch = archToString(context.arch)
+  const arch = Arch[context.arch]
   const resourcesDir =
     'darwin' === platform
       ? path.join(
