@@ -10,12 +10,14 @@ import type {
 	AiRouteLog,
 	AiRoutingMode,
 	AiSettings,
+	ProviderMessage,
 } from './types'
 import { AI_TOOLS, execute_tool_call } from './tools'
 import type { ToolExecutionContext } from './tools'
 import { route_ai_request } from './routing'
 import type { RouterConfig } from './routing'
 import { create_provider } from './providers/providerRegistry'
+import { build_history_messages, record_assistant_turn } from './toolLoop'
 
 // ---- System Prompt ----
 
@@ -368,12 +370,7 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 	// 3. Run turn with tool loop
 	let notes_changed = false
 	let forced_note_tool_retry_used = false
-	const input_messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = history
-		.filter((m: { role: string }) => 'user' === m.role || 'assistant' === m.role)
-		.map((m: { role: string; content?: string | null }) => ({
-			role: m.role as 'user' | 'assistant',
-			content: m.content || '',
-		}))
+	const input_messages: ProviderMessage[] = build_history_messages(history)
 
 	try {
 		for (let step = 0; step < 6; step += 1) {
@@ -423,21 +420,21 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 				}
 			}
 
-			// Add assistant response to input for the next turn
-			if (output.content) {
-				input_messages.push({ role: 'assistant', content: output.content })
-			}
-
-			// Execute tool calls
+			// Execute tool calls and capture their results so we can attach the
+			// correct tool_call_id when feeding the conversation back to the model.
 			const tool_ctx: ToolExecutionContext = { threadId: thread.id, model }
+			const tool_results: Array<{ id: string; output: string }> = []
 			for (const tool_call of output.toolCalls) {
 				const execution = execute_tool_call(db, tool_call, tool_ctx)
 				if (execution.notesChanged) notes_changed = true
-				input_messages.push({
-					role: 'assistant',
-					content: `Tool result for ${tool_call.name}: ${execution.output}`,
-				})
+				tool_results.push({ id: tool_call.id, output: execution.output })
 			}
+
+			// Push assistant turn (with its tool calls) and each tool outcome to
+			// the next-turn input. Providers need the assistant's tool_calls so
+			// they can match the subsequent tool result messages back to the
+			// originating call.
+			record_assistant_turn(input_messages, output.content, output.toolCalls, tool_results)
 		}
 
 		// Loop exhausted
@@ -498,3 +495,4 @@ export const run_ai_turn = async (db: StrataDatabase, thread: AiThread, options?
 }
 
 export { SYSTEM_PROMPT, derive_chat_title, resolve_ai_settings, resolve_api_key }
+export { record_assistant_turn, build_history_messages } from './toolLoop'

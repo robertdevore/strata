@@ -1,0 +1,63 @@
+// Pure helpers for building the message list sent to an AI provider.
+//
+// These functions are deliberately decoupled from the database and the
+// provider so they can be unit-tested in the renderer project (whose
+// `tsconfig` does not include Node types) without dragging in
+// `better-sqlite3` and other main-process dependencies.
+
+import type { AiProviderTurnOutput, ProviderMessage } from './types'
+
+/**
+ * Append the assistant's turn and each tool's result to the conversation in
+ * the shape providers expect for the next step.
+ *
+ * The earlier implementation dropped the assistant's `tool_calls` and
+ * pushed each tool outcome as a plain `{role: 'assistant', content: 'Tool
+ * result ...'}` message. That made the second turn look like two
+ * consecutive assistant messages and stripped the `tool_call_id` that
+ * OpenAI/DeepSeek/Kimi/OpenRouter require to associate a tool result with
+ * the call that produced it. As a result, multi-step flows silently lost
+ * context and often repeated the same tool call or returned a confused
+ * answer.
+ */
+export const record_assistant_turn = (
+	messages: ProviderMessage[],
+	content: string,
+	tool_calls: AiProviderTurnOutput['toolCalls'],
+	tool_results: Array<{ id: string; output: string }>,
+): void => {
+	if (tool_calls.length > 0) {
+		messages.push({
+			role: 'assistant',
+			content,
+			toolCalls: tool_calls,
+		})
+	} else if (content) {
+		messages.push({ role: 'assistant', content })
+	}
+
+	for (const result of tool_results) {
+		messages.push({
+			role: 'tool',
+			content: result.output,
+			toolCallId: result.id,
+		})
+	}
+}
+
+/**
+ * Build the initial conversation history from the persisted message log.
+ * Only `user` and `assistant` turns are carried over; tool call/result
+ * history is reconstructed in-memory for the current turn.
+ */
+export const build_history_messages = (history: Array<{ role: string; content?: string | null }>): ProviderMessage[] => {
+	const messages: ProviderMessage[] = []
+	for (const m of history) {
+		if ('user' === m.role) {
+			messages.push({ role: 'user', content: m.content || '' })
+		} else if ('assistant' === m.role) {
+			messages.push({ role: 'assistant', content: m.content || '' })
+		}
+	}
+	return messages
+}

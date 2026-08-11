@@ -12,21 +12,38 @@ export interface AiToolDefinition {
 	}
 }
 
-export interface AiProviderTurnInput {
-	model: string
-	systemPrompt: string
-	messages: Array<{
-		role: 'system' | 'user' | 'assistant'
-		content: string
-	}>
-	tools: AiToolDefinition[]
-	temperature?: number
-}
-
 export interface NormalizedToolCall {
 	id: string
 	name: string
 	argumentsJson: string
+}
+
+/**
+ * Conversation messages passed to an AI provider.
+ *
+ * We support four shapes:
+ * - `system`/`user`/`assistant` text messages
+ * - `assistant` messages that include the model's tool calls (text content may be empty)
+ * - `tool` messages carrying the result of a single tool call (linked by `toolCallId`)
+ *
+ * Providers translate these into their native wire format (OpenAI Chat Completions
+ * `tool_calls`/`role: 'tool'`, OpenAI Responses `function_call`/`function_call_output`,
+ * etc.). Round-tripping the assistant's `toolCalls` is required: without it, the
+ * provider cannot match a tool result back to the call that produced it, and the
+ * subsequent assistant turn loses the context of the function invocation.
+ */
+export type ProviderMessage =
+	| { role: 'system' | 'user'; content: string }
+	| { role: 'assistant'; content: string }
+	| { role: 'assistant'; content: string; toolCalls: NormalizedToolCall[] }
+	| { role: 'tool'; content: string; toolCallId: string }
+
+export interface AiProviderTurnInput {
+	model: string
+	systemPrompt: string
+	messages: ProviderMessage[]
+	tools: AiToolDefinition[]
+	temperature?: number
 }
 
 export interface AiProviderTurnOutput {

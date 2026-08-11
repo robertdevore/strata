@@ -1,7 +1,7 @@
 // OpenAI Responses API provider
 // Uses the /v1/responses endpoint with input/instructions/tools
 
-import type { AiProvider, AiProviderTurnInput, AiProviderTurnOutput, NormalizedToolCall } from '../types'
+import type { AiProvider, AiProviderTurnInput, AiProviderTurnOutput, NormalizedToolCall, ProviderMessage } from '../types'
 
 interface OpenAiResponsesPayload {
 	output?: OpenAiResponseOutputItem[]
@@ -21,6 +21,55 @@ interface OpenAiResponseOutputItem {
 	content?: Array<{ type: string; text?: string }>
 }
 
+type OpenAiInputItem =
+	| { role: 'user'; content: string }
+	| { role: 'assistant'; content: string }
+	| { type: 'function_call'; call_id: string; name: string; arguments: string }
+	| { type: 'function_call_output'; call_id: string; output: string }
+
+/**
+ * Translate a normalized ProviderMessage into the items the OpenAI Responses
+ * API accepts. The Responses API does not consume `role: 'tool'` chat
+ * messages: tool invocations are first-class `function_call` / `function_call_output`
+ * items keyed by `call_id`, so the assistant's call list and the matching
+ * outputs must both be present in the input array or the model loses
+ * continuity between tool turns. `role: 'system'` is intentionally skipped
+ * here because the system prompt is sent via the `instructions` field.
+ */
+const to_responses_input_item = (msg: ProviderMessage): OpenAiInputItem | OpenAiInputItem[] => {
+	if (msg.role === 'tool') {
+		return {
+			type: 'function_call_output',
+			call_id: msg.toolCallId,
+			output: msg.content,
+		}
+	}
+	if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls.length > 0) {
+		const items: OpenAiInputItem[] = []
+		if (msg.content) {
+			items.push({ role: 'assistant', content: msg.content })
+		}
+		for (const tc of msg.toolCalls) {
+			items.push({
+				type: 'function_call',
+				call_id: tc.id,
+				name: tc.name,
+				arguments: tc.argumentsJson || '{}',
+			})
+		}
+		return items
+	}
+	if (msg.role === 'system') {
+		// System prompt is provided via the `instructions` field, not the
+		// input array. Skip it to avoid an API validation error.
+		return []
+	}
+	return {
+		role: msg.role,
+		content: msg.content,
+	}
+}
+
 export class OpenAiResponsesProvider implements AiProvider {
 	public readonly providerId = 'openai-responses'
 	public readonly kind = 'openai_responses'
@@ -36,10 +85,7 @@ export class OpenAiResponsesProvider implements AiProvider {
 	}
 
 	async sendTurn(input: AiProviderTurnInput): Promise<AiProviderTurnOutput> {
-		const openai_input = input.messages.map((msg) => ({
-			role: msg.role,
-			content: msg.content,
-		}))
+		const openai_input: OpenAiInputItem[] = input.messages.flatMap((msg) => to_responses_input_item(msg))
 
 		const body: Record<string, unknown> = {
 			model: input.model,

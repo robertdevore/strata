@@ -1,7 +1,7 @@
 // Generic Chat Completions provider (OpenAI-compatible)
 // Supports DeepSeek, Kimi/Moonshot, OpenRouter, custom endpoints, llama.cpp
 
-import type { AiProvider, AiProviderTurnInput, AiProviderTurnOutput, NormalizedToolCall } from '../types'
+import type { AiProvider, AiProviderTurnInput, AiProviderTurnOutput, NormalizedToolCall, ProviderMessage } from '../types'
 
 interface ChatCompletionsResponse {
 	choices: Array<{
@@ -26,6 +26,56 @@ interface ChatCompletionsResponse {
 	}
 }
 
+interface ChatCompletionsMessage {
+	role: 'system' | 'user' | 'assistant' | 'tool'
+	content?: string | null
+	tool_calls?: Array<{
+		id: string
+		type: 'function'
+		function: { name: string; arguments: string }
+	}>
+	tool_call_id?: string
+}
+
+/**
+ * Translate a normalized ProviderMessage into the wire shape expected by
+ * OpenAI's Chat Completions API (and compatible endpoints such as DeepSeek,
+ * Kimi, OpenRouter, llama.cpp).
+ *
+ * - Assistant turns that include tool calls are emitted with `tool_calls`
+ *   so the provider can pair them with subsequent `role: 'tool'` results.
+ * - `role: 'tool'` results must carry the originating `tool_call_id`; without
+ *   it, providers reject the result or silently drop it, breaking the
+ *   multi-step tool loop.
+ */
+const to_chat_completions_message = (msg: ProviderMessage): ChatCompletionsMessage | ChatCompletionsMessage[] => {
+	if (msg.role === 'tool') {
+		return {
+			role: 'tool',
+			content: msg.content,
+			tool_call_id: msg.toolCallId,
+		}
+	}
+	if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls.length > 0) {
+		return {
+			role: 'assistant',
+			content: msg.content,
+			tool_calls: msg.toolCalls.map((tc) => ({
+				id: tc.id,
+				type: 'function' as const,
+				function: {
+					name: tc.name,
+					arguments: tc.argumentsJson || '{}',
+				},
+			})),
+		}
+	}
+	return {
+		role: msg.role,
+		content: msg.content,
+	}
+}
+
 export class ChatCompletionsProvider implements AiProvider {
 	public readonly providerId: string
 	public readonly kind = 'openai_chat_completions'
@@ -43,12 +93,9 @@ export class ChatCompletionsProvider implements AiProvider {
 	}
 
 	async sendTurn(input: AiProviderTurnInput): Promise<AiProviderTurnOutput> {
-		const messages: Array<{ role: string; content: string }> = [
+		const messages: ChatCompletionsMessage[] = [
 			{ role: 'system', content: input.systemPrompt },
-			...input.messages.map((msg) => ({
-				role: msg.role,
-				content: msg.content,
-			})),
+			...input.messages.flatMap((msg) => to_chat_completions_message(msg)),
 		]
 
 		// Convert Strata tools to OpenAI Chat Completions format
