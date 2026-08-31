@@ -427,7 +427,7 @@ Returns the project plus its notes:
 
 `GET /search?q=...&limit=25`
 
-Full-text search across note content, tags, and project names.
+Synchronous lexical substring search across note content, tags, and project names. A successful note create is immediately visible to this endpoint and remains visible after restart; there is no background indexing window. Search does not currently use embeddings, stemming, synonyms, or conceptual paraphrase matching.
 
 | Param | Description | Default |
 |-------|-------------|---------|

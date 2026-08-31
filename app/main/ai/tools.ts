@@ -23,7 +23,7 @@ export const AI_TOOLS: AiToolDefinition[] = [
 	{
 		type: 'function',
 		name: 'search_notes',
-		description: 'Search notes by text content or tags (fuzzy match). Use this when the user provides keywords, tags, or general search terms.',
+		description: 'Search notes by lexical substring across content, tags, and project names. Use this when the user provides exact keywords or phrases.',
 		parameters: {
 			type: 'object',
 			properties: {

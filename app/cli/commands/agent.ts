@@ -170,7 +170,7 @@ export const register_agent_commands = (
 
 	context
 		.command('search <query>')
-		.description('Search notes and return compact context results.')
+		.description('Search notes lexically and return compact context results.')
 		.option('--limit <count>', 'Limit result count', '5')
 		.option('--full', 'Return complete note records instead of compact results')
 		.action(async function (query: string, command_options: AgentContextOptions) {

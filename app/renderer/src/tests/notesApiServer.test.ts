@@ -1,9 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { Command } from 'commander'
 import { StrataDatabase } from '@main/db'
 import { startNotesApiServer } from '@main/api/notesApiServer'
+import { register_agent_commands } from '../../../cli/commands/agent'
+import { StrataApiClient } from '../../../cli/lib/apiClient'
+import type { CliRuntimeOptions } from '../../../cli/types'
 
 const cleanups: Array<() => Promise<void> | void> = []
 
@@ -38,5 +42,64 @@ describe('notes API validation', () => {
 
 		expect(response.status).toBe(404)
 		expect(await response.json()).toEqual({ error: 'Note not found' })
+	})
+
+	it('keeps create-to-retrieval synchronous across API, agent context, and restart', async () => {
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-retrieval-test-'))
+		let db: StrataDatabase | null = new StrataDatabase(directory)
+		let server: Awaited<ReturnType<typeof startNotesApiServer>> | null = await startNotesApiServer(db, { host: '127.0.0.1', port: 0 })
+		const make_client = () => new StrataApiClient({
+			baseUrl: `http://127.0.0.1:${server!.port}`,
+			token: null,
+			timeoutMs: 2000,
+		})
+		const output_options: CliRuntimeOptions = {
+			baseUrl: `http://127.0.0.1:${server.port}`,
+			token: null,
+			outputMode: 'json',
+			quiet: false,
+			verbose: false,
+			dryRun: false,
+			confirm: false,
+			timeoutMs: 2000,
+			agentMode: true,
+			noColor: true,
+			failOnWarning: false,
+		}
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		try {
+			let client = make_client()
+			const unique_term = 'cobalt-albatross-7319'
+			const note = await client.createNote({
+				content: `# Retrieval contract\n\nDurable marker ${unique_term} records cache invalidation.`,
+				tags: ['retrieval-contract'],
+			})
+
+			expect((await client.getNote(note.id)).id).toBe(note.id)
+			expect((await client.searchNotes(unique_term)).map((candidate) => candidate.id)).toContain(note.id)
+			expect(await client.searchNotes('evicting remembered bird concepts')).toEqual([])
+
+			const program = new Command().exitOverride()
+			register_agent_commands(program, () => ({ options: output_options, client }))
+			await program.parseAsync(['node', 'strata', 'agent', 'context', 'search', unique_term, '--limit', '5'])
+			const agent_output = JSON.parse(String(write.mock.calls.at(-1)?.[0]))
+			expect(agent_output.data.notes.map((candidate: { id: string }) => candidate.id)).toContain(note.id)
+
+			await server.close()
+			server = null
+			db.close()
+			db = null
+
+			db = new StrataDatabase(directory)
+			server = await startNotesApiServer(db, { host: '127.0.0.1', port: 0 })
+			client = make_client()
+			expect((await client.searchNotes(unique_term)).map((candidate) => candidate.id)).toContain(note.id)
+		} finally {
+			write.mockRestore()
+			if (server) await server.close()
+			db?.close()
+			fs.rmSync(directory, { recursive: true, force: true })
+		}
 	})
 })

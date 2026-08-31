@@ -16,7 +16,7 @@ export const register_search_command = (
 ): void => {
 	program
 		.command('search <query>')
-		.description('Search notes via Strata local API.')
+		.description('Search notes with synchronous lexical substring matching.')
 		.option('--tag <tag>', 'Optional tag filter applied client-side.')
 		.option('--project <name>', 'Optional project name filter.')
 		.option('--project-id <id>', 'Optional project ID filter.')

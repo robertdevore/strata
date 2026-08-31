@@ -140,6 +140,8 @@ npm run strata -- search "provider routing" --json
 npm run strata -- search "provider routing" --project "Work"
 ```
 
+Search is synchronous lexical substring matching over note content, tags, and project names. A successful create is searchable immediately and after restart. It is not semantic search: use distinctive terms that occur in the saved note, rather than a conceptual paraphrase.
+
 ### Tags
 
 ```bash
@@ -175,7 +177,7 @@ npm run strata -- agent summary --file ./summary.md --project "Agent Notes"
 npm run strata -- agent context search "routing" --limit 5
 ```
 
-Agent context search returns compact records (`id`, title, snippet, timestamps, project, and tags) by default. Use `--full` only when complete note bodies are required. The default limit is 5 and the accepted range is 1–50.
+Agent context search uses the same synchronous lexical search contract and returns compact records (`id`, title, snippet, timestamps, project, and tags) by default. Use `--full` only when complete note bodies are required. The default limit is 5 and the accepted range is 1–50.
 
 Agent-mode defaults:
 
