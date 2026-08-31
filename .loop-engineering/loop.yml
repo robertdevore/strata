@@ -1,5 +1,5 @@
-objective: "Reduce Strata memory workflow token cost while preserving durable second-brain recall"
-checklist_file: ".loop-engineering/recommended-updates.md"
+objective: "Define and verify Strata's synchronous lexical create-to-retrieval contract"
+checklist_file: ".loop-engineering/retrieval-contract-checklist.md"
 max_iterations: 1
 max_no_progress: 1
 max_consecutive_failures: 1
@@ -19,7 +19,7 @@ blocked_actions:
 
 eval_gates:
   - id: completion_audit
-    command: "npm test -- --run && npx tsc -b --pretty false && npx eslint app/cli/commands/agent.ts app/renderer/src/tests/cli/agentMode.test.ts && npm run build"
+    command: "npm test -- --run && npx tsc -b --pretty false && npx eslint app/cli/commands/search.ts app/cli/commands/agent.ts app/main/ai/tools.ts app/renderer/src/tests/notesApiServer.test.ts && npm run build"
     required: true
 
   - id: unit_tests
@@ -38,7 +38,7 @@ eval_gates:
       - "tsconfig*.json"
 
   - id: lint
-    command: "npx eslint app/cli/commands/agent.ts app/renderer/src/tests/cli/agentMode.test.ts"
+    command: "npx eslint app/cli/commands/search.ts app/cli/commands/agent.ts app/main/ai/tools.ts app/renderer/src/tests/notesApiServer.test.ts"
     required: true
     when_files_match:
       - "app/**"
@@ -47,7 +47,7 @@ eval_gates:
       - "docs/**"
 
   - id: diff_check
-    command: "git diff --check -- app skills CLI.md README.md docs"
+    command: "git diff --check -- app API.md CLI.md"
     required: true
 
 commit:
@@ -56,7 +56,7 @@ commit:
   push: false
 
 memory:
-  enabled: true
+  enabled: false
   provider: strata
   project: "Agent Notes"
   mode: consolidate
