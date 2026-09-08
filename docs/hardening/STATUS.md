@@ -128,3 +128,10 @@ Cheap/premium fallback now shares turn count, total tool-call count, applied-wri
 
 Committed tool writes now notify the desktop immediately, including when both providers later fail, rather than waiting for a successful final response. Added actual runner tests with scripted offline providers covering pending proposals across fallback, existing tool-result protocol, applied writes without replay, cumulative tool limits, cheap-only policy and notifications after double failure. No live provider calls were used. Full goal remains active; capability conformance and remaining release/desktop requirements are not yet complete.
 Final consolidated verification passed formatting, lint, 128 tests/27 files, TypeScript and production build.
+
+### Installed CLI package verification checkpoint
+
+Added `npm run package:verify`: packs the real distributable, installs production dependencies into an isolated temporary directory, checks the CLI bin link/executable bit, launches the installed CLI server against a synthetic library, authenticates, captures/deduplicates/searches through installed commands from outside the repository, and verifies clean termination. Fixed CLI server signal forwarding so stopping the wrapper stops its database-owning child. CI now executes this smoke test rather than only listing tarball contents. This does not claim Electron DMG/NSIS/AppImage, signing or notarization validation.
+
+The initial installed-runtime smoke passed. The additional bin-link assertion exposed macOS `/var` vs `/private/var` path aliasing in the verifier; it now compares realpaths on both sides. Final smoke rerun follows. Source verification is recorded below.
+Final installed package smoke passed, including canonical bin-link/executable checks. `npm run verify` passed formatting, lint, all 128 tests/27 files, TypeScript and production build. Remote CI and Electron package validation remain outstanding.

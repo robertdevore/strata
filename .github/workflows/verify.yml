@@ -26,5 +26,5 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npm audit --audit-level=high
-      - name: Check distributable CLI file manifest
-        run: npm pack --dry-run
+      - name: Verify installed CLI and native database
+        run: npm run package:verify

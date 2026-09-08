@@ -31,3 +31,5 @@ strata agent capture --file context.md --dry-run
 ```
 
 Duplicate detection uses an indexed hash populated by schema migration 12 and maintained with content updates. It is separate from request-key idempotency: captures can be recognized across sessions even without an idempotency key.
+
+For release verification, run `npm run package:verify`. It creates and installs a tarball in a temporary directory with production dependencies, exercises the installed authenticated server and native SQLite, and checks capture/retrieval and shutdown. It never opens the live library. The test needs package-registry access and runs separately from the offline `npm run verify` suite.

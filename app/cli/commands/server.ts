@@ -52,6 +52,11 @@ export const register_server_command = (
         },
       })
 
+      const forwardSignal = (signal: NodeJS.Signals) => child.kill(signal)
+      const onInterrupt = () => forwardSignal('SIGINT')
+      const onTerminate = () => forwardSignal('SIGTERM')
+      process.on('SIGINT', onInterrupt)
+      process.on('SIGTERM', onTerminate)
       await new Promise<void>((resolve, reject) => {
         child.once('error', reject)
         child.once('exit', (code, signal) => {
@@ -61,6 +66,9 @@ export const register_server_command = (
           }
           reject(new Error(`Standalone Strata server exited with code ${code ?? 'null'}.`))
         })
+      }).finally(() => {
+        process.off('SIGINT', onInterrupt)
+        process.off('SIGTERM', onTerminate)
       })
     })
 }
