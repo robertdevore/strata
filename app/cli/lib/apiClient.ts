@@ -51,6 +51,7 @@ export interface ApiClientOptions {
 }
 
 export interface RequestOptions {
+	idempotencyKey?: string
 	query?: Record<string, string | number | boolean | undefined>
 	body?: unknown
 	validate?: z.ZodTypeAny
@@ -91,13 +92,14 @@ export class StrataApiClient {
 		return url.toString()
 	}
 
-	async request<TResponse>(
+	async request<TResponse = Record<string, unknown>>(
 		method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
 		path: string,
 		options: RequestOptions = {},
 	): Promise<TResponse> {
 		const url = this.build_url(path, options.query)
 		const headers = this.build_headers()
+		if (options.idempotencyKey) headers.set('Idempotency-Key',options.idempotencyKey)
 		const allow_retry = Boolean(options.allowRetry && 'GET' === method)
 		const max_attempts = allow_retry ? 3 : 1
 		let attempt = 0
@@ -204,6 +206,10 @@ export class StrataApiClient {
 			allowRetry: true,
 		})
 		return response.notes
+	}
+
+	async listNotesPage(filters:Record<string,string|number|boolean|undefined> = {}):Promise<z.infer<typeof note_list_response_schema>> {
+		return this.request('GET','/notes',{query:filters,validate:note_list_response_schema,allowRetry:true})
 	}
 
 	async searchNotes(query: string, limit?: number): Promise<Array<z.infer<typeof note_schema>>> {

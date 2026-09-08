@@ -1,3 +1,4 @@
+import { register_protocol_commands } from './commands/protocol'
 import { Command } from 'commander'
 import { resolve_runtime_options } from './lib/config'
 import { StrataApiClient } from './lib/apiClient'
@@ -61,6 +62,7 @@ const get_context = (command: Command) => {
 	return { options, client }
 }
 
+register_protocol_commands(program, get_context)
 register_health_command(program, get_context)
 register_config_commands(program, get_context)
 register_notes_commands(program, get_context)

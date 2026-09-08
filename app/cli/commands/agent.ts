@@ -21,8 +21,8 @@ interface AgentContextOptions {
 }
 
 const compact_context_note = (note: Awaited<ReturnType<StrataApiClient['searchNotes']>>[number]) => {
-	const title = derive_title_from_markdown(note.content)
-	const snippet = note.content
+	const title = note.title ?? derive_title_from_markdown(note.content || note.snippet || '')
+	const snippet = (note.snippet || note.content)
 		.replace(/^#\s+.*$/m, '')
 		.replace(/\s+/g, ' ')
 		.trim()
@@ -30,6 +30,7 @@ const compact_context_note = (note: Awaited<ReturnType<StrataApiClient['searchNo
 
 	return {
 		id: note.id,
+		revision: note.revision,
 		title,
 		snippet,
 		updatedAt: note.updatedAt,
@@ -182,7 +183,7 @@ export const register_agent_commands = (
 				query,
 				count: notes.length,
 				compact: !command_options.full,
-				notes: command_options.full ? notes : notes.map(compact_context_note),
+				notes: command_options.full ? await Promise.all(notes.map(note=>client.getNote(note.id))) : notes.map(compact_context_note),
 			})
 		})
 }

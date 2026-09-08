@@ -19,8 +19,8 @@ export const resolve_server_bind_environment = (base_url: string): { STRATA_API_
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const electron_binary_path = path.resolve(__dirname, '../../../node_modules/.bin/electron')
-const standalone_server_entry = path.resolve(__dirname, '../../standalone/server.cjs')
+const node_binary_path = process.execPath
+const standalone_server_entry = path.resolve(__dirname, '../../standalone/server.ts')
 
 export const register_server_command = (
 	program: Command,
@@ -37,8 +37,8 @@ export const register_server_command = (
 			const { options } = get_context(this)
 			const command_options = this.optsWithGlobals() as Record<string, unknown>
 			const bind_environment = resolve_server_bind_environment(options.baseUrl)
-			const child = spawn(electron_binary_path, [standalone_server_entry], {
-				cwd: process.cwd(),
+			const child = spawn(node_binary_path, ['--import', 'tsx', standalone_server_entry], {
+				cwd: path.resolve(__dirname, '../../..'),
 				stdio: 'inherit',
 				env: {
 					...process.env,

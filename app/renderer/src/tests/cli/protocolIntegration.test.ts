@@ -1,0 +1,59 @@
+import { describe, expect, it } from 'vitest'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { StrataDatabase } from '@main/db'
+import { startNotesApiServer } from '@main/api/notesApiServer'
+const exec = promisify(execFile)
+describe('CLI protocol integration', () => {
+  it('discovers capabilities and executes safe idempotent batches from outside the checkout', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-cli-protocol-'))
+    const db = new StrataDatabase(dir)
+    const token = 'integration-test-token-with-at-least-32-characters'
+    const server = await startNotesApiServer(db, { port: 0, token })
+    const run = async (args: string[]) => {
+      const output = await exec(
+        process.execPath,
+        [
+          path.resolve('scripts/strata.mjs'),
+          '--json',
+          '--base-url',
+          `http://127.0.0.1:${server.port}`,
+          ...args,
+        ],
+        { cwd: dir, env: { ...process.env, STRATA_API_TOKEN: token }, maxBuffer: 1024 * 1024 },
+      )
+      return JSON.parse(output.stdout)
+    }
+    try {
+      const capabilities = await run(['capabilities'])
+      expect(capabilities.data.apiVersion).toBe(1)
+      const file = path.join(dir, 'operations.json')
+      fs.writeFileSync(
+        file,
+        JSON.stringify({ operations: [{ op: 'create_note', payload: { content: '# CLI batch' } }] }),
+      )
+      await run(['--dry-run', 'batch', '--file', file])
+      expect(db.listNotes()).toEqual([])
+      await run(['--confirm', 'batch', '--file', file, '--request-id', 'cli-retry'])
+      await run(['--confirm', 'batch', '--file', file, '--request-id', 'cli-retry'])
+      expect(db.listNotes()).toHaveLength(1)
+      const note = db.listNotes()[0]
+      await run(['--confirm', 'notes', 'update', note.id, '--content', '# Updated', '--if-revision', '1'])
+      await expect(
+        run(['--confirm', 'notes', 'update', note.id, '--content', '# Stale', '--if-revision', '1']),
+      ).rejects.toThrow()
+      expect(db.getNote(note.id)?.content).toBe('# Updated')
+      const search = await run(['agent', 'context', 'search', 'Updated'])
+      expect(search.data.notes[0]).toMatchObject({ title: 'Updated', revision: 2 })
+      const full = await run(['agent', 'context', 'search', 'Updated', '--full'])
+      expect(full.data.notes[0].content).toBe('# Updated')
+    } finally {
+      await server.close()
+      db.close()
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }, 20000)
+})

@@ -17,13 +17,14 @@ export const register_search_command = (
 	program
 		.command('search <query>')
 		.description('Search notes with synchronous lexical substring matching.')
-		.option('--tag <tag>', 'Optional tag filter applied client-side.')
+		.option('--tag <tag>', 'Optional exact tag filter.')
 		.option('--project <name>', 'Optional project name filter.')
 		.option('--project-id <id>', 'Optional project ID filter.')
 		.option('--limit <count>', 'Max notes to return.', '25')
-		.action(async function (query: string, command_options: { tag?: string; project?: string; projectId?: string; limit: string }) {
+		.option('--cursor <cursor>', 'Continue this search')
+		.action(async function (query: string, command_options: { tag?: string; project?: string; projectId?: string; limit: string; cursor?: string }) {
 			const { options, client } = get_context(this)
-			const limit = Math.max(1, Math.min(500, Number.parseInt(command_options.limit, 10) || 25))
+			const limit = Math.max(1, Math.min(100, Number.parseInt(command_options.limit, 10) || 25))
 			const project_id = command_options.projectId
 				?? (command_options.project
 					? (await client.listProjects()).find((project) => project.name.toLowerCase() === command_options.project!.trim().toLowerCase())?.id
@@ -34,18 +35,14 @@ export const register_search_command = (
 					code: 'PROJECT_NOT_FOUND',
 				})
 			}
-			let notes = await client.searchNotes(query, limit)
-			if (command_options.tag) {
-				notes = notes.filter((note) => note.tags.includes(command_options.tag || ''))
-			}
-			if (project_id) {
-				notes = notes.filter((note) => note.projectId === project_id)
-			}
+			const page = await client.listNotesPage({query,limit,tag:command_options.tag,projectId:project_id,cursor:command_options.cursor})
+			const notes=page.notes
 
 			const data = {
 				query,
 				count: notes.length,
-				notes,
+			nextCursor:page.nextCursor??null,
+				notes: notes.map(note=>Object.fromEntries(Object.entries(note).filter(([key])=>key!=='content'))),
 			}
 
 			if ('pretty' === options.outputMode && !options.quiet) {
@@ -55,7 +52,7 @@ export const register_search_command = (
 					note.updatedAt,
 					note.projectId ? (project_names.get(note.projectId) ?? note.projectId.slice(0, 8)) : '',
 					note.tags.join(','),
-					derive_title_from_markdown(note.content),
+					note.title ?? derive_title_from_markdown(note.content || note.snippet || ''),
 				])
 				const table = format_table(['ID', 'Updated', 'Project', 'Tags', 'Title'], rows)
 				print_success(options, data, { prettyText: table })

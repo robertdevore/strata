@@ -68,7 +68,7 @@ describe('cli agent context search', () => {
 	})
 
 	it('returns complete note records only when --full is explicit', async () => {
-		const client = { searchNotes: vi.fn().mockResolvedValue([note]) } as unknown as StrataApiClient
+		const client = { searchNotes: vi.fn().mockResolvedValue([{...note,content:'',snippet:'Compact preview'}]), getNote:vi.fn().mockResolvedValue(note) } as unknown as StrataApiClient
 		const program = new Command().exitOverride()
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 		register_agent_commands(program, () => ({ options: { ...base_options, outputMode: 'json' }, client }))
@@ -78,6 +78,7 @@ describe('cli agent context search', () => {
 		const output = JSON.parse(String(write.mock.calls.at(-1)?.[0]))
 		expect(output.data.compact).toBe(false)
 		expect(output.data.notes[0].content).toBe(note.content)
+		expect(client.getNote).toHaveBeenCalledWith(note.id)
 		write.mockRestore()
 	})
 })

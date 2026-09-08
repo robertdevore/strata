@@ -73,6 +73,11 @@ export const register_notes_commands = (
 		.option('--archived <bool>', 'Filter archived true|false')
 		.option('--include-deleted', 'Include soft-deleted notes')
 		.option('--limit <count>', 'Limit result count', '50')
+		.option('--cursor <cursor>', 'Continue a server result page')
+		.option('--ids-only', 'Return only note IDs')
+		.option('--count', 'Return only the page count')
+		.option('--full', 'Explicitly fetch full records for this page')
+		.option('--fields <fields>', 'Comma-separated summary fields')
 		.action(async function (command_options: {
 			query?: string
 			tag?: string
@@ -82,6 +87,11 @@ export const register_notes_commands = (
 			archived?: string
 			includeDeleted?: boolean
 			limit: string
+			cursor?: string
+			idsOnly?: boolean
+			count?: boolean
+			full?: boolean
+			fields?: string
 		}) {
 			const { options, client } = get_context(this)
 			const limit = Math.max(1, Math.min(100, Number.parseInt(command_options.limit, 10) || 50))
@@ -99,6 +109,7 @@ export const register_notes_commands = (
 				})
 			}
 			const filters = notes_filter_schema.parse({
+				cursor: command_options.cursor,
 				query: command_options.query,
 				tag: command_options.tag,
 				projectId: project_id,
@@ -108,17 +119,12 @@ export const register_notes_commands = (
 				limit,
 			})
 
-			let result = await client.listNotes(filters)
-			if (result.length > limit) {
-				result = result.slice(0, limit)
-			}
+			const page=await client.listNotesPage(filters)
+			const result=command_options.full?await Promise.all(page.notes.map(note=>client.getNote(note.id))):page.notes
+			const fields=command_options.fields?.split(',').map(field=>field.trim()).filter(Boolean)
+			const data={ok:true,count:result.length,nextCursor:page.nextCursor??null,...(command_options.count?{}:{notes:command_options.idsOnly?result.map(note=>note.id):result.map(note=>Object.fromEntries(Object.entries(note).filter(([key])=>(command_options.full||key!=='content')&&(!fields||fields.includes(key)))))})}
 
-			const data = {
-				ok: true,
-				count: result.length,
-				notes: result,
-			}
-			if ('pretty' === options.outputMode && !options.quiet) {
+			if ('pretty' === options.outputMode && !options.quiet && !command_options.idsOnly && !command_options.count && !command_options.fields) {
 				const project_names = new Map((await client.listProjects()).map((project) => [project.id, project.name]))
 				const rows = result.map((note) => [
 					note.id.slice(0, 8),
@@ -142,7 +148,7 @@ export const register_notes_commands = (
 			note_id_schema.parse(note_id)
 			const note = await client.getNote(note_id)
 
-			if (command_options.contentOnly && 'pretty' === options.outputMode) {
+			if (command_options.contentOnly) {
 				if (!options.quiet) process.stdout.write(note.content + '\n')
 				return
 			}

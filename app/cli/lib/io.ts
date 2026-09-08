@@ -2,6 +2,9 @@ import { promises as fs } from 'node:fs'
 import { CliError } from './errors'
 import { ExitCode } from '../types'
 
+const MAX_INPUT_BYTES = 1024 * 1024
+const bounded = (text:string):string => {if(Buffer.byteLength(text)>MAX_INPUT_BYTES) throw new CliError({message:'Input exceeds 1MB',code:'INPUT_TOO_LARGE',exitCode:ExitCode.ValidationError});return text}
+
 export const read_content_input = async (params: {
 	content?: string
 	file?: string
@@ -21,12 +24,14 @@ export const read_content_input = async (params: {
 		})
 	}
 
-	if (params.content) return params.content
+	if (params.content) return bounded(params.content)
 
 	if (params.file) {
 		try {
-			return await fs.readFile(params.file, 'utf-8')
+			if((await fs.stat(params.file)).size>MAX_INPUT_BYTES) throw new CliError({message:'Input exceeds 1MB',code:'INPUT_TOO_LARGE',exitCode:ExitCode.ValidationError})
+			return bounded(await fs.readFile(params.file, 'utf-8'))
 		} catch (error) {
+			if(error instanceof CliError) throw error
 			throw new CliError({
 				message: `Could not read file: ${params.file}`,
 				exitCode: ExitCode.ValidationError,
@@ -38,8 +43,11 @@ export const read_content_input = async (params: {
 
 	if (params.stdin) {
 		const chunks: Buffer[] = []
+		let received=0
 		for await (const chunk of process.stdin) {
 			const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+			received+=data.length
+			if(received>MAX_INPUT_BYTES) throw new CliError({message:'Input exceeds 1MB',code:'INPUT_TOO_LARGE',exitCode:ExitCode.ValidationError})
 			chunks.push(data)
 		}
 		return Buffer.concat(chunks).toString('utf-8')
