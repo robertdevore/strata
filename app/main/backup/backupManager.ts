@@ -249,7 +249,6 @@ export class BackupManager {
       }
       await fsPromises.chmod(staged_database_path, 0o600)
       await fsPromises.rm(staging_data, { recursive: true, force: true })
-      await this.createBackupNow('pre-restore')
       return { sourcePath: source_database_path, stagingDirectory: staging_directory }
     } catch (error) {
       await fsPromises.rm(staging_directory, { recursive: true, force: true })

@@ -63,21 +63,47 @@ export class DraftCloseGuard {
     return this.busy
   }
 
+  /** Freeze edits and require saved drafts before a destructive lifecycle operation. */
+  async withSavedDrafts(operation: () => Promise<void>): Promise<void> {
+    if (!this.ready || this.approved || this.busy) throw new Error('Another lifecycle operation is active.')
+    const generation = this.generation
+    const attempt = async () => {
+      try {
+        const saved = await this.requestSave()
+        if (!saved || generation !== this.generation)
+          throw new Error('Save all drafts and resolve conflicts before restoring a backup.')
+        await operation()
+      } finally {
+        if (generation === this.generation) this.cancel()
+      }
+    }
+    this.busy = attempt()
+    try {
+      await this.busy
+    } finally {
+      if (generation === this.generation) this.busy = undefined
+    }
+  }
+
+  private requestSave(): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const id = randomUUID()
+      const timer = setTimeout(() => {
+        this.pending = undefined
+        resolve(false)
+      }, this.options.timeoutMs ?? 10000)
+      this.pending = { id, timer, resolve }
+      try {
+        this.options.requestSave(id)
+      } catch {
+        this.reply(id, false)
+      }
+    })
+  }
+
   private async prepare(generation: number): Promise<void> {
     try {
-      const saved = await new Promise<boolean>((resolve) => {
-        const id = randomUUID()
-        const timer = setTimeout(() => {
-          this.pending = undefined
-          resolve(false)
-        }, this.options.timeoutMs ?? 10000)
-        this.pending = { id, timer, resolve }
-        try {
-          this.options.requestSave(id)
-        } catch {
-          this.reply(id, false)
-        }
-      })
+      const saved = await this.requestSave()
       if (generation !== this.generation) return
       const allowed = saved || (await this.options.confirmDiscard())
       if (generation !== this.generation) return

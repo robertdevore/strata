@@ -45,11 +45,28 @@ let backup_manager: BackupManager | null = null
 let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
 let database_recovery: DatabaseRecoveryResult | null = null
+let api_start: Promise<void> | null = null
 
 const notifyDataChanged = (changed: ChangedDomains) => {
   const contents = main_window?.webContents
   if (!contents || contents.isDestroyed()) return
   notifyCommittedChanges((domains) => contents.send('data:changed', domains), changed)
+}
+
+const startApi = (): Promise<void> => {
+  if (api_start) return api_start
+  if (notes_api_server || !db) return Promise.resolve()
+  api_start = startNotesApiServer(db, { onDataChanged: notifyDataChanged })
+    .then((server) => {
+      notes_api_server = server
+    })
+    .catch((error: unknown) => {
+      console.error('[strata-api] Failed to start notes API server', runtimeErrorCode(error))
+    })
+    .finally(() => {
+      api_start = null
+    })
+  return api_start
 }
 
 const draftCloseGuard = new DraftCloseGuard({
@@ -79,15 +96,35 @@ const draftCloseGuard = new DraftCloseGuard({
 })
 
 const restore_prepared_database = async (preparation: BackupRestorePreparation): Promise<void> => {
-  backup_manager?.stop()
-  await notes_api_server?.close()
-  notes_api_server = null
-  db?.close()
-  db = null
-  current_settings = null
-  backup_manager?.commitRestore(preparation)
-  app.relaunch()
-  app.exit(0)
+  await draftCloseGuard.withSavedDrafts(async () => {
+    if (!backup_manager || !db) throw new Error('The library is unavailable.')
+    backup_manager.stop()
+    try {
+      await api_start
+      await notes_api_server?.close()
+      notes_api_server = null
+      // Capture drafts acknowledged by the renderer, after stopping this API's writers.
+      await backup_manager.createBackupNow('pre-restore')
+    } catch (error) {
+      backup_manager.start()
+      await startApi()
+      throw error
+    }
+    db.close()
+    db = null
+    current_settings = null
+    try {
+      backup_manager.commitRestore(preparation)
+    } catch {
+      // Existing IPC handlers own the closed connection; a restart is required even after rollback.
+      dialog.showErrorBox(
+        'Backup Restore Failed',
+        'The backup could not be installed. Strata will restart. Recovery copies of the previous library are preserved in its data folder.',
+      )
+    }
+    app.relaunch()
+    app.exit(0)
+  })
 }
 
 const hotkey_to_electron_accelerator = (hotkey: string): string | undefined => {
@@ -401,15 +438,7 @@ void app
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
 
-    void startNotesApiServer(db, {
-      onDataChanged: notifyDataChanged,
-    })
-      .then((server) => {
-        notes_api_server = server
-      })
-      .catch((error: unknown) => {
-        console.error('[strata-api] Failed to start notes API server', runtimeErrorCode(error))
-      })
+    void startApi()
   })
   .catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)

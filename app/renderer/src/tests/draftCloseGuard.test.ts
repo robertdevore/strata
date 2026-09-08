@@ -72,3 +72,41 @@ it('keeps the window open if confirmation fails', async () => {
   expect(f.complete).not.toHaveBeenCalled()
   expect(f.cancelled).toHaveBeenCalledOnce()
 })
+
+it('requires saved drafts for restore without offering discard, then re-enables editing on failure', async () => {
+  const f = fixture(true)
+  const restore = vi.fn(async () => {})
+  const attempt = f.guard.withSavedDrafts(restore)
+  f.guard.reply(f.requestSave.mock.calls[0][0], false)
+  await expect(attempt).rejects.toThrow('Save all drafts')
+  expect(restore).not.toHaveBeenCalled()
+  expect(f.confirmDiscard).not.toHaveBeenCalled()
+  expect(f.cancelled).toHaveBeenCalledOnce()
+  expect(f.guard.approved).toBe(false)
+})
+
+it('serializes restore against close and other restore requests', async () => {
+  const f = fixture()
+  let finish!: () => void
+  const operation = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+  )
+  const attempt = f.guard.withSavedDrafts(operation)
+  expect(operation).not.toHaveBeenCalled()
+  await expect(f.guard.withSavedDrafts(operation)).rejects.toThrow('lifecycle operation')
+  f.guard.reply(f.requestSave.mock.calls[0][0], true)
+  await Promise.resolve()
+  const close = f.guard.intercept(f.event, true)
+  expect(f.event.preventDefault).toHaveBeenCalledOnce()
+  expect(f.requestSave).toHaveBeenCalledTimes(1)
+  expect(f.complete).not.toHaveBeenCalled()
+  finish()
+  await attempt
+  await close
+  expect(operation).toHaveBeenCalledOnce()
+  expect(f.cancelled).toHaveBeenCalledOnce()
+  expect(f.complete).not.toHaveBeenCalled()
+})
