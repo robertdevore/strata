@@ -102,6 +102,26 @@ describe('transactional knowledge contracts', () => {
     expect(db.getNote(first.notes[0].id)!.content.length).toBeGreaterThan(1000)
     expect(() => db.listSummaryPage({ tag: 'changed', cursor: first.nextCursor! })).toThrow('Cursor')
   })
+  it('continues substring fallback across multiple pages',()=>{
+    const {db}=open()
+    for(let i=0;i<6;i++) db.createNote({content:`# Category ${i}\ncategory42`})
+    const first=db.listSummaryPage({query:'gory42',limit:2})
+    const second=db.listSummaryPage({query:'gory42',limit:2,cursor:first.nextCursor!})
+    expect(first.notes).toHaveLength(2);expect(second.notes).toHaveLength(2)
+    expect(new Set([...first.notes,...second.notes].map(note=>note.id)).size).toBe(4)
+  })
+
+  it('refuses a future schema without modifying it',()=>{
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'strata-future-'))
+    const db=new StrataDatabase(dir);db.close()
+    const raw=new Database(path.join(dir,'data/strata.sqlite'))
+    try {
+      raw.pragma('user_version=999')
+      expect(()=>new StrataDatabase(dir)).toThrow('newer Strata')
+      expect(raw.pragma('user_version',{simple:true})).toBe(999)
+    } finally {raw.close();fs.rmSync(dir,{recursive:true,force:true})}
+  })
+
   it('enforces declared foreign keys and cascades', () => {
     const { db, dir } = open()
     const note = db.createNote({ content: '# Cascade' })

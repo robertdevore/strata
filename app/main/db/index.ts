@@ -144,6 +144,7 @@ export class StrataDatabase {
     if (!fs.existsSync(data_dir)) fs.mkdirSync(data_dir, { recursive: true })
     const db_path = path.join(data_dir, 'strata.sqlite')
     this.db = new Database(db_path)
+    try {
     this.db.function('strata_title', { deterministic: true }, deriveNoteTitle)
     this.db.function('strata_normalize', { deterministic: true }, (value: string) =>
       this.normalizeTitle(value),
@@ -157,6 +158,7 @@ export class StrataDatabase {
     this.db.pragma('journal_size_limit = 10000000')
     this.runMigrations()
     this.ensureSettings()
+    } catch(error) { this.db.close(); throw error }
   }
 
   private mutationSource = 'system'
@@ -279,6 +281,66 @@ export class StrataDatabase {
     }))
   }
 
+  listRevisionSummaries(
+    id: string,
+    limit = 50,
+  ): Array<{ revision: number; source: string; operation: string; createdAt: string; bytes: number }> {
+    return this.db
+      .prepare(
+        'SELECT revision,source,operation,created_at AS createdAt,length(CAST(snapshot AS BLOB)) AS bytes FROM note_revisions WHERE note_id=? ORDER BY revision DESC LIMIT ?',
+      )
+      .all(id, Math.max(1, Math.min(100, limit))) as Array<{
+      revision: number
+      source: string
+      operation: string
+      createdAt: string
+      bytes: number
+    }>
+  }
+  getRevision(id: string, revision: number): NoteRevision | null {
+    const row = this.db
+      .prepare('SELECT * FROM note_revisions WHERE note_id=? AND revision=?')
+      .get(id, revision) as
+      | {
+          note_id: string
+          revision: number
+          source: string
+          operation: string
+          created_at: string
+          snapshot: string
+        }
+      | undefined
+    return row
+      ? {
+          noteId: row.note_id,
+          revision: row.revision,
+          source: row.source,
+          operation: row.operation,
+          createdAt: row.created_at,
+          snapshot: JSON.parse(row.snapshot),
+        }
+      : null
+  }
+  historyStats(): { revisions: number; bytes: number } {
+    return this.db
+      .prepare(
+        'SELECT COUNT(*) AS revisions,COALESCE(SUM(length(CAST(snapshot AS BLOB))),0) AS bytes FROM note_revisions',
+      )
+      .get() as { revisions: number; bytes: number }
+  }
+  pruneHistory(keep: number): number {
+    if (!Number.isSafeInteger(keep) || keep < 20 || keep > 10000)
+      throw new DomainError('VALIDATION_ERROR', 'Keep between 20 and 10000 revisions per note')
+    return this.transaction(
+      () =>
+        this.db
+          .prepare(
+            'DELETE FROM note_revisions WHERE revision NOT IN (SELECT revision FROM note_revisions recent WHERE recent.note_id=note_revisions.note_id ORDER BY revision DESC LIMIT ?)',
+          )
+          .run(keep).changes,
+    )
+  }
+
   restoreRevision(id: string, revision: number, expectedRevision: number): Note | null {
     return this.transaction(() => {
       const current = this.aiGetNoteById(id, true)
@@ -337,7 +399,9 @@ export class StrataDatabase {
 
   attachSecretStore(store: SecretStore): void {
     // Persist and verify each key before deleting its only plaintext copy.
-    let migrated = false
+    let migrated = Boolean(
+      this.db.prepare("SELECT 1 FROM settings WHERE key='credentialSanitizationPending'").get(),
+    )
     const read = this.db.prepare('SELECT value FROM settings WHERE key = ?')
     for (const key of SECRET_KEYS) {
       const row = read.get(key) as { value: string } | undefined
@@ -350,12 +414,24 @@ export class StrataDatabase {
     }
     this.db.pragma('secure_delete = ON')
     this.db.transaction(() => {
+      if (migrated)
+        this.db
+          .prepare(
+            "INSERT OR REPLACE INTO settings(key,value) VALUES ('credentialSanitizationPending','true')",
+          )
+          .run()
       for (const key of SECRET_KEYS) this.db.prepare('DELETE FROM settings WHERE key = ?').run(key)
     })()
     if (migrated) {
-      this.db.pragma('wal_checkpoint(TRUNCATE)')
+      const checkpoint = () => {
+        const rows = this.db.pragma('wal_checkpoint(TRUNCATE)') as Array<{ busy: number }>
+        if (rows.some((row) => row.busy !== 0))
+          throw new Error('Close other Strata database processes to finish credential sanitization')
+      }
+      checkpoint()
       this.db.exec('VACUUM')
-      this.db.pragma('wal_checkpoint(TRUNCATE)')
+      checkpoint()
+      this.db.prepare("DELETE FROM settings WHERE key='credentialSanitizationPending'").run()
     }
     this.secretStore = store
   }
@@ -363,6 +439,7 @@ export class StrataDatabase {
   private runMigrations() {
     const current_version_row = this.db.prepare('PRAGMA user_version').get() as Record<string, number>
     let current_version = current_version_row.user_version ?? 0
+    if(current_version>(migrations.at(-1)?.version??0)) throw new Error('This database requires a newer Strata version')
 
     for (const migration of migrations) {
       if (migration.version <= current_version) continue
@@ -470,7 +547,7 @@ export class StrataDatabase {
     return value.replace(/[\\%_]/g, '\\$&')
   }
 
-  private queryNotes(filters: NotesFilter = {}, summaries = false, forceSubstring = false): Note[] {
+  private queryNotes(filters: NotesFilter = {}, summaries = false): Note[] {
     const values: unknown[] = []
     const where: string[] = []
     if (!filters.includeDeleted) where.push('n.deleted_at IS NULL')
@@ -481,16 +558,27 @@ export class StrataDatabase {
       }
     }
     if (filters.tag) {
-      where.push(this.tagWhereFragment())
+      where.push(
+        filters.includeDeleted
+          ? 'EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = ?)'
+          : this.tagWhereFragment(),
+      )
       values.push(filters.tag)
     }
+    if (filters.untagged) where.push('json_array_length(n.tags) = 0')
     if (filters.projectId) {
       where.push('n.project_id = ?')
       values.push(filters.projectId)
     }
     const terms = filters.query?.match(/[\p{L}\p{N}_]+/gu)?.slice(0, 30) ?? []
-    const useFts = !forceSubstring && terms.length > 0
-    let rank = 'n.updated_at DESC, n.id DESC'
+    const ftsExpression = terms.map((term) => '"' + term.replace(/"/g, '""') + '"*').join(' AND ')
+    const useFts = terms.length > 0 && Boolean(this.db.prepare('SELECT rowid FROM notes_fts WHERE notes_fts MATCH ? LIMIT 1').get(ftsExpression))
+    let rank =
+      filters.sort === 'created_desc'
+        ? 'n.created_at DESC, n.id DESC'
+        : filters.sort === 'title_asc'
+          ? 'n.normalized_title ASC, n.id DESC'
+          : 'n.updated_at DESC, n.id DESC'
     if (filters.query) {
       if (useFts) {
         where.push(
@@ -507,6 +595,11 @@ export class StrataDatabase {
       }
       rank = `CASE WHEN n.normalized_title = ? THEN 0 WHEN n.normalized_title LIKE ? ESCAPE '\\' THEN 1 ELSE 2 END, n.updated_at DESC, n.id DESC`
     }
+    if (useFts)
+      rank = rank.replace(
+        'n.updated_at DESC',
+        `COALESCE((SELECT bm25(notes_fts,8.0,1.0,4.0) FROM notes_fts WHERE rowid=n.rowid AND notes_fts MATCH ?),0), n.updated_at DESC`,
+      )
     let offset = 0
     if (filters.cursor) {
       try {
@@ -531,6 +624,7 @@ export class StrataDatabase {
         this.normalizeTitle(filters.query),
         this.escapeLikePattern(this.normalizeTitle(filters.query)) + '%',
       )
+    if (useFts) values.push(ftsExpression)
     const limit =
       filters.limit === undefined ? (summaries ? 100 : -1) : Math.max(1, Math.min(200, filters.limit))
     values.push(limit, offset)
@@ -542,7 +636,6 @@ export class StrataDatabase {
         `SELECT ${select} FROM notes n LEFT JOIN projects p ON p.id=n.project_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY ${rank} LIMIT ? OFFSET ?`,
       )
       .all(...values) as DbNoteRow[]
-    if (!rows.length && useFts && !offset) return this.queryNotes(filters, summaries, true)
     return rows.map((row) => (summaries ? this.mapNoteSummary(row) : this.mapNote(row)))
   }
 
@@ -834,9 +927,7 @@ export class StrataDatabase {
 
   listTags(): Array<{ name: string; count: number }> {
     return this.db
-      .prepare(
-        `SELECT j.value AS name, COUNT(DISTINCT n.id) AS count FROM notes n, json_each(n.tags) j WHERE n.deleted_at IS NULL GROUP BY j.value ORDER BY j.value`,
-      )
+      .prepare(`SELECT tag AS name, COUNT(*) AS count FROM note_tags GROUP BY tag ORDER BY tag`)
       .all() as Array<{ name: string; count: number }>
   }
 

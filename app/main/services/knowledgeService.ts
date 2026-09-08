@@ -17,6 +17,8 @@ export const createSchema = z.object(noteFields).strict()
 export const updateSchema = createSchema.extend({ expectedRevision: revisionSchema }).strict()
 export const listSchema = z
   .object({
+    untagged: z.boolean().optional(),
+    sort: z.enum(['updated_desc', 'created_desc', 'title_asc']).optional(),
     query: z.string().max(500).optional(),
     starred: z.boolean().optional(),
     archived: z.boolean().optional(),

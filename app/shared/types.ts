@@ -38,6 +38,8 @@ export interface Note {
 }
 
 export interface NotesFilter {
+	untagged?: boolean
+	sort?: SortMode
 	limit?: number
 	cursor?: string
 	query?: string

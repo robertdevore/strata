@@ -90,6 +90,8 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
     }
     const filters = () =>
       listSchema.parse({
+        sort: url.searchParams.get('sort') ?? undefined,
+        untagged: boolean(url.searchParams.get('untagged')),
         query: url.searchParams.get('query') ?? url.searchParams.get('q') ?? undefined,
         starred: boolean(url.searchParams.get('starred')),
         archived: boolean(url.searchParams.get('archived')),
@@ -105,7 +107,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
       return ok({
         version: '0.8.0',
         apiVersion: 1,
-        schemaVersion: 10,
+        schemaVersion: 11,
         auth: 'local-token',
         search: 'fts5-with-substring-fallback',
         capabilities: [
@@ -154,7 +156,11 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
             mutationOptions,
           ),
         )
-      if (method === 'GET' && parts[2] === 'history') return ok({ revisions: db.listRevisions(id) })
+      if (method === 'GET' && parts[2] === 'history' && parts.length === 4) {
+        const revision = db.getRevision(id, revisionSchema.parse(Number(parts[3])))
+        return revision ? ok({ revision }) : fail('NOT_FOUND', 'Revision not found', 404)
+      }
+      if (method === 'GET' && parts[2] === 'history') return ok({ revisions: db.listRevisionSummaries(id) })
       if (method === 'POST' && parts[2] === 'restore') {
         const parsed = z
           .object({ revision: revisionSchema, expectedRevision: revisionSchema })

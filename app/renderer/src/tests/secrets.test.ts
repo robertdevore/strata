@@ -34,4 +34,22 @@ describe('provider credentials',()=>{
   const store=new EncryptedSecretStore('/unused',{isEncryptionAvailable:()=>true,getSelectedStorageBackend:()=> 'basic_text',encryptString:Buffer.from,decryptString:()=>''})
   expect(()=>store.set('openAiApiKey','secret')).toThrow('OS credential encryption is unavailable')
  })
+ it('resumes sanitization after a concurrent reader blocks WAL truncation',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'strata-secret-reader-'))
+  const db=new StrataDatabase(dir)
+  const raw=new Database(path.join(dir,'data/strata.sqlite'))
+  const memory=new Map<SecretKey,string>()
+  const store={get:(key:SecretKey)=>memory.get(key)??'',set:(key:SecretKey,value:string)=>{memory.set(key,value)}}
+  try {
+   raw.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('openAiApiKey',JSON.stringify('reader-blocked-secret'))
+   raw.exec('BEGIN')
+   raw.prepare('SELECT * FROM settings').all()
+   expect(()=>db.attachSecretStore(store)).toThrow('Close other Strata')
+   raw.exec('COMMIT')
+   db.attachSecretStore(store)
+   expect(db.getSettings().openAiApiKey).toBe('reader-blocked-secret')
+   expect(raw.prepare("SELECT * FROM settings WHERE key='credentialSanitizationPending'").get()).toBeUndefined()
+  } finally {if(raw.inTransaction)raw.exec('ROLLBACK');raw.close();db.close();fs.rmSync(dir,{recursive:true,force:true})}
+ },15000)
+
 })

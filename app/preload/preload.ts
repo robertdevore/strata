@@ -4,6 +4,10 @@ import { IPC_CHANNELS } from '../shared/ipc'
 
 const api: StrataApi = {
 	notes: {
+		history: (id) => ipcRenderer.invoke('notes:history',{id}),
+		getRevision: (id,revision) => ipcRenderer.invoke('notes:revision',{id,revision}),
+		restoreRevision: (id,revision,expectedRevision) => ipcRenderer.invoke('notes:revision:restore',{id,revision,expectedRevision}),
+		page: (filters) => ipcRenderer.invoke('notes:page',filters),
 		list: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesList, filters),
 		listSummaries: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesListSummaries, filters),
 		get: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesGet, { id }),

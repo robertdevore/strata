@@ -11,6 +11,29 @@ const star_schema = z.object({ id: z.string().uuid(), starred: z.boolean() })
 
 export const registerNotesHandlers = (db: StrataDatabase) => {
   const service = new KnowledgeService(db)
+  ipcMain.handle('notes:history', (_event, payload) => db.listRevisionSummaries(id_schema.parse(payload).id))
+  ipcMain.handle('notes:revision', (_event, payload) => {
+    const p = z.object({ id: z.string().uuid(), revision: z.number().int().positive() }).parse(payload)
+    return db.getRevision(p.id, p.revision)
+  })
+  ipcMain.handle('notes:revision:restore', (_event, payload) => {
+    const p = z
+      .object({
+        id: z.string().uuid(),
+        revision: z.number().int().positive(),
+        expectedRevision: z.number().int().positive(),
+      })
+      .parse(payload)
+    return db.restoreRevision(p.id, p.revision, p.expectedRevision)
+  })
+  ipcMain.handle('notes:page', (_event, payload) => {
+    const page = db.listSummaryPage(listSchema.optional().parse(payload))
+    return {
+      ...page,
+      notes: page.notes.map((note) => ({ ...note, content: note.snippet, contentLoaded: false })),
+    }
+  })
+
   ipcMain.handle(IPC_CHANNELS.notesList, (_event, payload) => {
     const filters = listSchema.optional().parse(payload)
     return db.listNotes(filters)

@@ -209,4 +209,21 @@ export const migrations: Migration[] = [
 			CREATE TABLE mutation_proposals (id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending');
 		`,
   },
+
+  {
+    version: 11,
+    description: 'indexed active note tags',
+    upSql: `
+      CREATE TABLE note_tags(note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE, tag TEXT NOT NULL, PRIMARY KEY(note_id,tag));
+      CREATE INDEX idx_note_tags_tag ON note_tags(tag,note_id);
+      INSERT OR IGNORE INTO note_tags SELECT n.id,j.value FROM notes n,json_each(n.tags) j WHERE n.deleted_at IS NULL;
+      CREATE TRIGGER note_tags_insert AFTER INSERT ON notes WHEN new.deleted_at IS NULL BEGIN
+        INSERT OR IGNORE INTO note_tags SELECT new.id,value FROM json_each(new.tags);
+      END;
+      CREATE TRIGGER note_tags_update AFTER UPDATE OF tags,deleted_at ON notes BEGIN
+        DELETE FROM note_tags WHERE note_id=new.id;
+        INSERT OR IGNORE INTO note_tags SELECT new.id,value FROM json_each(new.tags) WHERE new.deleted_at IS NULL;
+      END;
+    `,
+  },
 ]
