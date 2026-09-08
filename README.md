@@ -78,3 +78,5 @@ Run `npm run verify` before submitting changes. It checks source formatting, lin
 Chat model choices retain their provider identity. “Auto” uses the configured router; an explicit choice uses its catalog provider. If an older chat's bare model name is ambiguous or no longer in the catalog, select its provider/model again or add the model to Settings. Strata does not guess a provider from the model's name.
 
 `npm run package:electron:verify` builds an unsigned temporary Electron directory and checks its bundled assets and native SQLite/FTS runtime without opening the live library. It requires Electron build dependencies/download access. It does not sign, notarize, publish, or prove installer and renderer behavior. The macOS CI job runs this separately from normal source verification.
+
+For custom OpenAI-compatible endpoints, Advanced AI settings let you disable unsupported tool calls, system messages, or temperature parameters. Text-only endpoints cannot retrieve or edit notes through tools. When system roles are unavailable, instructions are included as user text; mutation permissions remain enforced by Strata.

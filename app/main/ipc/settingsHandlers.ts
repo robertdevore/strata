@@ -65,6 +65,10 @@ const settings_patch_schema = z.object({
   aiKimiApiKey: z.string().max(2048).optional(),
   aiOpenrouterApiKey: z.string().max(2048).optional(),
   aiCustomApiKey: z.string().max(2048).optional(),
+  aiCustomCapabilities: z
+    .object({ tools: z.boolean(), systemMessages: z.boolean(), temperature: z.boolean() })
+    .strict()
+    .optional(),
   aiCustomBaseUrl: z.string().max(512).optional(),
   aiShowRoutingDecisions: z.boolean().optional(),
   aiEnableRouteLogs: z.boolean().optional(),

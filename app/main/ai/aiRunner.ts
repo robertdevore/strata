@@ -10,6 +10,15 @@ import type { RouterConfig } from './routing'
 import { create_provider, resolve_model_selection, get_preset_by_id } from './providers/providerRegistry'
 import { budgetHistory, runProviderToolLoop, createToolLoopState } from './toolLoop'
 
+const normalizeCapabilities = (value: unknown): import('../../shared/types').ProviderCapabilities => {
+  const input = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    tools: input.tools !== false,
+    systemMessages: input.systemMessages !== false,
+    temperature: input.temperature !== false,
+  }
+}
+
 // ---- System Prompt ----
 
 const SYSTEM_PROMPT =
@@ -117,6 +126,7 @@ const resolve_ai_settings = (db: StrataDatabase): AiSettings => {
     aiKimiApiKey: 'string' === typeof raw.aiKimiApiKey ? (raw.aiKimiApiKey as string) : '',
     aiOpenrouterApiKey: 'string' === typeof raw.aiOpenrouterApiKey ? (raw.aiOpenrouterApiKey as string) : '',
     aiCustomApiKey: 'string' === typeof raw.aiCustomApiKey ? (raw.aiCustomApiKey as string) : '',
+    aiCustomCapabilities: normalizeCapabilities(raw.aiCustomCapabilities),
     aiCustomBaseUrl: 'string' === typeof raw.aiCustomBaseUrl ? (raw.aiCustomBaseUrl as string) : '',
     aiShowRoutingDecisions:
       'boolean' === typeof raw.aiShowRoutingDecisions ? (raw.aiShowRoutingDecisions as boolean) : true,
@@ -157,6 +167,7 @@ const resolve_provider_for_route = (
       model,
       apiKeys: api_keys,
       customBaseUrl: ai_settings.aiCustomBaseUrl,
+      customCapabilities: ai_settings.aiCustomCapabilities,
     })
     return { provider, model, provider_id: preset_id }
   }
@@ -169,6 +180,7 @@ const resolve_provider_for_route = (
     model,
     apiKeys: api_keys,
     customBaseUrl: ai_settings.aiCustomBaseUrl,
+    customCapabilities: ai_settings.aiCustomCapabilities,
   })
   return { provider, model, provider_id: preset_id }
 }
@@ -226,6 +238,7 @@ const resolve_provider_for_forced_model = (
     model: selection.model,
     apiKeys: build_api_keys_map(ai_settings),
     customBaseUrl: ai_settings.aiCustomBaseUrl,
+    customCapabilities: ai_settings.aiCustomCapabilities,
   })
   return {
     provider,

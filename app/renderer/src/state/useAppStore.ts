@@ -126,6 +126,7 @@ const defaultSettings: Settings = {
   aiOpenrouterApiKey: '',
   aiCustomApiKey: '',
   aiCustomBaseUrl: '',
+  aiCustomCapabilities: { tools: true, systemMessages: true, temperature: true },
   aiShowRoutingDecisions: true,
   aiEnableRouteLogs: false,
   aiRouteLogRetentionDays: 30,

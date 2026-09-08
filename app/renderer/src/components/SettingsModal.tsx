@@ -816,6 +816,42 @@ export function SettingsModal({
                     />
                   </label>
 
+                  <fieldset>
+                    <legend>Custom endpoint capabilities</legend>
+                    {(
+                      [
+                        ['tools', 'Tool calls'],
+                        ['systemMessages', 'System messages'],
+                        ['temperature', 'Temperature parameter'],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label key={key} className="inline-toggle">
+                        <input
+                          type="checkbox"
+                          checked={settings.aiCustomCapabilities?.[key] ?? true}
+                          onChange={(event) =>
+                            onUpdate({
+                              aiCustomCapabilities: {
+                                ...(settings.aiCustomCapabilities ?? {
+                                  tools: true,
+                                  systemMessages: true,
+                                  temperature: true,
+                                }),
+                                [key]: event.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                    <p>
+                      Disable unsupported features. Without tool calls this endpoint can chat but cannot
+                      retrieve or edit notes. Without system-message support, instructions are included as
+                      user text.
+                    </p>
+                  </fieldset>
+
                   <label className="inline-toggle">
                     <input
                       type="checkbox"

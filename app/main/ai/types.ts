@@ -154,6 +154,7 @@ export interface AiSettings {
   aiCustomApiKey: string
 
   // Custom provider
+  aiCustomCapabilities: import('../../shared/types').ProviderCapabilities
   aiCustomBaseUrl: string
 
   // Display options
@@ -181,6 +182,7 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   aiOpenrouterApiKey: '',
   aiCustomApiKey: '',
   aiCustomBaseUrl: '',
+  aiCustomCapabilities: { tools: true, systemMessages: true, temperature: true },
   aiShowRoutingDecisions: true,
   aiEnableRouteLogs: false,
   aiCheapConfidenceThreshold: 0.85,

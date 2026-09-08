@@ -197,6 +197,7 @@ export interface ProviderFactoryInput {
   presetId: string
   model: string
   apiKeys: Record<string, string>
+  customCapabilities?: import('../../../shared/types').ProviderCapabilities
   customBaseUrl?: string
 }
 
@@ -229,7 +230,12 @@ export const create_provider = (input: ProviderFactoryInput): AiProvider => {
     throw new Error(`Base URL not configured for ${preset.label}. Set it in Settings.`)
   }
 
-  return new ChatCompletionsProvider(api_key, base_url, preset.id)
+  return new ChatCompletionsProvider(
+    api_key,
+    base_url,
+    preset.id,
+    preset.id === 'custom' ? input.customCapabilities : undefined,
+  )
 }
 
 /** Resolve exact catalog identities; never infer a provider from a model substring. */

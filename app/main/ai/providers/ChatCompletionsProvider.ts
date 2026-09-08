@@ -1,3 +1,5 @@
+import { DomainError } from '../../../shared/errors'
+import type { ProviderCapabilities } from '../../../shared/types'
 import { requestProviderJson, validateProviderUrl } from '../providerRequest'
 // Generic Chat Completions provider (OpenAI-compatible)
 // Supports DeepSeek, Kimi/Moonshot, OpenRouter, custom endpoints, llama.cpp
@@ -90,17 +92,44 @@ export class ChatCompletionsProvider implements AiProvider {
   public readonly kind = 'openai_chat_completions'
   private readonly apiKey: string
   private readonly baseUrl: string
+  private readonly capabilities: ProviderCapabilities
 
-  constructor(apiKey: string, baseUrl: string, providerId: string) {
+  constructor(
+    apiKey: string,
+    baseUrl: string,
+    providerId: string,
+    capabilities: ProviderCapabilities = {
+      tools: true,
+      systemMessages: true,
+      temperature: true,
+    },
+  ) {
+    this.capabilities = capabilities
     this.apiKey = apiKey
     this.baseUrl = validateProviderUrl(baseUrl)
     this.providerId = providerId
   }
 
   async sendTurn(input: AiProviderTurnInput): Promise<AiProviderTurnOutput> {
+    if (
+      !this.capabilities.tools &&
+      input.messages.some(
+        (message) => message.role === 'tool' || ('toolCalls' in message && message.toolCalls.length > 0),
+      )
+    )
+      throw new DomainError(
+        'UNSUPPORTED_CAPABILITY',
+        'This endpoint cannot continue a conversation containing tool calls',
+      )
     const messages: ChatCompletionsMessage[] = [
-      { role: 'system', content: input.systemPrompt },
-      ...input.messages.flatMap((msg) => to_chat_completions_message(msg)),
+      { role: this.capabilities.systemMessages ? 'system' : 'user', content: input.systemPrompt },
+      ...input.messages.flatMap((msg) =>
+        to_chat_completions_message(
+          msg.role === 'system' && !this.capabilities.systemMessages
+            ? { role: 'user', content: msg.content }
+            : msg,
+        ),
+      ),
     ]
 
     // Convert Strata tools to OpenAI Chat Completions format
@@ -117,11 +146,10 @@ export class ChatCompletionsProvider implements AiProvider {
     const body: Record<string, unknown> = {
       model: input.model,
       messages,
-      tools: openai_tools,
-      tool_choice: 'auto',
+      ...(this.capabilities.tools && openai_tools.length ? { tools: openai_tools, tool_choice: 'auto' } : {}),
     }
 
-    if (undefined !== input.temperature) {
+    if (this.capabilities.temperature && undefined !== input.temperature) {
       body.temperature = input.temperature
     }
 
@@ -134,7 +162,13 @@ export class ChatCompletionsProvider implements AiProvider {
       body: JSON.stringify(body),
     })
 
-    return this.normalize(payload as ChatCompletionsResponse)
+    const normalized = this.normalize(payload as ChatCompletionsResponse)
+    if (!this.capabilities.tools && normalized.toolCalls.length)
+      throw new DomainError(
+        'UNSUPPORTED_CAPABILITY',
+        'Endpoint returned tool calls while tool support is disabled',
+      )
+    return normalized
   }
 
   private normalize(payload: ChatCompletionsResponse): AiProviderTurnOutput {

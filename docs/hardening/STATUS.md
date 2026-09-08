@@ -142,3 +142,10 @@ Built an unsigned macOS x64 application directory with Electron 41.10.3 using el
 
 The pre-existing configured PNG/ICNS/ICO release assets were ignored with the whole build directory; narrowed ignores so the three required icons can be tracked and clean checkouts can package them. macOS CI now includes the unsigned directory/native check. Signing/notarization, Windows NSIS and Linux AppImage remain unverified. Final reusable-script and source verification results follow.
 Reusable unsigned macOS x64 check passed: Electron 41.10.3, SQLite 3.53.4, bundled assets/FTS/integrity. Source `npm run verify` passed formatting, lint, 128 tests/27 files, typecheck and build. No signing was attempted; full hardening goal remains active.
+
+### Custom-provider capability checkpoint
+
+Custom endpoints now have explicit tools, system-message and temperature capabilities in Settings. Their adapter omits unsupported tools/tool_choice/temperature fields; when system messages are disabled, instructions are carried as user text. Text-only endpoints cannot consume a tool-result transcript and unexpected returned tool calls are rejected before execution. Existing provider defaults remain enabled for compatibility. Settings IPC validates the capability object; runner resolution passes it through configured and forced custom-provider paths.
+
+Added offline request-shape and capability-rejection tests. Typecheck caught test-fixture/tool-type and duplicated-default issues, which were corrected. Final verification result follows. Desktop interaction, broader provider compatibility and remaining full-goal audit work are still open.
+Verification passed all 131 tests/28 files, formatting and lint. After explicitly typing the conformance fixture, final TypeScript/production build and changed-file lint passed. Full hardening goal remains active.

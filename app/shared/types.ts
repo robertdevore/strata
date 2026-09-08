@@ -1,3 +1,8 @@
+export interface ProviderCapabilities {
+  tools: boolean
+  systemMessages: boolean
+  temperature: boolean
+}
 import type { HotkeysSettings } from './hotkeys'
 import type { HomeTileConfig } from './homeTiles'
 import type { SidebarLayoutSettings } from './sidebarLayout'
@@ -70,6 +75,7 @@ export interface Settings {
   aiKimiApiKey: string
   aiOpenrouterApiKey: string
   aiCustomApiKey: string
+  aiCustomCapabilities: ProviderCapabilities
   aiCustomBaseUrl: string
   aiShowRoutingDecisions: boolean
   aiEnableRouteLogs: boolean
