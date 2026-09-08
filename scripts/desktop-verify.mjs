@@ -312,11 +312,14 @@ try {
     .toBe(true)
   // Synthetic provider transport only: no requests reach a real AI service.
   await application.evaluate(() => {
+    process.env.STRATA_OPENAI_API_KEY = 'synthetic-desktop-fixture-key'
     globalThis.__strataAiFixtureStarted = false
     globalThis.__strataAiFixtureAborted = false
     globalThis.fetch = async (url, init) => {
       if (String(url) !== 'https://api.openai.com/v1/responses')
         throw new Error('Unexpected fixture provider URL')
+      if (init.headers.Authorization !== 'Bearer synthetic-desktop-fixture-key')
+        throw new Error('Fixture environment credential was not used')
       globalThis.__strataAiFixtureStarted = true
       return new Promise((_resolve, reject) => {
         init.signal.addEventListener(

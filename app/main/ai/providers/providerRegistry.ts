@@ -1,3 +1,4 @@
+import { DomainError } from '../../../shared/errors'
 // Provider registry — presets and factory for AI providers
 
 import type { AiProvider, AiProviderPreset } from '../types'
@@ -212,12 +213,8 @@ export const create_provider = (input: ProviderFactoryInput): AiProvider => {
   }
 
   const api_key = input.apiKeys[preset.apiKeySetting] || ''
-  if (!api_key && 'openai_responses' !== preset.kind) {
-    // For OpenAI, we also check env var in the caller
-    if (!api_key && 'openai' !== preset.id) {
-      throw new Error(`API key not configured for ${preset.label}. Set it in Settings.`)
-    }
-  }
+  if (!api_key.trim())
+    throw new DomainError('AUTH_ERROR', `API key not configured for ${preset.label}. Set it in Settings.`)
 
   if ('openai_responses' === preset.kind) {
     return new OpenAiResponsesProvider(api_key, preset.baseUrl)

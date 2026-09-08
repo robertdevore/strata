@@ -99,8 +99,11 @@ const linkify_note_ids = (db: StrataDatabase, content: string): string => {
 
 // ---- AI Settings helpers ----
 
-const resolve_api_key = (db: StrataDatabase, key_field: keyof AiSettings): string => {
-  const settings = db.getSettings() as unknown as Record<string, unknown>
+const resolve_api_key = (
+  db: StrataDatabase,
+  key_field: keyof AiSettings,
+  settings = db.getSettings() as unknown as Record<string, unknown>,
+): string => {
   const from_env = process.env.STRATA_OPENAI_API_KEY?.trim()
 
   if ('openAiApiKey' === key_field && from_env) return from_env
@@ -115,7 +118,7 @@ const resolve_api_key = (db: StrataDatabase, key_field: keyof AiSettings): strin
 const resolve_ai_settings = (db: StrataDatabase): AiSettings => {
   const raw = db.getSettings() as unknown as Record<string, unknown>
   return {
-    openAiApiKey: 'string' === typeof raw.openAiApiKey ? (raw.openAiApiKey as string) : '',
+    openAiApiKey: resolve_api_key(db, 'openAiApiKey', raw),
     openAiModel: 'string' === typeof raw.openAiModel ? (raw.openAiModel as string) : 'gpt-4o',
     aiRoutingMode: ('string' === typeof raw.aiRoutingMode ? raw.aiRoutingMode : 'auto') as AiRoutingMode,
     aiCheapProvider:

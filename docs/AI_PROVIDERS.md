@@ -129,3 +129,6 @@ All provider settings are in the Settings modal:
 While a chat request is running, the Send control becomes Stop. Stopping aborts the active provider request and prevents further tool calls or premium fallback. Changes already committed remain saved; pending proposals can still be reviewed. Switching chats or closing the editor cancels its old request. Transcription has a Cancel control and ignores late results after cancellation. Strata permits at most four active provider/transcription requests, including cancelled requests that have not settled yet.
 
 Provider requests have a 60-second deadline and a 4 MiB response limit. Cancellation, timeout, authentication, rate-limit, malformed-response and network failures use distinct internal error codes without exposing provider response bodies or abort reasons.
+
+
+For OpenAI, `STRATA_OPENAI_API_KEY` overrides the stored OS-encrypted credential for routed and explicitly selected requests. A blank environment value falls back to the stored credential. Missing credentials are rejected before a provider connection is opened.
