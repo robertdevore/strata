@@ -22,6 +22,22 @@ const open = () => {
   return { db, dir, service: new KnowledgeService(db) }
 }
 describe('transactional knowledge contracts', () => {
+  it('keeps ranked FTS, project matches and exact tag filters consistent across pages', () => {
+    const { db } = open()
+    const project = db.createProject('Needle project')
+    const exact = db.createNote({ content: '# Needle', tags: ['a%'] })
+    const prefix = db.createNote({ content: '# Needle guide', tags: ['a%'] })
+    const body = db.createNote({ content: '# Other\nneedle needle', tags: ['a%'] })
+    const projectOnly = db.createNote({ content: '# Project only', projectId: project.id, tags: ['a%'] })
+    db.createNote({ content: '# Needle excluded', tags: ['abc'] })
+    const first = db.listSummaryPage({ query: 'needle', tag: 'a%', limit: 2 })
+    expect(first.notes.map((note) => note.id)).toEqual([exact.id, prefix.id])
+    const second = db.listSummaryPage({ query: 'needle', tag: 'a%', limit: 2, cursor: first.nextCursor! })
+    expect(second.notes.map((note) => note.id)).toEqual([body.id, projectOnly.id])
+    expect(second.nextCursor).toBeNull()
+    expect(db.listSummaryPage({ tag: 'a%' }).notes).toHaveLength(4)
+  })
+
   it('deduplicates captures by exact normalized content and project without merging', () => {
     const { db, service } = open()
     const input = {

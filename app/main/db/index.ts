@@ -568,23 +568,9 @@ export class StrataDatabase {
     }
   }
 
-  /**
-   * Build the WHERE-fragment for an exact tag match against a tag-array column
-   * aliased as `n.tags` (used by `listNotes` and `listNoteSummaries`).
-   *
-   * Tags are stored as a JSON array string (e.g. `["foo","bar"]`). The previous
-   * implementation matched them with a LIKE pattern, which had two problems:
-   *   1. SQL LIKE wildcards (`%`, `_`) inside the filter tag were interpreted as
-   *      wildcards, so a filter like `bar%` matched `bar`, `bar2`, `bar3`, etc.
-   *   2. The pattern had no anchor at the start of an array element, so a
-   *      malformed or unusual JSON shape could surface as a false positive.
-   *
-   * The fix uses SQLite's JSON1 `json_each` to iterate the array and compare
-   * each element to the filter value, so the match is exact and special
-   * characters are not interpreted as wildcards.
-   */
+  // Active-note tags are materialized and indexed by migration 11.
   private tagWhereFragment(): string {
-    return 'EXISTS (SELECT 1 FROM json_each(n.tags) WHERE json_each.value = ?)'
+    return 'n.id IN (SELECT note_id FROM note_tags WHERE tag = ?)'
   }
 
   private escapeLikePattern(value: string): string {
@@ -630,12 +616,9 @@ export class StrataDatabase {
     if (filters.query) {
       if (useFts) {
         where.push(
-          `(n.rowid IN (SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?) OR n.project_id IN (SELECT id FROM projects WHERE name LIKE ? ESCAPE '\\'))`,
+          `(n.rowid IN (SELECT note_rowid FROM search_scores UNION SELECT rowid FROM notes WHERE project_id IN (SELECT id FROM projects WHERE name LIKE ? ESCAPE '\\')))`,
         )
-        values.push(
-          terms.map((term) => '"' + term.replace(/"/g, '""') + '"*').join(' AND '),
-          `%${this.escapeLikePattern(filters.query)}%`,
-        )
+        values.push(`%${this.escapeLikePattern(filters.query)}%`)
       } else {
         where.push("(n.content LIKE ? ESCAPE '\\' OR n.tags LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')")
         const wildcard = `%${this.escapeLikePattern(filters.query)}%`
@@ -643,11 +626,7 @@ export class StrataDatabase {
       }
       rank = `CASE WHEN n.normalized_title = ? THEN 0 WHEN n.normalized_title LIKE ? ESCAPE '\\' THEN 1 ELSE 2 END, n.updated_at DESC, n.id DESC`
     }
-    if (useFts)
-      rank = rank.replace(
-        'n.updated_at DESC',
-        `COALESCE((SELECT bm25(notes_fts,8.0,1.0,4.0) FROM notes_fts WHERE rowid=n.rowid AND notes_fts MATCH ?),0), n.updated_at DESC`,
-      )
+    if (useFts) rank = rank.replace('n.updated_at DESC', `COALESCE(search_scores.score,0), n.updated_at DESC`)
     let offset = 0
     if (filters.cursor) {
       try {
@@ -672,7 +651,7 @@ export class StrataDatabase {
         this.normalizeTitle(filters.query),
         this.escapeLikePattern(this.normalizeTitle(filters.query)) + '%',
       )
-    if (useFts) values.push(ftsExpression)
+    if (useFts) values.unshift(ftsExpression)
     const limit =
       filters.limit === undefined ? (summaries ? 100 : -1) : Math.max(1, Math.min(200, filters.limit))
     values.push(limit, offset)
@@ -681,7 +660,7 @@ export class StrataDatabase {
       : 'n.*'
     const rows = this.db
       .prepare(
-        `SELECT ${select} FROM notes n LEFT JOIN projects p ON p.id=n.project_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY ${rank} LIMIT ? OFFSET ?`,
+        ` ${useFts ? 'WITH search_scores AS MATERIALIZED (SELECT rowid AS note_rowid,bm25(notes_fts,8.0,1.0,4.0) AS score FROM notes_fts WHERE notes_fts MATCH ?)' : ''} SELECT ${select} FROM notes n LEFT JOIN projects p ON p.id=n.project_id ${useFts ? 'LEFT JOIN search_scores ON search_scores.note_rowid=n.rowid' : ''} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY ${rank} LIMIT ? OFFSET ?`,
       )
       .all(...values) as DbNoteRow[]
     return rows.map((row) => (summaries ? this.mapNoteSummary(row) : this.mapNote(row)))

@@ -1,0 +1,88 @@
+{
+  "node": "v24.20.0",
+  "platform": "darwin",
+  "arch": "x64",
+  "results": [
+    {
+      "count": 100,
+      "ms": {
+        "startup": 6.933942999999999,
+        "get": 0.22803499999997712,
+        "list": 0.8481839999999465,
+        "search": 1.1212960000000294,
+        "tags": 0.19435699999996814,
+        "tagList": 0.3816739999999754,
+        "updateLinks": 3.514648999999963,
+        "backlinks": 0.36332100000004175,
+        "related": 2.336230999999998
+      },
+      "payloadBytes": {
+        "list50": 25460,
+        "search10": 576
+      },
+      "rss": 79335424
+    },
+    {
+      "count": 1000,
+      "ms": {
+        "startup": 4.267859999999928,
+        "get": 0.16819199999986267,
+        "list": 1.0538699999999608,
+        "search": 1.6252640000000156,
+        "tags": 0.49303600000007464,
+        "tagList": 0.5250240000000304,
+        "updateLinks": 3.7405529999998635,
+        "backlinks": 0.2993309999999383,
+        "related": 1.457255000000032
+      },
+      "payloadBytes": {
+        "list50": 25508,
+        "search10": 5760
+      },
+      "rss": 85860352
+    },
+    {
+      "count": 10000,
+      "ms": {
+        "startup": 3.412381999999525,
+        "get": 0.11804899999970075,
+        "list": 0.6845920000005208,
+        "search": 2.0930809999999838,
+        "tags": 3.162810000000718,
+        "tagList": 1.481804000000011,
+        "updateLinks": 2.6177590000006603,
+        "backlinks": 0.25562300000001414,
+        "related": 1.2921790000000328
+      },
+      "payloadBytes": {
+        "list50": 25559,
+        "search10": 5770
+      },
+      "rss": 99667968
+    },
+    {
+      "count": 50000,
+      "ms": {
+        "startup": 3.439706000004662,
+        "get": 0.1287289999963832,
+        "list": 0.8174440000002505,
+        "search": 4.828233000000182,
+        "tags": 11.179603999997198,
+        "tagList": 7.198735999998462,
+        "updateLinks": 2.3398740000047837,
+        "backlinks": 0.29010799999377923,
+        "related": 2.0163620000021183
+      },
+      "payloadBytes": {
+        "list50": 25605,
+        "search10": 5780
+      },
+      "rss": 120381440
+    }
+  ],
+  "measurementNotes": [
+    "Candidate-ID union and materialized FTS scores; exact active tag filtering uses note_tags index.",
+    "Run after previous tests/build completed, without a concurrent verification command.",
+    "Same intermediate sparse-link/literal-escaped-newline fixture; not desktop or dense-graph evidence. Comparison with after-schema12.json is indicative because the earlier run overlapped verification."
+  ]
+}
