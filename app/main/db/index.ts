@@ -1,3 +1,4 @@
+import { SECRET_KEYS, SECRET_PRESENT, type SecretStore } from '../security/secretStore'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
@@ -120,6 +121,7 @@ const DEFAULT_SETTINGS: Settings = {
 
 export class StrataDatabase {
 	private db: import('better-sqlite3').Database
+	private secretStore?: SecretStore
 	constructor(user_data_path: string) {
 		const data_dir = path.join(user_data_path, 'data')
 		if (!fs.existsSync(data_dir)) fs.mkdirSync(data_dir, { recursive: true })
@@ -144,7 +146,41 @@ export class StrataDatabase {
 
 	async backupTo(destination_path: string): Promise<void> {
 		await this.db.backup(destination_path)
+		const backup = new Database(destination_path)
+		try {
+			backup.pragma('secure_delete = ON')
+			const remove = backup.prepare('DELETE FROM settings WHERE key = ?')
+			for (const key of SECRET_KEYS) remove.run(key)
+			backup.exec('VACUUM')
+			if (backup.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('Backup integrity check failed')
+		} finally { backup.close() }
 	}
+
+	attachSecretStore(store: SecretStore): void {
+		// Persist and verify each key before deleting its only plaintext copy.
+		let migrated = false
+		const read = this.db.prepare('SELECT value FROM settings WHERE key = ?')
+		for (const key of SECRET_KEYS) {
+			const row = read.get(key) as {value:string} | undefined
+			const value = row ? JSON.parse(row.value) as string : ''
+			if (row) migrated = true
+			if (value) {
+				store.set(key, value)
+				if (store.get(key) !== value) throw new Error('Credential migration verification failed')
+			}
+		}
+		this.db.pragma('secure_delete = ON')
+		this.db.transaction(() => {
+			for (const key of SECRET_KEYS) this.db.prepare('DELETE FROM settings WHERE key = ?').run(key)
+		})()
+		if (migrated) {
+			this.db.pragma('wal_checkpoint(TRUNCATE)')
+			this.db.exec('VACUUM')
+			this.db.pragma('wal_checkpoint(TRUNCATE)')
+		}
+		this.secretStore = store
+	}
+
 
 	private runMigrations() {
 		const current_version_row = this.db.prepare('PRAGMA user_version').get() as Record<string, number>
@@ -164,6 +200,7 @@ export class StrataDatabase {
 	private ensureSettings() {
 		const insert = this.db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
 		for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+			if ((SECRET_KEYS as readonly string[]).includes(key)) continue
 			insert.run(key, JSON.stringify(value))
 		}
 	}
@@ -932,6 +969,7 @@ export class StrataDatabase {
 				;(merged as Record<string, unknown>)[row.key] = parsed
 			}
 		}
+		for (const key of SECRET_KEYS) merged[key] = this.secretStore?.get(key) ?? ''
 		return merged
 	}
 
@@ -1051,12 +1089,18 @@ export class StrataDatabase {
 	}
 
 	setSettings(patch: Partial<Settings>): Settings {
+		for (const key of SECRET_KEYS) {
+			if (patch[key] === undefined || patch[key] === SECRET_PRESENT) continue
+			if (!this.secretStore) throw new Error('OS credential storage is unavailable')
+			this.secretStore.set(key, patch[key]!)
+		}
 		const now = this.getSettings()
 		const next = { ...now, ...patch }
 		const upsert = this.db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
 		for (const [key, value] of Object.entries(next)) {
+			if ((SECRET_KEYS as readonly string[]).includes(key)) continue
 			upsert.run(key, JSON.stringify(value))
 		}
-		return next
+		return this.getSettings()
 	}
 }

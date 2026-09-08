@@ -64,9 +64,6 @@ const api: StrataApi = {
 		selectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.dialogSelectFolder),
 		htmlFile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.publishHtmlFile, payload),
 	},
-	shell: {
-		run: (payload) => ipcRenderer.invoke(IPC_CHANNELS.shellRun, payload),
-	},
 	onCommand: (listener) => {
 		const wrapped = (_event: Electron.IpcRendererEvent, command: string) => listener(command)
 		ipcRenderer.on('ui:command', wrapped)

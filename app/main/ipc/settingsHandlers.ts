@@ -1,3 +1,4 @@
+import { redactSettings } from '../security/secretStore'
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { Settings } from '../../shared/types'
@@ -77,10 +78,10 @@ const settings_patch_schema = z.object({
 })
 
 export const registerSettingsHandlers = (db: StrataDatabase, on_settings_set?: (settings: Settings) => void) => {
-	ipcMain.handle(IPC_CHANNELS.settingsGet, () => db.getSettings())
+	ipcMain.handle(IPC_CHANNELS.settingsGet, () => redactSettings(db.getSettings()))
 	ipcMain.handle(IPC_CHANNELS.settingsSet, (_event, patch) => {
 		const updated = db.setSettings(settings_patch_schema.parse(patch))
 		on_settings_set?.(updated)
-		return updated
+		return redactSettings(updated)
 	})
 }

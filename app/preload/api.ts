@@ -75,9 +75,6 @@ export interface StrataApi {
 		selectFolder: () => Promise<string | null>
 		htmlFile: (payload: { destination: string; title: string; html: string }) => Promise<{ success: boolean; path?: string; error?: string }>
 	}
-	shell: {
-		run: (payload: { command: string; cwd?: string }) => Promise<{ success: boolean; stdout: string; stderr: string }>
-	}
 	onCommand: (listener: (command: string) => void) => () => void
 	onNotesChanged: (listener: () => void) => () => void
 }

@@ -40,7 +40,6 @@ export const IPC_CHANNELS = {
 	aiEditsRevert: 'ai:edits:revert',
 	dialogSelectFolder: 'dialog:select-folder',
 	publishHtmlFile: 'publish:html-file',
-	shellRun: 'shell:run',
 	aiRouteLogsList: 'ai:route-logs:list',
 	aiModelCatalog: 'ai:model-catalog',
 } as const

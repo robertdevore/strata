@@ -1,3 +1,4 @@
+import { ensureLocalCredential, isLoopbackHost, tokensEqual } from '../../shared/apiCredential'
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server } from 'node:http'
 import { z } from 'zod'
@@ -103,6 +104,7 @@ interface ApiServerInstance {
 }
 
 interface NotesApiServerOptions {
+	token?: string
 	onNotesChanged?: () => void
 	host?: string
 	port?: number
@@ -148,9 +150,8 @@ const write_json = (response: import('node:http').ServerResponse, status: number
 	const body = undefined === payload ? '' : JSON.stringify(payload)
 	response.statusCode = status
 	response.setHeader('Content-Type', 'application/json; charset=utf-8')
-	response.setHeader('Access-Control-Allow-Origin', '*')
-	response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-	response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+	response.setHeader('X-Content-Type-Options', 'nosniff')
+	response.setHeader('Cache-Control', 'no-store')
 	response.end(body)
 }
 
@@ -183,13 +184,6 @@ const resolve_project_id = (
 	return { hasProjectId: false, projectId: null, valid: true }
 }
 
-const resolve_api_token = (): string | null => {
-	const token = process.env.STRATA_API_TOKEN
-	if (!token) return null
-	const trimmed = token.trim()
-	return trimmed ? trimmed : null
-}
-
 const get_request_token = (request: IncomingMessage): string | null => {
 	const direct_token = request.headers['x-strata-token']
 	if ('string' === typeof direct_token && direct_token.trim()) {
@@ -211,13 +205,14 @@ const create_handler = (db: StrataDatabase, api_token: string | null, options: N
 		if (!method) {
 			return { status: 405, body: { error: 'Method not allowed' } }
 		}
-		if ('OPTIONS' === method) {
-			return { status: 204 }
-		}
+		if (request.headers.origin || request.headers['sec-fetch-site']) return { status: 403, body: { error: 'Browser requests are not allowed' } }
+		if ((request.url?.length ?? 0) > 8192) return { status: 414, body: { error: 'URL too long' } }
+		if (Number(request.headers['content-length'] ?? 0) > request_body_limit_bytes) return { status: 413, body: { error: 'Request body exceeds 1MB limit' } }
+		if (['POST', 'PUT', 'PATCH'].includes(method) && !/^application\/json(?:;|$)/i.test(request.headers['content-type'] ?? '')) return { status: 415, body: { error: 'Expected application/json' } }
 
 		if (api_token) {
 			const request_token = get_request_token(request)
-			if (request_token !== api_token) {
+			if (!tokensEqual(request_token, api_token)) {
 				return { status: 401, body: { error: 'Unauthorized' } }
 			}
 		}
@@ -431,7 +426,9 @@ const start_http_server = async (server: Server, port: number, host: string): Pr
 export const startNotesApiServer = async (db: StrataDatabase, options: NotesApiServerOptions = {}): Promise<ApiServerInstance> => {
 	const host = options.host ?? resolve_api_host()
 	const requested_port = options.port ?? resolve_api_port()
-	const api_token = resolve_api_token()
+	if (!isLoopbackHost(host)) throw new Error('Non-loopback API binding is disabled; use an authenticated tunnel for remote automation')
+	const api_token = options.token ?? ensureLocalCredential()
+	if (api_token.length < 32) throw new Error('API token must contain at least 32 characters')
 	const handler = create_handler(db, api_token, options)
 
 	const server = createServer(async (request, response) => {
@@ -457,11 +454,16 @@ export const startNotesApiServer = async (db: StrataDatabase, options: NotesApiS
 				return
 			}
 
-			console.error('[strata-api] Request failed', error)
+			console.error('[strata-api] Request failed')
 			write_json(response, 500, { error: 'Internal server error' })
 		}
 	})
 
+	server.requestTimeout = 15000
+	server.headersTimeout = 10000
+	server.keepAliveTimeout = 5000
+	server.setTimeout(15000, socket => socket.destroy())
+	server.maxHeadersCount = 50
 	await start_http_server(server, requested_port, host)
 	const address = server.address()
 	const port = address && 'object' === typeof address ? address.port : requested_port

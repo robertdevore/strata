@@ -9,6 +9,9 @@ import { register_agent_commands } from '../../../cli/commands/agent'
 import { StrataApiClient } from '../../../cli/lib/apiClient'
 import type { CliRuntimeOptions } from '../../../cli/types'
 
+const testToken = 'strata-test-token-000000000000000000000000'
+const authenticatedFetch: typeof fetch = (input, init) => globalThis.fetch(input, { ...init, headers: { Authorization: `Bearer ${testToken}`, ...init?.headers } })
+
 const cleanups: Array<() => Promise<void> | void> = []
 
 afterEach(async () => {
@@ -18,7 +21,7 @@ afterEach(async () => {
 const start_test_server = async () => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-api-test-'))
 	const db = new StrataDatabase(directory)
-	const server = await startNotesApiServer(db, { host: '127.0.0.1', port: 0 })
+	const server = await startNotesApiServer(db, { host: '127.0.0.1', port: 0, token: testToken })
 	cleanups.push(async () => {
 		await server.close()
 		db.close()
@@ -30,7 +33,7 @@ const start_test_server = async () => {
 describe('notes API validation', () => {
 	it('rejects malformed boolean filters instead of silently dropping them', async () => {
 		const { baseUrl } = await start_test_server()
-		const response = await fetch(`${baseUrl}/notes?starred=definitely`)
+		const response = await authenticatedFetch(`${baseUrl}/notes?starred=definitely`)
 
 		expect(response.status).toBe(400)
 		expect(await response.json()).toMatchObject({ error: 'Validation failed' })
@@ -38,7 +41,7 @@ describe('notes API validation', () => {
 
 	it('returns 404 when AI edit history is requested for a missing note', async () => {
 		const { baseUrl } = await start_test_server()
-		const response = await fetch(`${baseUrl}/notes/00000000-0000-4000-8000-000000000000/ai-edits`)
+		const response = await authenticatedFetch(`${baseUrl}/notes/00000000-0000-4000-8000-000000000000/ai-edits`)
 
 		expect(response.status).toBe(404)
 		expect(await response.json()).toEqual({ error: 'Note not found' })
@@ -47,15 +50,15 @@ describe('notes API validation', () => {
 	it('keeps create-to-retrieval synchronous across API, agent context, and restart', async () => {
 		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-retrieval-test-'))
 		let db: StrataDatabase | null = new StrataDatabase(directory)
-		let server: Awaited<ReturnType<typeof startNotesApiServer>> | null = await startNotesApiServer(db, { host: '127.0.0.1', port: 0 })
+		let server: Awaited<ReturnType<typeof startNotesApiServer>> | null = await startNotesApiServer(db, { host: '127.0.0.1', port: 0, token: testToken })
 		const make_client = () => new StrataApiClient({
 			baseUrl: `http://127.0.0.1:${server!.port}`,
-			token: null,
+			token: testToken,
 			timeoutMs: 2000,
 		})
 		const output_options: CliRuntimeOptions = {
 			baseUrl: `http://127.0.0.1:${server.port}`,
-			token: null,
+			token: testToken,
 			outputMode: 'json',
 			quiet: false,
 			verbose: false,
@@ -92,7 +95,7 @@ describe('notes API validation', () => {
 			db = null
 
 			db = new StrataDatabase(directory)
-			server = await startNotesApiServer(db, { host: '127.0.0.1', port: 0 })
+			server = await startNotesApiServer(db, { host: '127.0.0.1', port: 0, token: testToken })
 			client = make_client()
 			expect((await client.searchNotes(unique_term)).map((candidate) => candidate.id)).toContain(note.id)
 		} finally {

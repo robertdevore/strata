@@ -1,3 +1,4 @@
+import { protectNavigation } from '../security/navigation'
 import { BrowserWindow, ipcMain } from 'electron'
 import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/ipc'
@@ -22,9 +23,11 @@ export const registerExportHandlers = () => {
 				nodeIntegration: false,
 				contextIsolation: true,
 				sandbox: true,
+				javascript: false,
 			},
 		})
 
+		protectNavigation(export_window.webContents)
 		try {
 			await export_window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 
@@ -60,9 +63,11 @@ export const registerExportHandlers = () => {
 				nodeIntegration: false,
 				contextIsolation: true,
 				sandbox: true,
+				javascript: false,
 			},
 		})
 
+		protectNavigation(print_window.webContents)
 		try {
 			await print_window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 

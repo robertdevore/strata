@@ -1,3 +1,4 @@
+import { readLocalCredential, isLoopbackHost } from '../../shared/apiCredential'
 import { z } from 'zod'
 import type { CliRuntimeOptions, OutputMode } from '../types'
 
@@ -55,10 +56,11 @@ export const resolve_runtime_options = (raw_input: unknown): CliRuntimeOptions =
 
 	const token_from_env = (process.env.STRATA_API_TOKEN || '').trim()
 	const token_from_flag = (raw.token || '').trim()
-	const token = token_from_flag || token_from_env || null
+
 
 	const base_url = (raw.baseUrl || process.env.STRATA_API_BASE_URL || default_base_url).trim()
 
+	const token = token_from_flag || token_from_env || (isLoopbackHost(new URL(base_url).hostname) ? readLocalCredential() : null)
 	return {
 		baseUrl: base_url,
 		token,

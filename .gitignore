@@ -75,3 +75,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local knowledge exports
+/work/

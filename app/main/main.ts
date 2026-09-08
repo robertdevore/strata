@@ -1,5 +1,7 @@
+import { EncryptedSecretStore } from './security/secretStore'
+import { protectNavigation } from './security/navigation'
 import path from 'node:path'
-import { app, BrowserWindow, dialog, Menu, session } from 'electron'
+import { app, BrowserWindow, dialog, Menu, session, shell, safeStorage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import type { Settings } from '../shared/types'
 import { DEFAULT_HOTKEYS } from '../shared/hotkeys'
@@ -223,6 +225,7 @@ const createWindow = () => {
 	}
 
 	main_window = new BrowserWindow(window_options)
+	protectNavigation(main_window.webContents, url => shell.openExternal(url))
 
 	createAppMenu(current_settings ?? undefined)
 
@@ -256,10 +259,11 @@ void app.whenReady().then(async () => {
 	setCspHeaders()
 
 	const user_data_path = app.getPath('userData')
-	console.info(`[strata-startup] opening database at ${user_data_path}`)
+	console.info('[strata-startup] opening database')
 	try {
 		database_recovery = await openStrataDatabaseWithRecovery(user_data_path)
 		db = database_recovery.db
+		db.attachSecretStore(new EncryptedSecretStore(path.join(user_data_path, 'credentials'), safeStorage))
 	} catch (error) {
 		console.error('[strata-startup] failed to open database', error)
 		const message = error instanceof Error ? error.message : String(error)
