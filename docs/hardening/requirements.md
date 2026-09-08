@@ -9,7 +9,7 @@ This is a working gap ledger, not a completion verdict. â€œScoped tests passedâ€
 | 2 | Lock Down the Local HTTP API | Implemented; final audit pending | notesApiServer.ts; apiSecurity.test.ts. Default token, loopback, origin/body/time limits covered; packaged transport checks remain. |
 | 3 | Remove Arbitrary Renderer Shell Execution | Implemented; final audit pending | Preload shell.run removed; publishHandlers.ts uses selected destinations. Final privileged-surface sweep outstanding. |
 | 4 | Harden Electron Navigation | Partial | security/navigation.ts and navigation unit checks; actual renderer navigation/permission validation outstanding. |
-| 5 | Move AI/API Secrets Out of SQLite | Partial | secretStore.ts, secrets.test.ts, sanitized backups. Standalone legacy secret migration/credential behavior still needs closure. |
+| 5 | Move AI/API Secrets Out of SQLite | Partial | secretStore.ts, secrets.test.ts, sanitized backups. Standalone fails closed until desktop OS migration completes; custom library paths are shared. Actual OS/desktop release validation remains. |
 | 6 | Make AI "Confirm" Mode Actually Confirm | Partial | KnowledgeService proposals, AiProposals UI, aiMutationSafety/providerFallback tests. Full approval UI interactions outstanding. |
 | 7 | Introduce Universal Note Revisions | Implemented; final audit pending | note_revisions migration, transaction snapshots, revisionsSearch tests. Final mutation-source coverage sweep outstanding. |
 | 8 | Add Optimistic Concurrency | Partial | Expected revisions required at main write transports; autosave/history tests. Per-note/split-pane status and remaining UI race audit outstanding. |

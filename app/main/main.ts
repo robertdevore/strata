@@ -1,6 +1,7 @@
 import { EncryptedSecretStore } from './security/secretStore'
 import { protectNavigation } from './security/navigation'
 import path from 'node:path'
+import fs from 'node:fs'
 import { app, BrowserWindow, dialog, Menu, session, shell, safeStorage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import type { Settings } from '../shared/types'
@@ -21,6 +22,13 @@ import { registerProjectsHandlers } from './ipc/projectsHandlers'
 import { startNotesApiServer } from './api/notesApiServer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Share an explicit library location with the standalone CLI, including migration/testing.
+if (process.env.STRATA_USER_DATA_DIR?.trim()) {
+  const directory = path.resolve(process.env.STRATA_USER_DATA_DIR.trim())
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
+  app.setPath('userData', directory)
+}
 
 let main_window: BrowserWindow | null = null
 let notes_api_server: { close: () => Promise<void> } | null = null

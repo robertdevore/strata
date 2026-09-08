@@ -168,3 +168,10 @@ Verification passed formatting/lint, the full 135-test/30-file suite and product
 Replaced placeholder-only requirements rows with a 60-step working evidence/gap ledger. It explicitly preserves outstanding standalone secret behavior, legacy transport consolidation, granular invalidation, desktop/e2e/profile work, final controlled benchmarks/budgets, remote CI and release/documentation audit. Scoped implementation evidence is not a final completion claim.
 
 Fixed delayed note hydration: removed notes are not resurrected, older responses cannot replace newer loaded revisions, and an external revision arriving during a draft preserves its original base and surfaces conflict. Added two concurrency regressions. `npm run verify` passed formatting/lint, 138 tests in 31 files, TypeScript and production build. Full hardening goal remains active.
+
+### Standalone credential boundary checkpoint
+
+The standalone server now fails closed before binding HTTP if known legacy provider values or a pending credential-sanitization marker remain. It closes its database handle and reports a migration-required error without deleting the only credential copy. Desktop startup now honors the same explicit STRATA_USER_DATA_DIR as standalone, enabling secure desktop migration of non-default libraries. Standalone remains a knowledge API without provider-key configuration/decryption.
+
+Tests cover fresh/legacy/migrated/pending states, preservation of the original key, successful migration through the secret-store contract, and an actual standalone subprocess refusing a pending library. Full verification and focused subprocess tests passed; final result recorded below. This closes the unsafe standalone-startup behavior, but OS-specific desktop/end-to-end validation and the complete release audit remain outstanding.
+Final verification passed the 139-test/31-file suite, formatting/lint, TypeScript and production build. Focused credential/subprocess tests and final typecheck passed. Installed CLI fresh-library smoke passed on retry after one host EAGAIN spawn failure; no application data was involved in that transient host failure.

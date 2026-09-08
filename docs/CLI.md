@@ -33,3 +33,7 @@ strata agent capture --file context.md --dry-run
 Duplicate detection uses an indexed hash populated by schema migration 12 and maintained with content updates. It is separate from request-key idempotency: captures can be recognized across sessions even without an idempotency key.
 
 For release verification, run `npm run package:verify`. It creates and installs a tarball in a temporary directory with production dependencies, exercises the installed authenticated server and native SQLite, and checks capture/retrieval and shutdown. It never opens the live library. The test needs package-registry access and runs separately from the offline `npm run verify` suite.
+
+### Legacy provider credentials and standalone libraries
+
+The standalone knowledge server does not decrypt or configure desktop provider credentials. If its library contains legacy plaintext credentials or an unfinished sanitization marker, startup fails with `CREDENTIAL_MIGRATION_REQUIRED` before exposing the API. Open that library once in the desktop app to complete the verified OS-encrypted migration; the server preserves the original credential until migration succeeds. Both desktop and standalone honor `STRATA_USER_DATA_DIR`, so use the same explicit directory for a non-default library. Fresh libraries and already-migrated libraries start normally without a credential vault in the CLI process.

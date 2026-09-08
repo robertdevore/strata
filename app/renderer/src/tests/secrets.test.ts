@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import os from 'node:os'
 import path from 'node:path'
 import Database from 'better-sqlite3'
@@ -12,6 +14,43 @@ import {
 } from '@main/security/secretStore'
 
 describe('provider credentials', () => {
+  it('refuses standalone startup until legacy credentials and pending sanitization are resolved', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-standalone-credentials-'))
+    const db = new StrataDatabase(dir)
+    const raw = new Database(path.join(dir, 'data/strata.sqlite'))
+    try {
+      expect(() => db.assertStandaloneCredentialsSafe()).not.toThrow()
+      raw
+        .prepare('INSERT OR REPLACE INTO settings(key,value) VALUES (?,?)')
+        .run('openAiApiKey', JSON.stringify('private-test-key'))
+      expect(() => db.assertStandaloneCredentialsSafe()).toThrow('Open this library in Strata desktop')
+      expect(raw.prepare('SELECT value FROM settings WHERE key=?').get('openAiApiKey')).toEqual({
+        value: JSON.stringify('private-test-key'),
+      })
+      const vault = new Map<string, string>()
+      db.attachSecretStore({
+        get: (key) => vault.get(key) ?? '',
+        set: (key, value) => {
+          vault.set(key, value)
+        },
+      })
+      expect(vault.get('openAiApiKey')).toBe('private-test-key')
+      expect(() => db.assertStandaloneCredentialsSafe()).not.toThrow()
+      raw.prepare('INSERT INTO settings VALUES (?,?)').run('credentialSanitizationPending', 'true')
+      expect(() => db.assertStandaloneCredentialsSafe()).toThrow('Open this library')
+      await expect(
+        promisify(execFile)(process.execPath, ['--import', 'tsx', path.resolve('app/standalone/server.ts')], {
+          env: { ...process.env, STRATA_USER_DATA_DIR: dir },
+          timeout: 10000,
+        }),
+      ).rejects.toMatchObject({ stderr: expect.stringContaining('CREDENTIAL_MIGRATION_REQUIRED') })
+    } finally {
+      raw.close()
+      db.close()
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('migrates plaintext only after verified storage and sanitizes backups', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-secrets-'))
     let db = new StrataDatabase(dir)

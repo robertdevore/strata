@@ -442,6 +442,25 @@ export class StrataDatabase {
     }
   }
 
+  assertStandaloneCredentialsSafe(): void {
+    const pending = this.db.prepare("SELECT 1 FROM settings WHERE key='credentialSanitizationPending'").get()
+    const read = this.db.prepare('SELECT value FROM settings WHERE key=?')
+    const legacy = SECRET_KEYS.some((key) => {
+      const row = read.get(key) as { value: string } | undefined
+      if (!row) return false
+      try {
+        return Boolean(JSON.parse(row.value))
+      } catch {
+        return true
+      }
+    })
+    if (pending || legacy)
+      throw new DomainError(
+        'CREDENTIAL_MIGRATION_REQUIRED',
+        'Open this library in Strata desktop once to migrate legacy provider credentials into OS-encrypted storage before starting the standalone server. Use the same STRATA_USER_DATA_DIR for both.',
+      )
+  }
+
   attachSecretStore(store: SecretStore): void {
     // Persist and verify each key before deleting its only plaintext copy.
     let migrated = Boolean(
