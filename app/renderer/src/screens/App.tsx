@@ -1,3 +1,4 @@
+import { installDataRefresh } from '../state/installDataRefresh'
 import { useDraftCloseProtection } from '../state/useDraftCloseProtection'
 import { runtimeErrorCode } from '@shared/runtimeLogging'
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
@@ -218,11 +219,32 @@ export function App() {
   const [undoTimeoutId, setUndoTimeoutId] = useState<number | null>(null)
   const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
   const [showRelatedNotes, setShowRelatedNotes] = useState(false)
+  const [relatedNoteId, setRelatedNoteId] = useState<string | null>(null)
+  const openRelatedNotes = useCallback((id: string) => {
+    setRelatedNoteId(id)
+    setRelatedNotes([])
+    setShowRelatedNotes(true)
+  }, [])
   const [showTagsModal, setShowTagsModal] = useState(false)
   const [homeScreenMode, setHomeScreenMode] = useState<'home' | 'projects'>('home')
   const [relatedNotes, setRelatedNotes] = useState<
     Array<{ note: import('@shared/types').Note; reason: string; score: number }>
   >([])
+  useEffect(() => {
+    if (!showRelatedNotes || !relatedNoteId) return
+    let current = true
+    void window.strata.links
+      .relatedNotes(relatedNoteId)
+      .then((notes) => {
+        if (current) setRelatedNotes(notes)
+      })
+      .catch(() => {
+        if (current) setRelatedNotes([])
+      })
+    return () => {
+      current = false
+    }
+  }, [showRelatedNotes, relatedNoteId, store.linksVersion])
   const hotkeys: HotkeysSettings = useMemo(
     () => ({ ...DEFAULT_HOTKEYS, ...(store.settings.hotkeys ?? {}) }),
     [store.settings.hotkeys],
@@ -481,9 +503,7 @@ export function App() {
   }, [runCommand])
 
   useEffect(() => {
-    const unsubscribe = window.strata.onNotesChanged(() => {
-      void load()
-    })
+    const unsubscribe = installDataRefresh(window.strata.onDataChanged)
     return unsubscribe
   }, [load])
 
@@ -535,11 +555,7 @@ export function App() {
       if (hotkey_matches(event, hotkeys.relatedNotes)) {
         event.preventDefault()
         if (store.selectedNoteId) {
-          window.strata.links
-            .relatedNotes(store.selectedNoteId)
-            .then(setRelatedNotes)
-            .catch(() => setRelatedNotes([]))
-          setShowRelatedNotes(true)
+          openRelatedNotes(store.selectedNoteId)
         }
         return
       }
@@ -634,7 +650,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [runCommand, store, paletteMode, hotkeys])
+  }, [runCommand, store, paletteMode, hotkeys, openRelatedNotes])
 
   useEffect(() => {
     return () => {
@@ -871,11 +887,7 @@ export function App() {
                         }}
                         onOpenNoteFromChat={openNoteFromChat}
                         onShowRelatedNotes={() => {
-                          window.strata.links
-                            .relatedNotes(pinned.id)
-                            .then(setRelatedNotes)
-                            .catch(() => setRelatedNotes([]))
-                          setShowRelatedNotes(true)
+                          openRelatedNotes(pinned.id)
                         }}
                         onOpenSettings={() => store.setShowSettings(true)}
                         onThemeToggle={() =>
@@ -916,11 +928,7 @@ export function App() {
                       onOpenNoteFromChat={openNoteFromChat}
                       onShowRelatedNotes={() => {
                         if (store.selectedNoteId) {
-                          window.strata.links
-                            .relatedNotes(store.selectedNoteId)
-                            .then(setRelatedNotes)
-                            .catch(() => setRelatedNotes([]))
-                          setShowRelatedNotes(true)
+                          openRelatedNotes(store.selectedNoteId)
                         }
                       }}
                       onOpenSettings={() => store.setShowSettings(true)}
@@ -978,11 +986,7 @@ export function App() {
                           }}
                           onOpenNoteFromChat={openNoteFromChat}
                           onShowRelatedNotes={() => {
-                            window.strata.links
-                              .relatedNotes(pinned.id)
-                              .then(setRelatedNotes)
-                              .catch(() => setRelatedNotes([]))
-                            setShowRelatedNotes(true)
+                            openRelatedNotes(pinned.id)
                           }}
                           onOpenSettings={() => store.setShowSettings(true)}
                           onThemeToggle={() =>
@@ -1031,11 +1035,7 @@ export function App() {
                       onOpenNoteFromChat={openNoteFromChat}
                       onShowRelatedNotes={() => {
                         if (store.selectedNoteId) {
-                          window.strata.links
-                            .relatedNotes(store.selectedNoteId)
-                            .then(setRelatedNotes)
-                            .catch(() => setRelatedNotes([]))
-                          setShowRelatedNotes(true)
+                          openRelatedNotes(store.selectedNoteId)
                         }
                       }}
                       onOpenSettings={() => store.setShowSettings(true)}
@@ -1078,11 +1078,7 @@ export function App() {
                 onOpenNoteFromChat={openNoteFromChat}
                 onShowRelatedNotes={() => {
                   if (store.selectedNoteId) {
-                    window.strata.links
-                      .relatedNotes(store.selectedNoteId)
-                      .then(setRelatedNotes)
-                      .catch(() => setRelatedNotes([]))
-                    setShowRelatedNotes(true)
+                    openRelatedNotes(store.selectedNoteId)
                   }
                 }}
                 onOpenSettings={() => store.setShowSettings(true)}

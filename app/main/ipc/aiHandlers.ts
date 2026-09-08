@@ -1,3 +1,4 @@
+import { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { requestProviderJson } from '../ai/providerRequest'
 import { transcriptionSchema } from '../ai/transcriptionInput'
@@ -93,11 +94,11 @@ const build_open_notes_context = (
   )
 }
 
-export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => void) => {
+export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed: ChangedDomains) => void) => {
   handleTrustedIpc('ai:proposals:list', () => db.listProposals())
   handleTrustedIpc('ai:proposals:resolve', (_event, payload) => {
     const parsed = z.object({ id: z.string().uuid(), approved: z.boolean() }).strict().parse(payload)
-    return new KnowledgeService(db, () => on_notes_changed?.()).approve(parsed.id, parsed.approved)
+    return new KnowledgeService(db, onDataChanged).approve(parsed.id, parsed.approved)
   })
   handleTrustedIpc(IPC_CHANNELS.aiThreadsList, () => {
     return db.listAiThreads()
@@ -142,7 +143,7 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
     const ai_turn = await run_ai_turn(db, thread, {
       openNotesContext: build_open_notes_context(openNotes),
       forcedModel: effective_model,
-      onNotesChanged: on_notes_changed,
+      onDataChanged,
     })
     const assistant_message = db.createAiMessage(thread.id, 'assistant', ai_turn.content)
     const refreshed_thread = db.getAiThread(thread.id)
@@ -210,7 +211,9 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
   // AI edits revert (unchanged)
   handleTrustedIpc(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
     const { editId } = z.object({ editId: z.string().uuid() }).parse(payload)
-    return db.revertAiEdit(editId)
+    const result = db.revertAiEdit(editId)
+    if (result) onDataChanged?.(ALL_CHANGED)
+    return result
   })
 
   // AI model catalog

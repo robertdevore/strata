@@ -1,3 +1,4 @@
+import { NO_CHANGED } from '@shared/changedDomains'
 import { expect, it, vi } from 'vitest'
 import type { StrataDatabase } from '@main/db'
 const mocks = vi.hoisted(() => ({
@@ -20,7 +21,7 @@ it('leaves Auto unforced and preserves an explicit provider-qualified selection'
     getAiThread: () => thread,
     createAiMessage: vi.fn().mockReturnValue({ content: 'reply' }),
   } as unknown as StrataDatabase
-  mocks.run.mockResolvedValue({ content: 'reply', notesChanged: false })
+  mocks.run.mockResolvedValue({ content: 'reply', changed: { ...NO_CHANGED } })
   const frame = { url: 'file:///test/index.html' }
   const sender = { mainFrame: frame } as Electron.WebContents
   configureTrustedIpc(() => sender, frame.url)

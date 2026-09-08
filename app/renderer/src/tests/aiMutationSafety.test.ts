@@ -1,3 +1,4 @@
+import { NO_CHANGED } from '@shared/changedDomains'
 import { afterEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -38,7 +39,7 @@ describe('AI mutation permissions', () => {
     const { db, call, service } = open()
     const note = db.createNote({ content: '# Before' })
     const result = call('update_note', { note_id: note.id, expected_revision: 1, content: '# After' })
-    expect(result.notesChanged).toBe(false)
+    expect(result.changed.notes).toBe(false)
     expect(result.proposalId).toBeTruthy()
     expect(db.getNote(note.id)?.content).toBe('# Before')
     service.approve(result.proposalId!, true)
@@ -105,7 +106,7 @@ describe('bounded provider loop', () => {
         tools: [],
         execute: () => {
           executions++
-          return { output: '{}', notesChanged: false }
+          return { output: '{}', changed: { ...NO_CHANGED } }
         },
       })
       expect(result.content).toBe('Answer')
@@ -133,7 +134,7 @@ describe('bounded provider loop', () => {
       tools: [],
       execute: () => {
         executions++
-        return { output: '', notesChanged: false }
+        return { output: '', changed: { ...NO_CHANGED } }
       },
     })
     expect(result.content).toContain('limit')

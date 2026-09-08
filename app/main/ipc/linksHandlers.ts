@@ -1,10 +1,11 @@
+import type { ChangedDomains } from '../../shared/changedDomains'
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { z } from 'zod'
 import type { StrataDatabase } from '../db'
 import { KnowledgeService } from '../services/knowledgeService'
 import { IPC_CHANNELS } from '../../shared/ipc'
 const idSchema = z.object({ id: z.string().uuid() })
-export const registerLinksHandlers = (db: StrataDatabase, onChanged?: () => void) => {
+export const registerLinksHandlers = (db: StrataDatabase, onChanged?: (changed: ChangedDomains) => void) => {
   const service = new KnowledgeService(db, onChanged)
   handleTrustedIpc(IPC_CHANNELS.linksBacklinks, (_event, payload) =>
     db.getBacklinks(idSchema.parse(payload).id),

@@ -1,11 +1,15 @@
+import type { ChangedDomains } from '../../shared/changedDomains'
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { z } from 'zod'
 import type { StrataDatabase } from '../db/index'
 import { IPC_CHANNELS } from '../../shared/ipc'
 import { KnowledgeService } from '../services/knowledgeService'
 
-export const registerProjectsHandlers = (db: StrataDatabase, on_notes_changed?: () => void) => {
-  const service = new KnowledgeService(db, on_notes_changed)
+export const registerProjectsHandlers = (
+  db: StrataDatabase,
+  onDataChanged?: (changed: ChangedDomains) => void,
+) => {
+  const service = new KnowledgeService(db, onDataChanged)
   handleTrustedIpc(IPC_CHANNELS.projectsList, () => db.listProjects())
   handleTrustedIpc(IPC_CHANNELS.projectsCreate, (_event, payload) => {
     const { name } = z.object({ name: z.string() }).strict().parse(payload)

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Note } from '@shared/types'
 import { useAppStore } from '../state/useAppStore'
 export const MoreNotes = () => {
@@ -57,7 +57,26 @@ export const NoteHistory = () => {
 }
 
 const NoteHistoryDetails = ({ note, dirty }: { note: Note; dirty: boolean }) => {
+  const historyVersion = useAppStore((state) => state.historyVersion)
+  const details = useRef<HTMLDetailsElement>(null)
   const request = useRef(0)
+  const historyRequest = useRef(0)
+  useEffect(() => {
+    if (!details.current?.open) return
+    let current = true
+    const generation = ++historyRequest.current
+    void window.strata.notes
+      .history(note.id)
+      .then((value) => {
+        if (current && generation === historyRequest.current) setRevisions(value)
+      })
+      .catch(() => {
+        if (current && generation === historyRequest.current) setError('Could not load revision history')
+      })
+    return () => {
+      current = false
+    }
+  }, [historyVersion, note.id])
   const expectedRevision = useRef(note.revision)
   const [revisions, setRevisions] = useState<Array<{ revision: number; source: string; createdAt: string }>>(
     [],
@@ -66,14 +85,15 @@ const NoteHistoryDetails = ({ note, dirty }: { note: Note; dirty: boolean }) => 
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const load = async () => {
-    const generation = ++request.current
+    request.current++
+    const generation = ++historyRequest.current
     try {
       setSnapshot(null)
       setError('')
       const history = await window.strata.notes.history(note.id)
-      if (generation === request.current) setRevisions(history)
+      if (generation === historyRequest.current) setRevisions(history)
     } catch {
-      if (generation === request.current) setError('Could not load revision history')
+      if (generation === historyRequest.current) setError('Could not load revision history')
     }
   }
   const restore = async () => {
@@ -92,6 +112,7 @@ const NoteHistoryDetails = ({ note, dirty }: { note: Note; dirty: boolean }) => 
   }
   return (
     <details
+      ref={details}
       onToggle={(event) => {
         if (event.currentTarget.open) void load()
       }}

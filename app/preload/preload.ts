@@ -1,3 +1,4 @@
+import type { ChangedDomains } from '../shared/changedDomains'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { StrataApi } from './api'
 import { IPC_CHANNELS } from '../shared/ipc'
@@ -102,10 +103,10 @@ const api: StrataApi = {
     ipcRenderer.on('ui:command', wrapped)
     return () => ipcRenderer.removeListener('ui:command', wrapped)
   },
-  onNotesChanged: (listener) => {
-    const wrapped = () => listener()
-    ipcRenderer.on('notes:changed', wrapped)
-    return () => ipcRenderer.removeListener('notes:changed', wrapped)
+  onDataChanged: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, changed: ChangedDomains) => listener(changed)
+    ipcRenderer.on('data:changed', wrapped)
+    return () => ipcRenderer.removeListener('data:changed', wrapped)
   },
 }
 

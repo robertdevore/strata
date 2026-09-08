@@ -1,3 +1,4 @@
+import type { ChangedDomains } from '../shared/changedDomains'
 import { IPC_CHANNELS } from '../shared/ipc'
 import { DraftCloseGuard } from './lifecycle/draftCloseGuard'
 import { registerLifecycleHandlers } from './ipc/lifecycleHandlers'
@@ -43,6 +44,8 @@ let backup_manager: BackupManager | null = null
 let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
 let database_recovery: DatabaseRecoveryResult | null = null
+
+const notifyDataChanged = (changed: ChangedDomains) => main_window?.webContents.send('data:changed', changed)
 
 const draftCloseGuard = new DraftCloseGuard({
   requestSave: (requestId) => {
@@ -372,17 +375,17 @@ void app
     debugRuntime('[strata-startup] backup manager ready')
 
     registerLifecycleHandlers(draftCloseGuard)
-    registerNotesHandlers(db)
+    registerNotesHandlers(db, notifyDataChanged)
     registerSettingsHandlers(db, (settings) => {
       current_settings = settings
       createAppMenu(current_settings)
     })
     registerExportHandlers()
-    registerAiHandlers(db, () => main_window?.webContents.send('notes:changed'))
+    registerAiHandlers(db, notifyDataChanged)
     registerBackupHandlers(backup_manager, restore_prepared_database)
-    registerLinksHandlers(db, () => main_window?.webContents.send('notes:changed'))
+    registerLinksHandlers(db, notifyDataChanged)
     registerPublishHandlers()
-    registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
+    registerProjectsHandlers(db, notifyDataChanged)
     backup_manager.start()
     debugRuntime('[strata-startup] ipc registered')
 
@@ -394,7 +397,7 @@ void app
     })
 
     void startNotesApiServer(db, {
-      onNotesChanged: () => main_window?.webContents.send('notes:changed'),
+      onDataChanged: notifyDataChanged,
     })
       .then((server) => {
         notes_api_server = server

@@ -1,15 +1,11 @@
+import { NO_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 // Strata AI — tool definitions and execution
 // Provides tool schemas for AI providers and executes tool calls against the database.
 
 import type { StrataDatabase } from '../db/index'
 import type { AiToolDefinition, NormalizedToolCall } from './types'
 import { z } from 'zod'
-import {
-  KnowledgeService,
-  operationSchema,
-  ALL_CHANGED,
-  type ChangedDomains,
-} from '../services/knowledgeService'
+import { KnowledgeService, operationSchema } from '../services/knowledgeService'
 import { DomainError } from '../../shared/errors'
 import { deriveNoteTitle } from '../../shared/noteTitle'
 import type { Note } from '../../shared/types'
@@ -261,8 +257,7 @@ export interface ToolExecutionContext {
 }
 export interface ToolExecutionResult {
   output: string
-  notesChanged: boolean
-  changed?: ChangedDomains
+  changed: ChangedDomains
   proposalId?: string
 }
 const mutations = new Set([
@@ -353,7 +348,10 @@ export const execute_tool_call = (
     if (mutations.has(call.name)) {
       const mode = db.getSettings().aiEditMode
       if (mode === 'read_only') throw new DomainError('READ_ONLY', 'AI mutations are disabled')
-      const service = new KnowledgeService(db)
+      let changed = { ...NO_CHANGED }
+      const service = new KnowledgeService(db, (domains) => {
+        changed = domains
+      })
       let operation: unknown
       if (['create_note', 'update_note', 'update_note_by_title'].includes(call.name)) {
         const current =
@@ -388,15 +386,14 @@ export const execute_tool_call = (
             proposalId: proposal.id,
             operation: parsed.op,
           }),
-          notesChanged: false,
+          changed: { ...NO_CHANGED },
           proposalId: proposal.id,
         }
       }
       result = service.mutate(parsed, { source: 'ai' })
       return {
         output: JSON.stringify({ status: 'applied', result }),
-        notesChanged: true,
-        changed: ALL_CHANGED,
+        changed,
       }
     }
     switch (call.name) {
@@ -449,7 +446,7 @@ export const execute_tool_call = (
       default:
         throw new DomainError('UNSUPPORTED_TOOL', 'Unsupported tool')
     }
-    return { output: JSON.stringify(result), notesChanged: false }
+    return { output: JSON.stringify(result), changed: { ...NO_CHANGED } }
   } catch (error) {
     const code = error instanceof DomainError ? error.code : 'VALIDATION_ERROR'
     const message = error instanceof DomainError ? error.message : 'Malformed tool arguments'
@@ -458,7 +455,7 @@ export const execute_tool_call = (
         ok: false,
         error: { code, message, details: error instanceof DomainError ? error.details : {} },
       }),
-      notesChanged: false,
+      changed: { ...NO_CHANGED },
     }
   }
 }

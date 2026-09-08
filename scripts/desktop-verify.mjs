@@ -235,7 +235,8 @@ try {
   const pinnedPane = panes.first()
   const activePane = panes.last()
   await expect(pinnedPane.locator('.cm-content')).toContainText('Persisted through the real editor')
-  // An independent IPC writer changes storage without updating the editor's loaded revision.
+  // A committed independent write invalidates an already-dirty editor.
+  await pinnedPane.locator('.cm-content[contenteditable="true"]').fill('Preserved pinned draft')
   await page.evaluate(async (id) => {
     const latest = await window.strata.notes.get(id)
     await window.strata.notes.update(id, {
@@ -243,7 +244,6 @@ try {
       expectedRevision: latest.revision,
     })
   }, saved.id)
-  await pinnedPane.locator('.cm-content[contenteditable="true"]').fill('Preserved pinned draft')
   await expect(pinnedPane.getByRole('alert')).toContainText('Your draft is preserved')
   await expect(activePane.getByRole('alert')).toHaveCount(0)
   await activePane.locator('.cm-content[contenteditable="true"]').fill('Another pane saved')
@@ -282,6 +282,34 @@ try {
   expect((await page.evaluate((id) => window.strata.notes.get(id), recovered[0].id)).content).toContain(
     'Preserved pinned draft',
   )
+  await activePane.getByTitle('Preview', { exact: true }).click()
+  const linkSource = await page.evaluate(() =>
+    window.strata.notes.create({ content: '# Invalidation source\n\n[[Distant lookup target]]' }),
+  )
+  await expect(activePane.locator('.backlinks-toggle').filter({ hasText: '1 Backlink' })).toBeVisible()
+  await page.evaluate(
+    (note) =>
+      window.strata.notes.update(note.id, {
+        content: '# Invalidation source',
+        expectedRevision: note.revision,
+      }),
+    linkSource,
+  )
+  await expect(activePane.locator('.backlinks-toggle').filter({ hasText: '1 Backlink' })).toHaveCount(0)
+  await page.evaluate(async () => {
+    window.__strataDomainEvents = []
+    window.strata.onDataChanged((changed) => window.__strataDomainEvents.push(changed))
+    await window.strata.projects.create({ name: 'Notification project' })
+  })
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__strataDomainEvents.some(
+          (event) => event.projects && !event.notes && !event.tags && !event.links && !event.history,
+        ),
+      ),
+    )
+    .toBe(true)
   // Close immediately after input, before the debounce can save it.
   await activePane.locator('.cm-content[contenteditable="true"]').fill('Saved while quitting')
   await application.close()
@@ -346,7 +374,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {

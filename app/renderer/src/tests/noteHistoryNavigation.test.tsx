@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NoteHistory } from '../components/KnowledgeStatus'
 import { useAppStore } from '../state/useAppStore'
 import type { Note, NoteRevision } from '@shared/types'
@@ -74,4 +74,45 @@ it('restores against the revision read when the historical snapshot was selected
   fireEvent.click(screen.getByText('Restore revision 1'))
   await screen.findByText(/Restore conflicted/)
   expect(restore).toHaveBeenCalledWith(note.id, 1, 5)
+})
+it('refreshes an open history list after invalidation without changing the reviewed snapshot', async () => {
+  const restore = setup(vi.fn().mockResolvedValue(snapshot(1)))
+  fireEvent.click(await screen.findByText(/Revision 1 ·/))
+  await screen.findByText('snapshot 1')
+  vi.mocked(window.strata.notes.history).mockResolvedValue([
+    { revision: 6, source: 'api', operation: 'update', createdAt: 'now', bytes: 100 },
+  ])
+  act(() =>
+    useAppStore.setState({ historyVersion: initial.historyVersion + 1, notes: [{ ...note, revision: 6 }] }),
+  )
+  await screen.findByText(/Revision 6 ·/)
+  expect(screen.getByText('snapshot 1')).toBeTruthy()
+  fireEvent.click(screen.getByText('Restore revision 1'))
+  await screen.findByText(/Restore conflicted/)
+  expect(restore).toHaveBeenCalledWith(note.id, 1, 5)
+})
+
+it('does not let a delayed manual history load replace a newer invalidation result', async () => {
+  const pending: Array<(value: Array<{ revision: number; source: string; createdAt: string }>) => void> = []
+  Object.defineProperty(window, 'strata', {
+    configurable: true,
+    value: {
+      notes: {
+        history: vi.fn(() => new Promise((resolve) => pending.push(resolve))),
+        getRevision: vi.fn(),
+        restoreRevision: vi.fn(),
+      },
+    },
+  })
+  useAppStore.setState({ notes: [note], selectedNoteId: note.id, drafts: {} })
+  render(<NoteHistory />)
+  fireEvent.click(screen.getByText('Note revision history'))
+  await waitFor(() => expect(pending).toHaveLength(1))
+  act(() => useAppStore.setState({ historyVersion: initial.historyVersion + 1 }))
+  await waitFor(() => expect(pending).toHaveLength(2))
+  await act(async () => pending[1]([{ revision: 6, source: 'api', createdAt: 'now' }]))
+  await screen.findByText(/Revision 6 ·/)
+  await act(async () => pending[0]([{ revision: 1, source: 'human', createdAt: 'before' }]))
+  expect(screen.getByText(/Revision 6 ·/)).toBeTruthy()
+  expect(screen.queryByText(/Revision 1 ·/)).toBeNull()
 })

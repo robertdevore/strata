@@ -1,3 +1,5 @@
+import { ALL_CHANGED, NO_CHANGED, mergeChanged, type ChangedDomains } from '../../shared/changedDomains'
+export { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import type { StrataDatabase } from '../db'
@@ -87,19 +89,29 @@ export type Operation = z.infer<typeof operationSchema>
 export const batchSchema = z
   .object({ operations: z.array(operationSchema).min(1).max(50), dryRun: z.boolean().optional() })
   .strict()
-export type ChangedDomains = {
-  notes: boolean
-  projects: boolean
-  tags: boolean
-  links: boolean
-  history: boolean
-}
-export const ALL_CHANGED: ChangedDomains = {
-  notes: true,
-  projects: true,
-  tags: true,
-  links: true,
-  history: true,
+export const operationChanges = (operation: Operation): ChangedDomains => {
+  switch (operation.op) {
+    case 'create_project':
+    case 'reorder_projects':
+      return { ...NO_CHANGED, projects: true }
+    case 'rename_project':
+      // Project names participate in note search results.
+      return { ...NO_CHANGED, projects: true, notes: true }
+    case 'delete_project':
+      return { ...NO_CHANGED, projects: true, notes: true, history: true, links: true }
+    case 'update_note': {
+      const patch = operation.payload
+      return {
+        notes: true,
+        history: true,
+        projects: patch.projectId !== undefined || patch.projectName !== undefined,
+        tags: patch.tags !== undefined || patch.archived !== undefined,
+        links: true,
+      }
+    }
+    default:
+      return { ...ALL_CHANGED }
+  }
 }
 
 export class KnowledgeService {
@@ -232,6 +244,7 @@ export class KnowledgeService {
   }
   importFolder(input: unknown, options: { dryRun?: boolean; key?: string } = {}) {
     const parsed = importSchema.parse(input)
+    let applied = false
     const result = this.db.executeOperation(
       () => {
         const project = this.apply({
@@ -248,6 +261,7 @@ export class KnowledgeService {
               }),
             }) as import('../../shared/types').Note,
         )
+        applied = true
         return { project, notes, count: notes.length }
       },
       {
@@ -256,7 +270,7 @@ export class KnowledgeService {
         fingerprint: createHash('sha256').update(JSON.stringify(parsed)).digest('hex'),
       },
     )
-    if (!options.dryRun) this.notify?.(ALL_CHANGED)
+    if (!options.dryRun && applied) this.notify?.(ALL_CHANGED)
     return result
   }
   propose(
@@ -273,29 +287,48 @@ export class KnowledgeService {
     })
   }
   approve(id: string, approved: boolean): unknown {
+    let changed: ChangedDomains | undefined
     const result = this.db.resolveProposal(idSchema.parse(id), approved, (payload) => {
       const proposal = z.object({ operation: operationSchema }).parse(payload)
-      return this.apply(proposal.operation)
+      const result = this.apply(proposal.operation)
+      changed = operationChanges(proposal.operation)
+      return result
     })
-    if (approved) this.notify?.(ALL_CHANGED)
+    if (approved && changed) this.notify?.(changed)
     return result
   }
 
   mutate(input: unknown, options: { source?: string; key?: string; dryRun?: boolean } = {}): unknown {
     const operation = operationSchema.parse(input)
     const fingerprint = createHash('sha256').update(JSON.stringify(operation)).digest('hex')
-    const result = this.db.executeOperation(() => this.apply(operation), { ...options, fingerprint })
-    if (!options.dryRun) this.notify?.(ALL_CHANGED)
+    let applied = false
+    const result = this.db.executeOperation(
+      () => {
+        const value = this.apply(operation)
+        applied = true
+        return value
+      },
+      { ...options, fingerprint },
+    )
+    if (!options.dryRun && applied) this.notify?.(operationChanges(operation))
     return result
   }
   batch(input: unknown, options: { source?: string; key?: string } = {}): unknown {
     const parsed = batchSchema.parse(input)
     const fingerprint = createHash('sha256').update(JSON.stringify(parsed)).digest('hex')
+    let applied = false
     const result = this.db.executeOperation(
-      () => parsed.operations.map((operation, index) => ({ index, result: this.apply(operation) })),
+      () => {
+        const results = parsed.operations.map((operation, index) => ({
+          index,
+          result: this.apply(operation),
+        }))
+        applied = true
+        return results
+      },
       { ...options, fingerprint, dryRun: parsed.dryRun },
     )
-    if (!parsed.dryRun) this.notify?.(ALL_CHANGED)
+    if (!parsed.dryRun && applied) this.notify?.(mergeChanged(...parsed.operations.map(operationChanges)))
     return { results: result, dryRun: Boolean(parsed.dryRun) }
   }
 }

@@ -388,6 +388,8 @@ const richTextPasteExtension = EditorView.domEventHandlers({
 })
 
 export function EditorPane(props: EditorPaneProps) {
+  const linksVersion = useAppStore((state) => state.linksVersion)
+  const historyVersion = useAppStore((state) => state.historyVersion)
   const {
     note,
     notes,
@@ -460,6 +462,21 @@ export function EditorPane(props: EditorPaneProps) {
   >([])
   const [showAiHistory, setShowAiHistory] = useState(false)
   const [aiEdits, setAiEdits] = useState<Array<import('@shared/types').AiNoteEdit>>([])
+  useEffect(() => {
+    if (!showAiHistory || !note?.id) return
+    let current = true
+    void window.strata.ai
+      .listEdits(note.id)
+      .then((edits) => {
+        if (current) setAiEdits(edits)
+      })
+      .catch(() => {
+        if (current) setAiEdits([])
+      })
+    return () => {
+      current = false
+    }
+  }, [historyVersion, showAiHistory, note?.id])
   const [showPublish, setShowPublish] = useState(false)
   const [copyToast, setCopyToast] = useState(false)
   const [showDocStats, setShowDocStats] = useState(false)
@@ -606,17 +623,29 @@ export function EditorPane(props: EditorPaneProps) {
       void onFlush(noteIdRef.current)
     }
     noteIdRef.current = note?.id ?? null
-    // Load backlinks for the current note
+  }, [note?.id, onFlush])
+
+  useEffect(() => {
+    let current = true
+    // Refresh graph panels when another note changes its edges or candidate metadata.
     if (note?.id) {
       try {
         window.strata.links
           .backlinks(note.id)
-          .then(setBacklinks)
-          .catch(() => setBacklinks([]))
+          .then((value) => {
+            if (current) setBacklinks(value)
+          })
+          .catch(() => {
+            if (current) setBacklinks([])
+          })
         window.strata.links
           .relatedNotes(note.id)
-          .then(setRelatedNotes)
-          .catch(() => setRelatedNotes([]))
+          .then((value) => {
+            if (current) setRelatedNotes(value)
+          })
+          .catch(() => {
+            if (current) setRelatedNotes([])
+          })
       } catch {
         setBacklinks([])
         setRelatedNotes([])
@@ -625,7 +654,10 @@ export function EditorPane(props: EditorPaneProps) {
       setBacklinks([])
       setRelatedNotes([])
     }
-  }, [note?.id, onFlush])
+    return () => {
+      current = false
+    }
+  }, [note?.id, linksVersion])
 
   useEffect(() => {
     return () => {

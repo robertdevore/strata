@@ -17,6 +17,7 @@ Strata 0.8.0 is a local-first Electron/React Markdown knowledge application. SQL
 - Never add wildcard CORS, unauthenticated API defaults, unsafe binding, arbitrary shell IPC, renderer Node access or unvalidated external navigation.
 - Register desktop IPC through `handleTrustedIpc`; never bypass its sender/frame/document validation. Permissions default to deny outside the application main frame.
 - Provider keys belong in OS-encrypted storage, never ordinary settings, backups, diagnostics or logs. Renderer settings expose only presence markers.
+- Emit committed `ChangedDomains` through `data:changed`; keep projects, tags, graph panels and history current without reloading unrelated data. Do not emit mutation notifications for dry-runs, rolled-back batches or idempotent replays.
 - Logical mutations must be transactional with indexes and history. Pass the revision actually read; never fetch a fresh revision merely to bypass a conflict.
 - AI read-only blocks every mutation domain. Confirm creates a reviewable proposal; explicit human approval rechecks its original revision. Models cannot approve proposals.
 - List/search return bounded summaries. Fetch full bodies explicitly. Duplicate titles must remain ambiguous.

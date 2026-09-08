@@ -1,3 +1,4 @@
+import { ALL_CHANGED, NO_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { KnowledgeService, listSchema, updateSchema, createSchema } from '../services/knowledgeService'
 import { z } from 'zod'
@@ -10,8 +11,11 @@ const mutation_schema = id_schema.extend({ expectedRevision: z.number().int().po
 const archive_schema = mutation_schema.extend({ archived: z.boolean() })
 const star_schema = mutation_schema.extend({ starred: z.boolean() })
 
-export const registerNotesHandlers = (db: StrataDatabase) => {
-  const service = new KnowledgeService(db)
+export const registerNotesHandlers = (
+  db: StrataDatabase,
+  onDataChanged?: (changed: ChangedDomains) => void,
+) => {
+  const service = new KnowledgeService(db, onDataChanged)
   handleTrustedIpc('history:storage', () => db.historyStats())
   handleTrustedIpc('history:prune:preview', (_event, payload) => {
     const { keep } = z
@@ -25,7 +29,9 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
       .object({ keep: z.number().int().min(20).max(10000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) })
       .strict()
       .parse(payload)
-    return db.pruneHistory(keep, fingerprint)
+    const result = db.pruneHistory(keep, fingerprint)
+    if (result) onDataChanged?.({ ...NO_CHANGED, history: true })
+    return result
   })
   handleTrustedIpc('notes:history', (_event, payload) =>
     db.listRevisionSummaries(id_schema.parse(payload).id),
@@ -42,7 +48,9 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
         expectedRevision: z.number().int().positive(),
       })
       .parse(payload)
-    return db.restoreRevision(p.id, p.revision, p.expectedRevision)
+    const result = db.restoreRevision(p.id, p.revision, p.expectedRevision)
+    if (result) onDataChanged?.(ALL_CHANGED)
+    return result
   })
   handleTrustedIpc('notes:page', (_event, payload) => {
     const page = db.listSummaryPage(listSchema.optional().parse(payload))

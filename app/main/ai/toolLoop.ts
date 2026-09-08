@@ -1,3 +1,4 @@
+import { NO_CHANGED, mergeChanged, type ChangedDomains } from '../../shared/changedDomains'
 // Pure helpers for building the message list sent to an AI provider.
 //
 // These functions are deliberately decoupled from the database and the
@@ -83,7 +84,7 @@ export const budgetHistory = (
 export const createToolLoopState = () => ({
   steps: 0,
   toolCalls: 0,
-  notesChanged: false,
+  changed: { ...NO_CHANGED },
   proposalIds: [] as string[],
 })
 
@@ -95,14 +96,14 @@ export const runProviderToolLoop = async (options: {
   tools: import('./types').AiToolDefinition[]
   execute: (call: import('./types').NormalizedToolCall) => {
     output: string
-    notesChanged: boolean
+    changed: ChangedDomains
     proposalId?: string
   }
   onUsage?: (usage: AiProviderTurnOutput['usage']) => void
   state?: ReturnType<typeof createToolLoopState>
-}): Promise<{ content: string; notesChanged: boolean; proposalIds: string[]; toolCalls: number }> => {
+}): Promise<{ content: string; changed: ChangedDomains; proposalIds: string[]; toolCalls: number }> => {
   const state = options.state ?? createToolLoopState()
-  let notesChanged = state.notesChanged
+  let changed = state.changed
   let toolCalls = state.toolCalls
   const proposalIds = state.proposalIds
   while (state.steps < 6) {
@@ -112,7 +113,7 @@ export const runProviderToolLoop = async (options: {
         content: proposalIds.length
           ? 'Context budget reached. Edits are awaiting your approval in the proposal panel.'
           : 'Context budget reached. Narrow the request to continue.',
-        notesChanged,
+        changed,
         proposalIds,
         toolCalls,
       }
@@ -128,7 +129,7 @@ export const runProviderToolLoop = async (options: {
         content: proposalIds.length
           ? 'Edits are awaiting your approval in the proposal panel.'
           : output.content,
-        notesChanged,
+        changed,
         proposalIds,
         toolCalls,
       }
@@ -137,7 +138,7 @@ export const runProviderToolLoop = async (options: {
         content: proposalIds.length
           ? 'Tool-call limit reached. Edits are awaiting your approval in the proposal panel.'
           : 'Tool-call limit reached. Narrow the request to continue.',
-        notesChanged,
+        changed,
         proposalIds,
         toolCalls,
       }
@@ -146,8 +147,8 @@ export const runProviderToolLoop = async (options: {
       const execution = options.execute(call)
       toolCalls++
       state.toolCalls = toolCalls
-      notesChanged ||= execution.notesChanged
-      state.notesChanged = notesChanged
+      changed = mergeChanged(changed, execution.changed)
+      state.changed = changed
       if (execution.proposalId) proposalIds.push(execution.proposalId)
       results.push({ id: call.id, output: execution.output })
     }
@@ -157,7 +158,7 @@ export const runProviderToolLoop = async (options: {
     content: proposalIds.length
       ? 'Edits are awaiting your approval in the proposal panel.'
       : 'Tool-call limit reached. Narrow the request to continue.',
-    notesChanged,
+    changed,
     proposalIds,
     toolCalls,
   }

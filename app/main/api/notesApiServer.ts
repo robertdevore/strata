@@ -1,3 +1,4 @@
+import { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
@@ -14,7 +15,7 @@ import {
 
 const MAX_BODY = 1024 * 1024
 interface Options {
-  onNotesChanged?: () => void
+  onDataChanged?: (changed: ChangedDomains) => void
   host?: string
   port?: number
   token?: string
@@ -64,7 +65,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid API port')
   const token = options.token ?? ensureLocalCredential()
   if (token.length < 32) throw new Error('API token must contain at least 32 characters')
-  const service = new KnowledgeService(db, () => options.onNotesChanged?.())
+  const service = new KnowledgeService(db, options.onDataChanged)
   const handle = async (request: IncomingMessage) => {
     if (request.headers.origin || request.headers['sec-fetch-site'])
       return fail('ORIGIN_FORBIDDEN', 'Browser requests are not allowed', 403)
@@ -185,7 +186,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
           .parse(await body(request))
         const note = db.restoreRevision(id, parsed.revision, parsed.expectedRevision)
         if (!note) return fail('NOT_FOUND', 'Note not found', 404)
-        options.onNotesChanged?.()
+        options.onDataChanged?.(ALL_CHANGED)
         return ok({ note })
       }
       if (!db.getNote(id)) return fail('NOT_FOUND', 'Note not found', 404)
@@ -216,8 +217,10 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
         .object({ projectIds: z.array(idSchema).max(1000) })
         .strict()
         .parse(await body(request))
-      const projects = db.reorderProjects(parsed.projectIds)
-      options.onNotesChanged?.()
+      const projects = service.mutate(
+        { op: 'reorder_projects', projectIds: parsed.projectIds },
+        mutationOptions,
+      )
       return ok({ projects })
     }
     if (parts[0] === 'projects' && parts.length >= 2) {
@@ -242,7 +245,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
     }
     if (method === 'POST' && parts[0] === 'ai-edits' && parts[2] === 'revert') {
       const reverted = db.revertAiEdit(idSchema.parse(parts[1]))
-      if (reverted) options.onNotesChanged?.()
+      if (reverted) options.onDataChanged?.(ALL_CHANGED)
       return reverted ? ok({ reverted }) : fail('NOT_FOUND', 'Edit not found or already reverted', 404)
     }
     return fail('NOT_FOUND', 'Not found', 404)

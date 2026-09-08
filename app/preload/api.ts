@@ -128,5 +128,7 @@ export interface StrataApi {
     }) => Promise<{ success: boolean; path?: string; error?: string }>
   }
   onCommand: (listener: (command: string) => void) => () => void
-  onNotesChanged: (listener: () => void) => () => void
+  onDataChanged: (
+    listener: (changed: import('../shared/changedDomains').ChangedDomains) => void,
+  ) => () => void
 }

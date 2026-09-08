@@ -1,3 +1,4 @@
+import { ALL_CHANGED, type ChangedDomains } from '@shared/changedDomains'
 import { create } from 'zustand'
 import type { Note, Settings } from '@shared/types'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
@@ -77,6 +78,9 @@ interface AppState {
   setSplitResizeRatio: (resizerIndex: number, leftFraction: number) => void
   setSplitLayout: (layout: 'columns' | 'grid') => void
   setSplitGridColumns: (cols: number) => void
+  linksVersion: number
+  historyVersion: number
+  refreshDomains: (changed: ChangedDomains) => Promise<void>
   load: () => Promise<void>
   navigationError: string | null
   navigateToNote: (id: string, newTab?: boolean) => Promise<boolean>
@@ -286,13 +290,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  linksVersion: 0,
+  historyVersion: 0,
   async load() {
-    const [projects, tags, settings] = await Promise.all([
-      projectsService.list(),
-      notesService.listTags(),
-      settingsService.get(),
+    set({ settings: await settingsService.get() })
+    await get().refreshDomains(ALL_CHANGED)
+  },
+
+  async refreshDomains(changed) {
+    set((state) => ({
+      linksVersion: state.linksVersion + Number(changed.links),
+      historyVersion: state.historyVersion + Number(changed.history),
+    }))
+    await Promise.all([
+      changed.projects ? projectsService.list().then((projects) => set({ projects })) : undefined,
+      changed.tags ? notesService.listTags().then((tags) => set({ tags })) : undefined,
     ])
-    set({ projects, tags, settings })
+    if (!changed.notes) return
     await get().refreshListing()
     const state = get()
     // Refresh open clean notes even when they are outside the current result page.

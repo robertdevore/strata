@@ -1,3 +1,4 @@
+import { NO_CHANGED, mergeChanged, hasChanges, type ChangedDomains } from '../../shared/changedDomains'
 // Strata AI Runner — orchestrates provider selection, routing, tool loop, and linkification
 // This replaces the core of aiHandlers.ts with a provider-agnostic implementation.
 
@@ -211,14 +212,14 @@ const accumulate_usage_value = (current: number | null, next: number | null | un
 
 export interface AiRunnerResult {
   content: string
-  notesChanged: boolean
+  changed: ChangedDomains
   routeLog: AiRouteLog | null
 }
 
 interface AiRunnerOptions {
   openNotesContext?: string
   forcedModel?: string
-  onNotesChanged?: () => void
+  onDataChanged?: (changed: ChangedDomains) => void
 }
 
 const build_system_prompt = (open_notes_context?: string): string => {
@@ -299,7 +300,7 @@ export const run_ai_turn = async (
     return {
       content:
         'I cannot perform that action. Deleting or permanently destroying notes is not allowed through the AI assistant.',
-      notesChanged: false,
+      changed: { ...NO_CHANGED },
       routeLog: route_log,
     }
   }
@@ -321,11 +322,11 @@ export const run_ai_turn = async (
   route_log.model = model
 
   const input_messages = budgetHistory(history)
-  let notes_changed = false
+  let changed = { ...NO_CHANGED }
   const execute = (call: import('./types').NormalizedToolCall) => {
     const result = execute_tool_call(db, call, { threadId: thread.id, model })
-    notes_changed ||= result.notesChanged
-    if (result.notesChanged) options?.onNotesChanged?.()
+    changed = mergeChanged(changed, result.changed)
+    if (hasChanges(result.changed)) options?.onDataChanged?.(result.changed)
     return result
   }
   const toolState = createToolLoopState()
@@ -363,8 +364,8 @@ export const run_ai_turn = async (
   }
   if (ai_settings.aiEnableRouteLogs) log_route(db, route_log)
   return {
-    content: linkify_note_ids(db, enforce_note_edit_truthfulness(result.content, notes_changed)),
-    notesChanged: notes_changed,
+    content: linkify_note_ids(db, enforce_note_edit_truthfulness(result.content, hasChanges(changed))),
+    changed,
     routeLog: route_log,
   }
 }

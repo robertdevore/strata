@@ -1,17 +1,27 @@
+import { useAppStore } from '../state/useAppStore'
 import { useEffect, useState } from 'react'
 
 export const HistoryStorage = () => {
+  const historyVersion = useAppStore((state) => state.historyVersion)
   const [stats, setStats] = useState<{ revisions: number; bytes: number } | null>(null)
   const [keep, setKeep] = useState(100)
   const [plan, setPlan] = useState<{ count: number; bytes: number; fingerprint: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   useEffect(() => {
+    let current = true
     void window.strata.history
       .storage()
-      .then(setStats)
-      .catch(() => setStatus('Could not read history storage'))
-  }, [])
+      .then((stats) => {
+        if (current) setStats(stats)
+      })
+      .catch(() => {
+        if (current) setStatus('Could not read history storage')
+      })
+    return () => {
+      current = false
+    }
+  }, [historyVersion])
   const preview = async () => {
     setBusy(true)
     setPlan(null)
