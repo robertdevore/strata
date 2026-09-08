@@ -264,3 +264,11 @@ A real CLI/API regression populated 128 notes in one project (13 deleted, seven 
 ### Benchmark fixture correction
 
 Rechecked the source and evaluated the original benchmark’s actual template literal. It contains real linefeeds and no literal backslash-n sequence. Earlier checkpoint prose describing a literal-newline limitation was incorrect and has been corrected; immutable benchmark JSON artifacts are unchanged. The real limitations remain raw seeding without a populated graph, narrow/common tag distributions and differences in query contracts or concurrent load between some historical runs. New adverse sparse-tag measurements are being recorded separately with a named, reproducible workload.
+
+### Indexed related-tag candidates and controlled sparse-tag measurements
+
+Replaced the related-note shared-tag JSON scan with a seek through idx_note_tags_tag, deduplicating at most 100 other active-note candidates. Multiple matching tags contribute one shared-tag signal. The current note is read as tags/project metadata instead of a full body; deleted current notes return no candidates. Added regressions for rare matches beyond 100 unrelated notes, combined link/tag scores, bounded snippets/no current-body hydration, tag updates, restored/deleted notes and archived matches.
+
+The separately named related-sparse-tags-v1 workload ran sequentially before and after the change at 100/1k/10k/50k notes with 15 warm samples per case and no concurrent verification. At 50k, rare-tag median fell from 203.479 to 1.205 ms; no-shared-tag median fell from 194.810 to 0.914 ms; dense-tag median was 2.460 versus 2.236 ms. Result counts remained 1/0/8. Immutable raw measurements and the full comparison/limitations are in related-tags-before.json, related-tags-after.json and related-tags.md. This isolates tags, not project pools, graph density or end-to-end UI latency.
+
+Full npm run verify passed formatting/lint, 163 tests in 42 files, TypeScript and production builds. The test runner now bounds native/subprocess suite fan-out to two workers following the earlier unbounded-run failure and successful bounded rerun. Remaining requirements keep the overall goal active.

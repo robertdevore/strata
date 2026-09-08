@@ -1537,7 +1537,9 @@ export class StrataDatabase {
   }
 
   getRelatedNotes(id: string): Array<{ note: Note; reason: string; score: number }> {
-    const current = this.getNote(id)
+    const current = this.db
+      .prepare('SELECT tags,project_id FROM notes WHERE id=? AND deleted_at IS NULL')
+      .get(id) as { tags: string; project_id: string | null } | undefined
     if (!current) return []
     // Each signal contributes a bounded pool; bodies are never loaded for scoring.
     const rows = this.db
@@ -1547,14 +1549,14 @@ export class StrataDatabase {
 		), incoming AS (
 			SELECT source_note_id AS id,50 AS score,'Links here' AS reason FROM note_links WHERE target_note_id=? LIMIT 100
 		), tagged AS (
-			SELECT n.id,10 AS score,'Shared tag' AS reason FROM notes n WHERE n.deleted_at IS NULL AND EXISTS(SELECT 1 FROM json_each(n.tags) j WHERE j.value IN (SELECT value FROM json_each(?))) LIMIT 100
+			SELECT DISTINCT nt.note_id AS id,10 AS score,'Shared tag' AS reason FROM note_tags nt INDEXED BY idx_note_tags_tag WHERE nt.tag IN (SELECT value FROM json_each(?)) AND nt.note_id<>? LIMIT 100
 		), grouped AS (
 			SELECT id,5 AS score,'Shared project' AS reason FROM notes WHERE project_id=? AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50
 		), pooled AS (SELECT * FROM candidates UNION ALL SELECT * FROM incoming UNION ALL SELECT * FROM tagged UNION ALL SELECT * FROM grouped)
 		SELECT n.id,n.title,n.revision,substr(n.content,1,280) AS content,n.created_at,n.updated_at,n.starred,n.archived,n.tags,n.project_id,n.deleted_at,SUM(p.score) AS score,GROUP_CONCAT(DISTINCT p.reason) AS reason
 		FROM pooled p JOIN notes n ON n.id=p.id WHERE n.id<>? AND n.deleted_at IS NULL GROUP BY n.id ORDER BY score DESC,n.updated_at DESC,n.id LIMIT 8`,
       )
-      .all(id, id, JSON.stringify(current.tags), current.projectId, id) as Array<
+      .all(id, id, current.tags, id, current.project_id, id) as Array<
       DbNoteRow & { score: number; reason: string }
     >
     return rows.map((row) => ({ note: this.mapNoteSummary(row), score: row.score, reason: row.reason }))

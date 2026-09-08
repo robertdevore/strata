@@ -23,7 +23,7 @@ This is a working gap ledger, not a completion verdict. “Scoped tests passed�
 | 16 | Add Server-Side Pagination | Implemented; final audit pending | Bounded server pages and validated filter-bound offsets; cursor behavior under concurrent changes must be documented/tested. |
 | 17 | Rewrite Tag Counting in SQL | Implemented; scoped tests passed | Materialized note_tags SQL counts; after-candidate-search.json measures 50k tags at 11.18 ms. |
 | 18 | Fix Backlink N+1 Queries | Implemented; scoped tests passed | Backlink summary JOIN, bounded results; DB link tests and intermediate benchmarks. |
-| 19 | Redesign Related Notes for Scale | Partial | Bounded link/tag/project candidate pools. Shared-tag candidate source still uses JSON scan; adversarial sparse-tag workload outstanding. |
+| 19 | Redesign Related Notes for Scale | Partial | Bounded link/tag/project pools. Shared-tag source now seeks note_tags and avoids current-body hydration; adverse 100–50k sparse-tag before/after measurements and functional regressions recorded in related-tags.md. Dense graph/project-pool evaluation remains. |
 | 20 | Make AI Retrieval More Token-Efficient | Partial | Default tool lists 15/snippets 200. Complete representative tool-byte/token comparison outstanding. |
 | 21 | Budget AI Conversation Context | Partial | History/open-note/tool-context budgets implemented; complete category/accounting/cancellation UI evaluation outstanding. |
 | 22 | Fix Cheap → Premium Fallback Tool Loop | Implemented; scoped tests passed | Shared tool loop/state across fallback; providerFallback tests cover proposals, writes, budgets and double failure. |
