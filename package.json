@@ -34,7 +34,8 @@
     "package:verify": "node scripts/package-verify.mjs",
     "package:electron:verify": "npm run build && node scripts/electron-package-verify.mjs",
     "desktop:verify": "npm run build && node scripts/desktop-verify.mjs",
-    "benchmark:payloads": "tsx --tsconfig tsconfig.app.json scripts/benchmark-payloads.ts"
+    "benchmark:payloads": "tsx --tsconfig tsconfig.app.json scripts/benchmark-payloads.ts",
+    "benchmark:controlled": "node --expose-gc scripts/benchmark-controlled.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
