@@ -1,0 +1,105 @@
+{
+  "workload": "related-sparse-tags-v1",
+  "node": "v24.20.0",
+  "platform": "darwin",
+  "arch": "x64",
+  "samples": 15,
+  "results": [
+    {
+      "count": 100,
+      "workloads": [
+        {
+          "name": "dense",
+          "found": 8,
+          "medianMs": 1.576771000000008,
+          "p95Ms": 1.9844150000000127
+        },
+        {
+          "name": "rare",
+          "found": 1,
+          "medianMs": 0.7798910000000205,
+          "p95Ms": 1.6506409999999505
+        },
+        {
+          "name": "noSharedTag",
+          "found": 0,
+          "medianMs": 0.7260290000000396,
+          "p95Ms": 0.7985300000000279
+        }
+      ],
+      "rss": 79360000
+    },
+    {
+      "count": 1000,
+      "workloads": [
+        {
+          "name": "dense",
+          "found": 8,
+          "medianMs": 1.295423000000028,
+          "p95Ms": 2.182743999999957
+        },
+        {
+          "name": "rare",
+          "found": 1,
+          "medianMs": 1.7066079999999602,
+          "p95Ms": 2.5285030000000006
+        },
+        {
+          "name": "noSharedTag",
+          "found": 0,
+          "medianMs": 1.6269750000001295,
+          "p95Ms": 2.931972999999971
+        }
+      ],
+      "rss": 86380544
+    },
+    {
+      "count": 10000,
+      "workloads": [
+        {
+          "name": "dense",
+          "found": 8,
+          "medianMs": 1.2792579999995723,
+          "p95Ms": 2.101423999999497
+        },
+        {
+          "name": "rare",
+          "found": 1,
+          "medianMs": 28.500843999999233,
+          "p95Ms": 41.59849200000008
+        },
+        {
+          "name": "noSharedTag",
+          "found": 0,
+          "medianMs": 29.544675000000097,
+          "p95Ms": 34.954445999999734
+        }
+      ],
+      "rss": 103534592
+    },
+    {
+      "count": 50000,
+      "workloads": [
+        {
+          "name": "dense",
+          "found": 8,
+          "medianMs": 2.460467000004428,
+          "p95Ms": 3.5122259999989183
+        },
+        {
+          "name": "rare",
+          "found": 1,
+          "medianMs": 203.4790290000019,
+          "p95Ms": 482.48427199999423
+        },
+        {
+          "name": "noSharedTag",
+          "found": 0,
+          "medianMs": 194.80991500000528,
+          "p95Ms": 283.809073000004
+        }
+      ],
+      "rss": 113733632
+    }
+  ]
+}

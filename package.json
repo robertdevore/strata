@@ -30,6 +30,7 @@
     "format:source": "prettier --write app scripts package.json package-lock.json \"tsconfig*.json\" vite.config.ts vitest.config.ts",
     "verify": "npm run format:check && npm run lint && npm test && npm run build",
     "benchmark": "tsx --tsconfig tsconfig.app.json scripts/benchmark.ts",
+    "benchmark:related": "tsx --tsconfig tsconfig.app.json scripts/benchmark-related.ts",
     "package:verify": "node scripts/package-verify.mjs",
     "package:electron:verify": "npm run build && node scripts/electron-package-verify.mjs",
     "desktop:verify": "npm run build && node scripts/desktop-verify.mjs"
