@@ -1,0 +1,88 @@
+{
+  "node": "v24.20.0",
+  "platform": "darwin",
+  "arch": "x64",
+  "results": [
+    {
+      "count": 100,
+      "ms": {
+        "startup": 4.554393000000005,
+        "get": 0.1842020000000275,
+        "list": 0.7261839999999893,
+        "search": 1.107385000000022,
+        "tags": 0.19868400000007114,
+        "tagList": 0.48119499999995696,
+        "updateLinks": 2.436664999999948,
+        "backlinks": 0.3844539999998915,
+        "related": 1.9602879999999914
+      },
+      "payloadBytes": {
+        "list50": 25458,
+        "search10": 576
+      },
+      "rss": 80584704
+    },
+    {
+      "count": 1000,
+      "ms": {
+        "startup": 5.413144000000102,
+        "get": 0.12891000000013264,
+        "list": 0.7112250000000131,
+        "search": 2.599052000000029,
+        "tags": 0.38011699999992743,
+        "tagList": 2.255628999999999,
+        "updateLinks": 3.063820000000078,
+        "backlinks": 0.30736400000000685,
+        "related": 1.6215950000000703
+      },
+      "payloadBytes": {
+        "list50": 25510,
+        "search10": 5760
+      },
+      "rss": 90697728
+    },
+    {
+      "count": 10000,
+      "ms": {
+        "startup": 4.009124999999585,
+        "get": 0.14159599999948114,
+        "list": 0.7254100000000108,
+        "search": 18.63003000000026,
+        "tags": 3.295183000000179,
+        "tagList": 56.11312200000066,
+        "updateLinks": 3.4647509999995236,
+        "backlinks": 0.25713100000029954,
+        "related": 1.912555999999313
+      },
+      "payloadBytes": {
+        "list50": 25560,
+        "search10": 5767
+      },
+      "rss": 103399424
+    },
+    {
+      "count": 50000,
+      "ms": {
+        "startup": 5.15148500000214,
+        "get": 0.17233199999463977,
+        "list": 0.7929719999956433,
+        "search": 166.39235100000224,
+        "tags": 13.0167980000042,
+        "tagList": 55.57762700000603,
+        "updateLinks": 2.421351999997569,
+        "backlinks": 0.30872599999565864,
+        "related": 2.5277120000027935
+      },
+      "payloadBytes": {
+        "list50": 25603,
+        "search10": 5781
+      },
+      "rss": 117735424
+    }
+  ],
+  "measurementNotes": [
+    "Intermediate schema-12 measurement; executed alongside local verification, not an isolated release benchmark.",
+    "Matches existing sparse-link fixture and bounded retrieval workloads. Fixture Markdown contains literal escaped newline sequences; do not represent this as real desktop workload validation.",
+    "Formatting/check runner change only plus registration of schema-12 content hash function for synthetic fixture inserts."
+  ]
+}

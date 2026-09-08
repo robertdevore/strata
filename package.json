@@ -25,7 +25,11 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format:check": "prettier --check app scripts package.json package-lock.json \"tsconfig*.json\" vite.config.ts vitest.config.ts",
+    "format:source": "prettier --write app scripts package.json package-lock.json \"tsconfig*.json\" vite.config.ts vitest.config.ts",
+    "verify": "npm run format:check && npm run lint && npm test && npm run build",
+    "benchmark": "tsx --tsconfig tsconfig.app.json scripts/benchmark.ts"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",

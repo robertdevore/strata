@@ -25,7 +25,7 @@ Strata 0.8.0 is a local-first Electron/React Markdown knowledge application. SQL
 
 ## Verification
 
-Run `npm test`, `npm run lint`, `npm run build`, and `npx tsc -b`. Benchmarks use `npx tsx --tsconfig tsconfig.app.json scripts/benchmark.ts`. Consolidated verify/CI/package checks remain tracked work until implemented.
+Run `npm run verify` for source formatting, lint, all offline tests (including TSX UI tests), TypeScript checking and production build. Use `npm run format:source` to normalize source/config formatting. Run `npm run benchmark` separately against synthetic libraries. GitHub Actions runs verification and dependency audit on Linux and macOS; packaging and desktop end-to-end verification remain separately tracked work.
 
 Use synthetic temporary libraries. Preserve immutable baselines and disclose workload changes. Never use the live user database as a fixture. Normal tests must not depend on live AI providers. Validate desktop behavior and packaged native SQLite separately.
 
