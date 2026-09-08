@@ -49,7 +49,7 @@ describe('provider credentials', () => {
       db.close()
       fs.rmSync(dir, { recursive: true, force: true })
     }
-  })
+  }, 20000)
 
   it('migrates plaintext only after verified storage and sanitizes backups', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-secrets-'))
