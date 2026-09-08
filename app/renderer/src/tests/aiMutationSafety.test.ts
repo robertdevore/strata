@@ -27,6 +27,35 @@ const open = () => {
   return { db, call, service: new KnowledgeService(db) }
 }
 describe('AI mutation permissions', () => {
+  it('rejects pending proposals when their conversation is deleted and refuses late mutations', () => {
+    const { db, service } = open()
+    const thread = db.createAiThread('Removed', '')
+    const other = db.createAiThread('Remaining', '')
+    const saved = db.createNote({ content: 'Already saved' })
+    const proposal = service.propose(
+      { op: 'create_note', payload: { content: 'pending' } },
+      { threadId: thread.id },
+    )
+    const retained = service.propose(
+      { op: 'create_note', payload: { content: 'other' } },
+      { threadId: other.id },
+    )
+    expect(db.deleteAiThread(thread.id)).toBe(true)
+    expect(db.listProposals(thread.id)).toEqual([])
+    expect(db.listProposals(other.id).map((item) => item.id)).toEqual([retained.id])
+    expect(() => service.approve(proposal.id, true)).toThrow('Pending proposal not found')
+    expect(() => service.propose({ op: 'create_note', payload: {} }, { threadId: thread.id })).toThrow(
+      'Chat was deleted',
+    )
+    db.setSettings({ aiEditMode: 'auto_apply' })
+    const late = execute_tool_call(
+      db,
+      { id: 'late', name: 'create_note', argumentsJson: '{"content":"late"}' },
+      { threadId: thread.id },
+    )
+    expect(JSON.parse(late.output).error.code).toBe('CANCELLED')
+    expect(db.listNotes().map((note) => note.id)).toEqual([saved.id])
+  })
   it('records the project identity and order that a human must review', () => {
     const { db, service } = open()
     const first = db.createProject('Original project')

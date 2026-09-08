@@ -333,6 +333,7 @@ export const run_ai_turn = async (
   const input_messages = budgetHistory(history)
   let changed = { ...NO_CHANGED }
   const execute = (call: import('./types').NormalizedToolCall) => {
+    if (!db.getAiThread(thread.id)) throw new DomainError('CANCELLED', 'Chat was deleted')
     const result = execute_tool_call(db, call, { threadId: thread.id, model })
     changed = mergeChanged(changed, result.changed)
     if (hasChanges(result.changed)) options?.onDataChanged?.(result.changed)

@@ -48,6 +48,20 @@ const open = () => {
   return { db, thread }
 }
 describe('runner provider fallback', () => {
+  it('rejects a late provider tool call after its conversation was removed', async () => {
+    const { db, thread } = open()
+    db.setSettings({ aiEditMode: 'auto_apply' })
+    providers.cheap.sendTurn.mockReset().mockImplementation(async () => {
+      db.deleteAiThread(thread.id)
+      return {
+        content: '',
+        toolCalls: [{ id: 'late', name: 'create_note', argumentsJson: '{"content":"late"}' }],
+      }
+    })
+    await expect(run_ai_turn(db, thread)).rejects.toMatchObject({ code: 'CANCELLED' })
+    expect(db.listNotes()).toEqual([])
+    expect(providers.premium.sendTurn).not.toHaveBeenCalled()
+  })
   it('refuses ask-each-time execution without an explicit model before contacting providers', async () => {
     const { db, thread } = open()
     db.setSettings({ aiRoutingMode: 'ask_each_time' })

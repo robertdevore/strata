@@ -1490,7 +1490,10 @@ export function ChatPanel(props: ChatPanelProps) {
         <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
             <h3>Delete chat</h3>
-            <p>This chat thread will be removed permanently.</p>
+            <p>
+              This chat will be removed permanently and its pending proposals rejected. Notes already saved
+              will remain.
+            </p>
             <div className="modal-actions">
               <button
                 className="ghost-button"

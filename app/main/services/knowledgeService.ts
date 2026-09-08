@@ -279,6 +279,8 @@ export class KnowledgeService {
   ): { id: string; operation: Operation; before: unknown; after: unknown } {
     const operation = operationSchema.parse(input)
     return this.db.transaction(() => {
+      if (actor?.threadId && !this.db.getAiThread(actor.threadId))
+        throw new DomainError('CANCELLED', 'Chat was deleted')
       const before =
         operation.op === 'update_note' || operation.op === 'delete_note' || operation.op === 'restore_note'
           ? this.db.aiGetNoteById(operation.id, true)

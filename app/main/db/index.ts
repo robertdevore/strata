@@ -1055,6 +1055,12 @@ export class StrataDatabase {
 
   deleteAiThread(id: string): boolean {
     const transaction = this.db.transaction((thread_id: string) => {
+      this.db
+        .prepare(
+          `UPDATE mutation_proposals SET status='rejected'
+        WHERE status='pending' AND json_extract(payload, '$.actor.threadId') = ?`,
+        )
+        .run(thread_id)
       this.db.prepare('DELETE FROM ai_messages WHERE thread_id = ?').run(thread_id)
       const deleted_thread = this.db.prepare('DELETE FROM ai_threads WHERE id = ?').run(thread_id)
       return deleted_thread.changes > 0

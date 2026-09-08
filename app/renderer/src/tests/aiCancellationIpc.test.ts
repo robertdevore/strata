@@ -26,10 +26,15 @@ beforeEach(() => {
 })
 const fixture = () => {
   const thread = { id: '00000000-0000-4000-8000-000000000001', title: 'Chat', model: '' }
+  let deleted = false
   const createAiMessage = vi.fn((_id, role, content) => ({ role, content }))
   const db = {
     getSettings: () => ({ aiRoutingMode: 'auto' }),
-    getAiThread: () => thread,
+    getAiThread: () => (deleted ? null : thread),
+    deleteAiThread: () => {
+      deleted = true
+      return true
+    },
     createAiMessage,
   } as unknown as StrataDatabase
   const frame = { url: 'file:///test/index.html' }
@@ -40,6 +45,7 @@ const fixture = () => {
   registerAiHandlers(db)
   return {
     createAiMessage,
+    deleteThread: () => mocks.handlers.get(IPC_CHANNELS.aiThreadDelete)!(event, { threadId: thread.id }),
     sender,
     send: () =>
       mocks.handlers.get(IPC_CHANNELS.aiSendMessage)!(event, {
@@ -129,4 +135,21 @@ it('cancels transcription through the same owner-scoped request contract', async
   expect(await outcome).toMatchObject({ error: { code: 'CANCELLED' } })
   expect(f.cancel()).toBe(false)
   expect(f.sender.listenerCount('destroyed')).toBe(0)
+})
+
+it('aborts an active chat when its conversation is deleted without writing a late reply', async () => {
+  const f = fixture()
+  mocks.run.mockImplementation(
+    (_db, _thread, options) =>
+      new Promise((_resolve, reject) => {
+        options.signal.addEventListener('abort', () => reject(new Error('cancelled')))
+      }),
+  )
+  const request = f.send()
+  const rejected = expect(request).rejects.toMatchObject({ code: 'CANCELLED' })
+  await vi.waitFor(() => expect(mocks.run).toHaveBeenCalledTimes(1))
+  expect(f.deleteThread()).toBe(true)
+  await rejected
+  expect(f.createAiMessage).toHaveBeenCalledTimes(1)
+  expect(f.cancel()).toBe(false)
 })

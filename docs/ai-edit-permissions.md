@@ -28,6 +28,10 @@ Legacy AI edit records remain available. Their revert operation checks whether l
 
 **Stop AI response** cancels an in-flight provider request. Already-applied writes remain saved, and pending proposals can still be reviewed. Switching conversations or unmounting the editor cancels that view's pending request; cancellation is not a transaction spanning the entire conversation.
 
+## Deleting a conversation
+
+Deleting a chat rejects its pending proposals in the same database transaction and cancels chat requests attached to it, including work started from another view. Late tool calls cannot mutate the library or create another proposal for that deleted chat. Notes and revisions already saved remain available. A rejected proposal cannot later be approved.
+
 ## Automation
 
 The loopback API requires authentication. Use the installed CLI or the current [CLI contract](../CLI.md) for note revisions, safe updates and restoration. Do not use the unauthenticated examples in historical design documents. Proposal approval is a human desktop action, not a model tool.

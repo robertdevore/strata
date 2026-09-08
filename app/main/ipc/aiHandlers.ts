@@ -120,13 +120,13 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
   const ownedRequest = async <T>(
     event: Electron.IpcMainInvokeEvent,
     requestId: string,
-    action: (signal: AbortSignal) => Promise<T>,
+    action: (signal: AbortSignal, bindThread: (threadId: string) => void) => Promise<T>,
   ): Promise<T> => {
     if (event.sender.isDestroyed()) throw new DomainError('CANCELLED', 'AI request cancelled')
     const request = requests.start(requestId, event.sender.id)
     event.sender.once('destroyed', request.cancel)
     try {
-      return await action(request.signal)
+      return await action(request.signal, request.bindThread)
     } finally {
       event.sender.removeListener('destroyed', request.cancel)
       request.finish()
@@ -150,7 +150,9 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
 
   handleTrustedIpc(IPC_CHANNELS.aiThreadDelete, (_event, payload) => {
     const { threadId } = thread_id_schema.parse(payload)
-    return db.deleteAiThread(threadId)
+    const deleted = db.deleteAiThread(threadId)
+    if (deleted) requests.cancelThread(threadId)
+    return deleted
   })
 
   handleTrustedIpc(IPC_CHANNELS.aiThreadRename, (_event, payload) => {
@@ -175,13 +177,14 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
 
   handleTrustedIpc(IPC_CHANNELS.aiSendMessage, async (event, payload): Promise<AiChatResponse> => {
     const { requestId, threadId, requestModel, message, openNotes } = send_schema.parse(payload)
-    return ownedRequest(event, requestId, async (signal) => {
+    return ownedRequest(event, requestId, async (signal, bindThread) => {
       const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
       assertNotCancelled(signal)
       if (db.getSettings().aiRoutingMode === 'ask_each_time' && !requestModel)
         throw new DomainError('MODEL_SELECTION_REQUIRED', 'Choose a model for this message.')
       const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
       if (!thread) throw new Error('Chat thread was not found.')
+      bindThread(thread.id)
       db.createAiMessage(thread.id, 'user', message)
       let content: string
       let cancelled = false
@@ -200,7 +203,8 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
         content =
           'Request cancelled. Any changes already applied remain saved. Pending proposals can still be reviewed.'
       }
-      if (event.sender.isDestroyed()) throw new DomainError('CANCELLED', 'AI request cancelled')
+      if (event.sender.isDestroyed() || !db.getAiThread(thread.id))
+        throw new DomainError('CANCELLED', 'AI request cancelled')
       const assistant_message = db.createAiMessage(thread.id, 'assistant', content)
       const refreshed_thread = db.getAiThread(thread.id)
       if (!refreshed_thread) throw new Error('Chat thread was not found after response generation.')

@@ -408,6 +408,36 @@ try {
   const approvedNotes = (await proposalNotes()).notes
   expect(approvedNotes).toHaveLength(1)
   expect(await page.evaluate((id) => window.strata.notes.history(id), approvedNotes[0].id)).toHaveLength(1)
+  await activePane.getByPlaceholder('Message Strata AI…').fill('Prepare another note proposal')
+  await activePane.getByLabel('Model for this message', { exact: true }).selectOption('openai::fixture-model')
+  await activePane.getByRole('button', { name: 'Send message', exact: true }).click()
+  await expect(activePane.getByText('AI edit awaiting approval: create note', { exact: true })).toBeVisible()
+  const pendingChat = await page.evaluate(async () => {
+    for (const entry of await window.strata.ai.listThreads()) {
+      const pending = await window.strata.ai.listProposals(entry.thread.id)
+      if (pending.length) return { threadId: entry.thread.id, proposalId: pending[0].id }
+    }
+    throw new Error('Missing fixture proposal')
+  })
+  await activePane.getByRole('button', { name: 'Delete chat', exact: true }).click()
+  await page
+    .locator('.modal-card')
+    .filter({ has: page.getByRole('heading', { name: 'Delete chat', exact: true }) })
+    .getByRole('button', { name: 'Delete chat', exact: true })
+    .click()
+  await expect(activePane.getByText('AI edit awaiting approval: create note', { exact: true })).toHaveCount(0)
+  expect(await page.evaluate((id) => window.strata.ai.listProposals(id), pendingChat.threadId)).toEqual([])
+  expect(
+    await page.evaluate(async (id) => {
+      try {
+        await window.strata.ai.resolveProposal(id, true)
+        return true
+      } catch {
+        return false
+      }
+    }, pendingChat.proposalId),
+  ).toBe(false)
+  expect((await proposalNotes()).notes).toHaveLength(1)
   await activePane.getByTitle('Open AI Chat', { exact: true }).click()
   // Close immediately after input, before the debounce can save it.
   await activePane.locator('.cm-content[contenteditable="true"]').fill('Saved while quitting')
@@ -473,7 +503,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation, per-message model choice and proposal rejection/approval, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation, per-message model choice, proposal rejection/approval and chat deletion, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {

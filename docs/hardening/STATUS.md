@@ -393,3 +393,11 @@ Per-message selection verification: final scoped TypeScript, ESLint and producti
 The next desktop attempt reached Settings but its exact label locator did not match the nested AI Mode label. The fixture now scopes to the AI Mode label's select element. Both desktop interruptions so far occurred before exercising model selection and are not reported as successful end-to-end coverage.
 
 Final desktop model-choice verification passed. Each request required a separate selection; the synthetic provider received the exact chosen model, and rejection/approval plus all prior desktop scenarios passed. Log: `/tmp/strata-ask-model-desktop-choice.log`.
+
+### Deleted conversation lifecycle
+
+Chat deletion now rejects its pending proposals atomically with message/thread removal, preserving already-saved notes. Main request ownership can bind newly created or existing threads and abort all requests associated with a deleted thread across renderer owners, while leaving other conversations/transcription requests unaffected. Slots remain occupied until cancelled work settles. The runner, mutation executor and proposal service each reject late work for a deleted owning thread; the IPC response path does not attempt a late assistant insertion after deletion.
+
+The confirmation text now explains pending-proposal rejection and preservation of saved notes. Focused tests passed 27 cases across mutation safety, fallback, request ownership and IPC cancellation, including a provider response arriving after direct database thread deletion. TypeScript, scoped lint and production build passed. Current inventory is 234 tests; last full suite checkpoint is 227. The expanded desktop fixture creates another pending proposal, deletes its chat, confirms the proposal cannot be approved, and checks the previously approved note remains.
+
+Desktop deletion verification passed, including refusal to approve the deleted chat's proposal and preservation of the already-approved note. All prior desktop scenarios also passed. Log: `/tmp/strata-deleted-chat-desktop.log`.

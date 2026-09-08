@@ -352,6 +352,8 @@ export const execute_tool_call = (
         : db.getProjectByName(String(args.project_name ?? ''))
     let result: unknown
     if (mutations.has(call.name)) {
+      if (ctx?.threadId && !db.getAiThread(ctx.threadId))
+        throw new DomainError('CANCELLED', 'Chat was deleted')
       const mode = db.getSettings().aiEditMode
       if (mode !== 'confirm' && mode !== 'auto_apply')
         throw new DomainError('READ_ONLY', 'AI mutations are disabled')
