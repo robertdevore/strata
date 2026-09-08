@@ -259,6 +259,18 @@ try {
   await expect(page.getByText('Could not close this tab. Your draft is preserved.')).toBeVisible()
   await expect(page.locator('.tab-item-pinned')).toHaveCount(1)
   await expect(pinnedPane.locator('.cm-content')).toContainText('Preserved pinned draft')
+  await pinnedPane.getByRole('button', { name: 'Save draft as new note and reload', exact: true }).click()
+  await expect(pinnedPane.getByRole('alert')).toHaveCount(0)
+  await expect(pinnedPane.locator('.cm-content')).toContainText('External update')
+  const recovered = await page.evaluate(async () =>
+    (await window.strata.notes.page({ query: 'Preserved pinned draft' })).notes.filter((note) =>
+      note.tags.includes('recovered-draft'),
+    ),
+  )
+  expect(recovered).toHaveLength(1)
+  expect((await page.evaluate((id) => window.strata.notes.get(id), recovered[0].id)).content).toContain(
+    'Preserved pinned draft',
+  )
   await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute(
     'content',
     /script-src 'self'/,

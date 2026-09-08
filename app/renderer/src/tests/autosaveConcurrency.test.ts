@@ -224,3 +224,32 @@ it('refuses to close if more text arrives during the closing save', async () => 
   expect(useAppStore.getState().openTabs).toEqual([note.id])
   expect(useAppStore.getState().drafts[note.id]).toBe('Newer text while waiting')
 })
+
+it('preserves text typed while untouched-note cleanup is pending', async () => {
+  let finish!: (value: boolean) => void
+  vi.stubGlobal('window', {
+    strata: {
+      notes: {
+        delete: vi.fn(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finish = resolve
+            }),
+        ),
+      },
+      tags: { list: vi.fn().mockResolvedValue([]) },
+    },
+  })
+  useAppStore.setState({
+    notes: [{ ...note, content: '# Untitled' }],
+    drafts: { [note.id]: '# Untitled' },
+    untouchedNewNoteIds: { [note.id]: true },
+  })
+  const cleanup = useAppStore.getState().flushDraft(note.id, { allowDiscardUntouchedEmpty: true })
+  useAppStore.getState().setDraft(note.id, '# Started writing\n\nPreserve this text')
+  finish(true)
+  await cleanup
+  expect(useAppStore.getState().drafts[note.id]).toContain('Preserve this text')
+  expect(useAppStore.getState().openTabs).toContain(note.id)
+  expect(useAppStore.getState().saveStates[note.id]).toBe('conflict')
+})

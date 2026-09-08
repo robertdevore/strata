@@ -25,9 +25,12 @@ const is_effectively_untouched_content = (content: string): boolean => {
   return '' === normalized || '# Untitled' === normalized
 }
 
-/** Maximum number of in-memory drafts before evicting stale entries. */
 const deletedRevisions = new Map<string, number>()
-const savesInFlight = new Map<string, Promise<void>>()
+const savesInFlight = new Map<string, { completion: Promise<void>; observedRevision: number }>()
+const observe_note_revision = (id: string, revision: number): void => {
+  const pending = savesInFlight.get(id)
+  if (pending) pending.observedRevision = Math.max(pending.observedRevision, revision)
+}
 const NOTE_SUMMARY_LENGTH = 280
 const HYDRATED_NOTE_IDLE_MS = 2 * 60 * 1000
 
@@ -145,6 +148,16 @@ const defaultSettings: Settings = {
   sidebarLayout: DEFAULT_SIDEBAR_LAYOUT,
 }
 
+const apply_metadata_result = (state: AppState, updated: Note): Partial<AppState> => {
+  observe_note_revision(updated.id, updated.revision)
+  const current = state.notes.find((note) => note.id === updated.id)
+  if (!current || current.revision > updated.revision) return {}
+  return {
+    notes: state.notes.map((note) => (note.id === updated.id ? updated : note)),
+    noteSummaryCache: { ...state.noteSummaryCache, [updated.id]: summarize_note_content(updated.content) },
+  }
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   notes: [],
   nextCursor: null,
@@ -227,17 +240,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         limit: 100,
         cursor: more ? (state.nextCursor ?? undefined) : undefined,
       })
+      for (const note of page.notes) observe_note_revision(note.id, note.revision)
       if (generation !== searchGeneration) return
       set((current) => {
         const existing = new Map(current.notes.map((note) => [note.id, note]))
         const conflicts = page.notes.filter(
           (note) =>
-            existing.get(note.id)?.revision !== note.revision && current.drafts[note.id] !== undefined,
+            note.revision > (existing.get(note.id)?.revision ?? 0) && current.drafts[note.id] !== undefined,
         )
         const merged = page.notes.map((note) => {
           const old = existing.get(note.id)
-          return old?.contentLoaded &&
-            (old.revision === note.revision || current.drafts[note.id] !== undefined)
+          return old &&
+            (old.revision > note.revision ||
+              current.drafts[note.id] !== undefined ||
+              (old.contentLoaded && old.revision === note.revision))
             ? old
             : note
         })
@@ -282,13 +298,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     await Promise.all(
       state.openTabs.map(async (id) => {
         const full = await notesService.get(id)
+        observe_note_revision(id, full?.revision ?? Infinity)
         set((current) => {
           const existing = current.notes.find((note) => note.id === id)
+          if (full && existing && full.revision < existing.revision) return {}
           if (current.drafts[id] !== undefined)
-            return full?.revision !== existing?.revision
+            return !full || full.deletedAt || full.revision > (existing?.revision ?? 0)
               ? { saveStates: { ...current.saveStates, [id]: 'conflict' as const } }
               : {}
-          if (!full)
+          if (!full || full.deletedAt)
             return {
               notes: current.notes.filter((note) => note.id !== id),
               openTabs: current.openTabs.filter((tab) => tab !== id),
@@ -303,14 +321,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async resolveConflict(id, saveCopy) {
     const draft = get().drafts[id]
+    const baseRevision = get().notes.find((note) => note.id === id)?.revision ?? 0
     if (saveCopy && draft !== undefined)
       await notesService.createWithPayload({ content: draft, tags: ['recovered-draft'] })
     const latest = await notesService.get(id)
-    set((current) => ({
-      drafts: Object.fromEntries(Object.entries(current.drafts).filter(([key]) => key !== id)),
-      notes: latest ? upsert_note(current.notes, latest) : current.notes.filter((note) => note.id !== id),
-      saveStates: { ...current.saveStates, [id]: 'saved' },
-    }))
+    observe_note_revision(id, latest?.revision ?? Infinity)
+    set((current) => {
+      if (current.drafts[id] !== draft) return {}
+      const existing = current.notes.find((note) => note.id === id)
+      const recovered = existing && existing.revision > (latest?.revision ?? baseRevision) ? existing : latest
+      return {
+        drafts: Object.fromEntries(Object.entries(current.drafts).filter(([key]) => key !== id)),
+        notes:
+          recovered && !recovered.deletedAt
+            ? upsert_note(current.notes, recovered)
+            : current.notes.filter((note) => note.id !== id),
+        saveStates: { ...current.saveStates, [id]: 'saved' },
+      }
+    })
     await get().load()
   },
 
@@ -352,6 +380,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     const note = await notesService.get(id)
+    observe_note_revision(id, note?.revision ?? Infinity)
     if (!note || note.deletedAt) throw new Error('Note unavailable')
     set((state) =>
       state.notes.some((current) => current.id === id)
@@ -367,7 +396,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const current = get().notes.find((note) => note.id === id)
     if (!current || current.contentLoaded) return
     const full_note = await notesService.get(id)
-    if (!full_note) return
+    observe_note_revision(id, full_note?.revision ?? Infinity)
+    if (!full_note || full_note.deletedAt) return
     set((state) => {
       const latest = state.notes.find((note) => note.id === id)
       // A delayed read must not resurrect a removed note or replace a newer revision.
@@ -491,6 +521,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       untouchedNewNoteIds: untouched_new_note_ids,
       splitNoteIds: split_note_ids,
       splitRatios: split_ratios,
+      navigationError: null,
     })
     return true
   },
@@ -590,7 +621,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   async flushDraft(id, options) {
     const pending = savesInFlight.get(id)
     if (pending) {
-      await pending
+      await pending.completion
       return get().flushDraft(id, options)
     }
     const state = get()
@@ -610,6 +641,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       if (await notesService.delete(id, note.revision)) {
         set((current) => {
+          if (current.drafts[id] === undefined) return {}
+          if (current.drafts[id] !== draft || !current.untouchedNewNoteIds[id]) {
+            return { saveStates: { ...current.saveStates, [id]: 'conflict' as const } }
+          }
           const drafts = { ...current.drafts }
           const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
           delete drafts[id]
@@ -633,16 +668,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!note) return
       set((current) => ({ saveStates: { ...current.saveStates, [id]: 'saving' } }))
       const saving = notesService.update(id, { content: draft, expectedRevision: note.revision })
-      savesInFlight.set(
-        id,
-        saving.then(
+      const pendingSave = {
+        observedRevision: note.revision,
+        completion: saving.then(
           () => {},
           () => {},
         ),
-      )
+      }
+      savesInFlight.set(id, pendingSave)
       const updated = await saving
       if (!updated) throw new Error('Note unavailable')
       set((current) => {
+        const latest = current.notes.find((item) => item.id === id)
+        if (
+          !latest ||
+          latest.revision > updated.revision ||
+          pendingSave.observedRevision > updated.revision
+        ) {
+          return current.drafts[id] !== undefined
+            ? { saveStates: { ...current.saveStates, [id]: 'conflict' as const } }
+            : {}
+        }
         const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
         if (untouched_new_note_ids[id] && !is_effectively_untouched_content(draft)) {
           delete untouched_new_note_ids[id]
@@ -658,7 +704,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             [id]: Date.now(),
           },
           untouchedNewNoteIds: untouched_new_note_ids,
-          saveStates: { ...current.saveStates, [id]: current.drafts[id] === draft ? 'saved' : 'unsaved' },
+          saveStates: {
+            ...current.saveStates,
+            [id]: current.drafts[id] === undefined || current.drafts[id] === draft ? 'saved' : 'unsaved',
+          },
           drafts:
             current.drafts[id] === draft
               ? Object.fromEntries(Object.entries(current.drafts).filter(([key]) => key !== id))
@@ -666,12 +715,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (error) {
-      set((current) => ({
-        saveStates: {
-          ...current.saveStates,
-          [id]: String(error).includes('REVISION_CONFLICT') ? 'conflict' : 'failed',
-        },
-      }))
+      set((current) =>
+        current.drafts[id] === undefined
+          ? {}
+          : {
+              saveStates: {
+                ...current.saveStates,
+                [id]: String(error).includes('REVISION_CONFLICT') ? 'conflict' : 'failed',
+              },
+            },
+      )
     } finally {
       savesInFlight.delete(id)
     }
@@ -682,10 +735,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!current) return
     const updated = await notesService.star(id, !current.starred, current.revision)
     if (!updated) return
-    set((state) => ({
-      notes: state.notes.map((note) => (note.id === id ? updated : note)),
-      noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
-    }))
+    set((state) => apply_metadata_result(state, updated))
   },
 
   async toggleArchive(id) {
@@ -693,10 +743,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!current) return
     const updated = await notesService.archive(id, !current.archived, current.revision)
     if (!updated) return
-    set((state) => ({
-      notes: state.notes.map((note) => (note.id === id ? updated : note)),
-      noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
-    }))
+    set((state) => apply_metadata_result(state, updated))
     await get().refreshTags()
   },
 
@@ -777,10 +824,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       expectedRevision: get().notes.find((note) => note.id === id)?.revision,
     })
     if (!updated) return
-    set((state) => ({
-      notes: state.notes.map((note) => (note.id === id ? updated : note)),
-      noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
-    }))
+    set((state) => apply_metadata_result(state, updated))
     await get().refreshTags()
   },
 
@@ -790,10 +834,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       expectedRevision: get().notes.find((note) => note.id === id)?.revision,
     })
     if (!updated) return
-    set((state) => ({
-      notes: state.notes.map((note) => (note.id === id ? updated : note)),
-      noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(updated.content) },
-    }))
+    set((state) => apply_metadata_result(state, updated))
   },
 
   setShowSettings(showSettings) {
