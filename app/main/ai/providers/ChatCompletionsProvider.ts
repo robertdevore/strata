@@ -155,6 +155,7 @@ export class ChatCompletionsProvider implements AiProvider {
 
     const payload = await requestProviderJson(`${base_url}/chat/completions`, {
       method: 'POST',
+      signal: input.signal,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',

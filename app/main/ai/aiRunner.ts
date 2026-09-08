@@ -1,3 +1,4 @@
+import { assertNotCancelled } from './cancellation'
 import { NO_CHANGED, mergeChanged, hasChanges, type ChangedDomains } from '../../shared/changedDomains'
 // Strata AI Runner — orchestrates provider selection, routing, tool loop, and linkification
 // This replaces the core of aiHandlers.ts with a provider-agnostic implementation.
@@ -217,6 +218,7 @@ export interface AiRunnerResult {
 }
 
 interface AiRunnerOptions {
+  signal?: AbortSignal
   openNotesContext?: string
   forcedModel?: string
   onDataChanged?: (changed: ChangedDomains) => void
@@ -259,6 +261,7 @@ export const run_ai_turn = async (
   thread: AiThread,
   options?: AiRunnerOptions,
 ): Promise<AiRunnerResult> => {
+  assertNotCancelled(options?.signal)
   const ai_settings = resolve_ai_settings(db)
   const history = db.listAiMessages(thread.id).slice(-40)
   const last_user = history.filter((m) => 'user' === m.role).pop()
@@ -332,6 +335,7 @@ export const run_ai_turn = async (
   const toolState = createToolLoopState()
   const run = () =>
     runProviderToolLoop({
+      signal: options?.signal,
       provider,
       model,
       state: toolState,
@@ -350,6 +354,8 @@ export const run_ai_turn = async (
   try {
     result = await run()
   } catch (error) {
+    assertNotCancelled(options?.signal)
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'CANCELLED') throw error
     if (effective_route_target !== 'cheap' || forcedModel || ai_settings.aiRoutingMode !== 'auto') throw error
     const premium = resolve_provider_for_route(db, 'premium')
     provider = premium.provider

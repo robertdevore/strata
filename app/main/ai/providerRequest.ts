@@ -1,3 +1,4 @@
+import { assertNotCancelled } from './cancellation'
 import { DomainError } from '../../shared/errors'
 
 export const validateProviderUrl = (value: string): string => {
@@ -33,11 +34,17 @@ export const requestProviderJson = async (
   timeoutMs = 60000,
 ): Promise<unknown> => {
   validateProviderUrl(url)
+  assertNotCancelled(init.signal)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal
   try {
     const response = await fetch(url, { ...init, redirect: 'error', signal })
+    if (signal.aborted) {
+      await response.body?.cancel()
+      assertNotCancelled(init.signal)
+      throw new DomainError('TIMEOUT', 'Provider request timed out')
+    }
     if (!response.ok) {
       await response.body?.cancel()
       const code =
@@ -70,15 +77,17 @@ export const requestProviderJson = async (
     } finally {
       reader.releaseLock()
     }
+    assertNotCancelled(init.signal)
+    if (controller.signal.aborted) throw new DomainError('TIMEOUT', 'Provider request timed out')
     try {
       return JSON.parse(Buffer.concat(chunks).toString('utf8'))
     } catch {
       throw new DomainError('INVALID_RESPONSE', 'Provider returned invalid JSON')
     }
   } catch (error) {
+    assertNotCancelled(init.signal)
     if (error instanceof DomainError) throw error
     if (controller.signal.aborted) throw new DomainError('TIMEOUT', 'Provider request timed out')
-    if (init.signal?.aborted) throw new DomainError('CANCELLED', 'Provider request cancelled')
     throw new DomainError('NETWORK_ERROR', 'Provider connection failed')
   } finally {
     clearTimeout(timeout)

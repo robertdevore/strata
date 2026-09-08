@@ -1,3 +1,4 @@
+import { assertNotCancelled } from './cancellation'
 import { NO_CHANGED, mergeChanged, type ChangedDomains } from '../../shared/changedDomains'
 // Pure helpers for building the message list sent to an AI provider.
 //
@@ -89,6 +90,7 @@ export const createToolLoopState = () => ({
 })
 
 export const runProviderToolLoop = async (options: {
+  signal?: AbortSignal
   provider: import('./types').AiProvider
   model: string
   systemPrompt: string
@@ -107,6 +109,7 @@ export const runProviderToolLoop = async (options: {
   let toolCalls = state.toolCalls
   const proposalIds = state.proposalIds
   while (state.steps < 6) {
+    assertNotCancelled(options.signal)
     state.steps++
     if (JSON.stringify(options.messages).length + options.systemPrompt.length > 100000)
       return {
@@ -118,11 +121,13 @@ export const runProviderToolLoop = async (options: {
         toolCalls,
       }
     const output = await options.provider.sendTurn({
+      signal: options.signal,
       model: options.model,
       systemPrompt: options.systemPrompt,
       messages: options.messages,
       tools: options.tools,
     })
+    assertNotCancelled(options.signal)
     options.onUsage?.(output.usage)
     if (!output.toolCalls.length)
       return {
@@ -144,6 +149,7 @@ export const runProviderToolLoop = async (options: {
       }
     const results = []
     for (const call of output.toolCalls) {
+      assertNotCancelled(options.signal)
       const execution = options.execute(call)
       toolCalls++
       state.toolCalls = toolCalls

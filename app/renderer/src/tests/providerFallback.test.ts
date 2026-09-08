@@ -103,4 +103,17 @@ describe('runner provider fallback', () => {
     expect(providers.premium.sendTurn).not.toHaveBeenCalled()
     expect(db.listProposals()).toHaveLength(1)
   })
+  it('does not fall back after cancellation and preserves already committed notifications', async () => {
+    const { db, thread } = open()
+    db.setSettings({ aiEditMode: 'auto_apply' })
+    const controller = new AbortController()
+    const changed = vi.fn(() => controller.abort())
+    await expect(
+      run_ai_turn(db, thread, { signal: controller.signal, onDataChanged: changed }),
+    ).rejects.toMatchObject({ code: 'CANCELLED' })
+    expect(changed).toHaveBeenCalledTimes(1)
+    expect(db.listNotes()).toHaveLength(1)
+    expect(providers.cheap.sendTurn).toHaveBeenCalledTimes(1)
+    expect(providers.premium.sendTurn).not.toHaveBeenCalled()
+  })
 })

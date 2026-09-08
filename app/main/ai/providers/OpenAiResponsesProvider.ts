@@ -106,6 +106,7 @@ export class OpenAiResponsesProvider implements AiProvider {
 
     const payload = await requestProviderJson(`${this.baseUrl}/v1/responses`, {
       method: 'POST',
+      signal: input.signal,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',

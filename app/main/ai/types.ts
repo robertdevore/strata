@@ -39,6 +39,7 @@ export type ProviderMessage =
   | { role: 'tool'; content: string; toolCallId: string }
 
 export interface AiProviderTurnInput {
+  signal?: AbortSignal
   model: string
   systemPrompt: string
   messages: ProviderMessage[]
