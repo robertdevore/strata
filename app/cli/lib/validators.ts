@@ -52,6 +52,11 @@ export const project_list_response_schema = z.object({
   projects: z.array(project_schema),
 })
 
+export const project_summary_schema = project_schema.extend({ noteCount: z.number().int().nonnegative() })
+export const project_summary_list_response_schema = z.object({
+  projects: z.array(project_summary_schema),
+})
+
 export const project_response_schema = z.object({
   project: project_schema,
 })

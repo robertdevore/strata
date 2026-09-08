@@ -58,15 +58,7 @@ export const register_projects_commands = (
     .description('List projects and note counts.')
     .action(async function () {
       const { options, client } = get_context(this)
-      const [project_list, notes] = await Promise.all([
-        client.listProjects(),
-        client.listNotes({ includeDeleted: false }),
-      ])
-      const note_counts = new Map<string, number>()
-      for (const note of notes) {
-        if (!note.projectId) continue
-        note_counts.set(note.projectId, (note_counts.get(note.projectId) ?? 0) + 1)
-      }
+      const project_list = await client.listProjects()
       const data = {
         projects: project_list,
         count: project_list.length,
@@ -76,7 +68,7 @@ export const register_projects_commands = (
           String(project.sortOrder + 1),
           project.id.slice(0, 8),
           project.name,
-          String(note_counts.get(project.id) ?? 0),
+          String(project.noteCount),
         ])
         print_success(options, data, { prettyText: format_table(['Order', 'ID', 'Project', 'Notes'], rows) })
         return

@@ -6,6 +6,8 @@ import {
   health_response_schema,
   project_schema,
   project_list_response_schema,
+  project_summary_schema,
+  project_summary_list_response_schema,
   project_response_schema,
   note_list_response_schema,
   note_response_schema,
@@ -307,11 +309,15 @@ export class StrataApiClient {
     return response.tags
   }
 
-  async listProjects(): Promise<Array<z.infer<typeof project_schema>>> {
-    const response = await this.request<z.infer<typeof project_list_response_schema>>('GET', '/projects', {
-      validate: project_list_response_schema,
-      allowRetry: true,
-    })
+  async listProjects(): Promise<Array<z.infer<typeof project_summary_schema>>> {
+    const response = await this.request<z.infer<typeof project_summary_list_response_schema>>(
+      'GET',
+      '/projects',
+      {
+        validate: project_summary_list_response_schema,
+        allowRetry: true,
+      },
+    )
     return response.projects
   }
 

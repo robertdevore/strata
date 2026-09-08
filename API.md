@@ -364,7 +364,7 @@ Response:
 
 `GET /projects`
 
-Returns all projects.
+Returns project summaries with `noteCount`: all non-deleted notes assigned to each project, including archived notes. Counts are computed in SQL independently of note pagination; no note bodies are returned.
 
 ```bash
 curl http://127.0.0.1:3939/projects
@@ -380,7 +380,8 @@ Response:
 	  "name": "Work",
 	  "createdAt": "2026-03-03T22:57:50.032Z",
 	  "updatedAt": "2026-03-03T22:57:50.032Z",
-	  "sortOrder": 0
+	  "sortOrder": 0,
+	  "noteCount": 42
 	}
   ]
 }

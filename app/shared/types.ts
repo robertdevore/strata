@@ -27,6 +27,11 @@ export interface Project {
   sortOrder: number
 }
 
+export interface ProjectSummary extends Project {
+  /** All non-deleted notes, including archived notes, independent of pagination. */
+  noteCount: number
+}
+
 export interface Note {
   revision: number
   title?: string

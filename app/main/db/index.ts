@@ -17,6 +17,7 @@ import type {
   NoteUpdatePatch,
   NotesFilter,
   Project,
+  ProjectSummary,
   Settings,
 } from '../../shared/types'
 import { DEFAULT_HOTKEYS } from '../../shared/hotkeys'
@@ -885,6 +886,16 @@ export class StrataDatabase {
       .prepare('SELECT * FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE ASC')
       .all() as DbProjectRow[]
     return rows.map((row) => this.mapProject(row))
+  }
+
+  listProjectSummaries(): ProjectSummary[] {
+    const rows = this.db
+      .prepare(
+        `SELECT p.*, (SELECT COUNT(*) FROM notes n WHERE n.project_id=p.id AND n.deleted_at IS NULL) AS note_count
+         FROM projects p ORDER BY p.sort_order ASC, p.name COLLATE NOCASE ASC`,
+      )
+      .all() as Array<DbProjectRow & { note_count: number }>
+    return rows.map((row) => ({ ...this.mapProject(row), noteCount: row.note_count }))
   }
 
   getProject(id: string): Project | null {

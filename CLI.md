@@ -133,6 +133,8 @@ npm run strata -- projects import ./folder-of-markdown
 Projects are local categories. Importing a folder of markdown files creates a project named after the folder by default, then imports each markdown file as a note in that project.
 `projects reorder` persists the sidebar/project order so the same sequence shows up in the UI, API, and agent flows.
 
+`projects list` reports each project's complete non-deleted note count, including archived notes. Counts are computed by the API in SQL and do not depend on note pagination. JSON project summaries include `noteCount`; the human-readable table uses the same value.
+
 ### Search
 
 ```bash

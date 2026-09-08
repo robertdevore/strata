@@ -200,7 +200,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
       if (method === 'GET' && parts[2] === 'ai-edits') return ok({ edits: db.listAiEdits(id) })
     }
     if (method === 'GET' && route === 'tags') return ok({ tags: db.listTags() })
-    if (method === 'GET' && route === 'projects') return ok({ projects: db.listProjects() })
+    if (method === 'GET' && route === 'projects') return ok({ projects: db.listProjectSummaries() })
     if (method === 'POST' && route === 'projects') {
       const parsed = z
         .object({ name: z.string() })
