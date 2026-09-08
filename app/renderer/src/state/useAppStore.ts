@@ -97,6 +97,7 @@ interface AppState {
   navigateForward: () => void
   createNote: () => Promise<void>
   setDraft: (id: string, content: string) => void
+  prepareToClose: () => Promise<boolean>
   flushDraft: (id: string, options?: FlushDraftOptions) => Promise<void>
   toggleStar: (id: string) => Promise<void>
   toggleArchive: (id: string) => Promise<void>
@@ -616,6 +617,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       }
     })
+  },
+
+  async prepareToClose() {
+    for (const id of Object.keys(get().drafts)) await get().flushDraft(id)
+    return Object.keys(get().drafts).length === 0
   },
 
   async flushDraft(id, options) {

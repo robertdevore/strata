@@ -1,3 +1,4 @@
+import { useDraftCloseProtection } from '../state/useDraftCloseProtection'
 import { runtimeErrorCode } from '@shared/runtimeLogging'
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -208,6 +209,7 @@ const collectDroppedMarkdownImports = async (
 }
 
 export function App() {
+  useDraftCloseProtection()
   const store = useAppStore()
   const load = useAppStore((state) => state.load)
   const [undoDelete, setUndoDelete] = useState<{ id: string; title: string } | null>(null)
@@ -472,6 +474,7 @@ export function App() {
 
   useEffect(() => {
     const unsubscribe = window.strata.onCommand((command) => {
+      if (document.body.inert) return
       void runCommand(command as UiCommand)
     })
     return unsubscribe

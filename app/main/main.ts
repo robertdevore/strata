@@ -1,3 +1,6 @@
+import { IPC_CHANNELS } from '../shared/ipc'
+import { DraftCloseGuard } from './lifecycle/draftCloseGuard'
+import { registerLifecycleHandlers } from './ipc/lifecycleHandlers'
 import { PRODUCTION_CSP } from '../shared/contentSecurityPolicy'
 import { debugRuntime, runtimeErrorCode } from '../shared/runtimeLogging'
 import { EncryptedSecretStore } from './security/secretStore'
@@ -40,6 +43,32 @@ let backup_manager: BackupManager | null = null
 let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
 let database_recovery: DatabaseRecoveryResult | null = null
+
+const draftCloseGuard = new DraftCloseGuard({
+  requestSave: (requestId) => {
+    if (!main_window || main_window.isDestroyed()) throw new Error('WINDOW_UNAVAILABLE')
+    main_window.webContents.send(IPC_CHANNELS.lifecyclePrepareClose, requestId)
+  },
+  confirmDiscard: async () => {
+    if (!main_window || main_window.isDestroyed()) return false
+    const result = await dialog.showMessageBox(main_window, {
+      type: 'warning',
+      title: 'Unsaved Drafts',
+      message: 'Some drafts have not been saved.',
+      detail: 'Keep editing to resolve conflicts or save errors, or discard the unsaved drafts and close.',
+      buttons: ['Keep Editing', 'Discard Drafts and Close'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    return result.response === 1
+  },
+  complete: (quit) => {
+    if (quit) app.quit()
+    else main_window?.close()
+  },
+  cancelled: () => main_window?.webContents.send(IPC_CHANNELS.lifecycleCloseCancelled),
+})
 
 const restore_prepared_database = async (preparation: BackupRestorePreparation): Promise<void> => {
   backup_manager?.stop()
@@ -240,7 +269,34 @@ const createWindow = () => {
     window_options.titleBarStyle = 'hiddenInset'
   }
 
+  draftCloseGuard.reset()
   main_window = new BrowserWindow(window_options)
+  const window = main_window
+  window.on('close', (event) => {
+    void draftCloseGuard.intercept(event)
+  })
+  window.on('closed', () => {
+    if (main_window === window) {
+      main_window = null
+      draftCloseGuard.reset()
+    }
+  })
+  window.webContents.on('will-prevent-unload', (event) => {
+    if (draftCloseGuard.approved) {
+      event.preventDefault()
+      return
+    }
+    const response = dialog.showMessageBoxSync(window, {
+      type: 'warning',
+      title: 'Unsaved Drafts',
+      message: 'Reloading will discard unsaved drafts.',
+      buttons: ['Keep Editing', 'Discard Drafts and Leave'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    if (response === 1) event.preventDefault()
+  })
   protectNavigation(main_window.webContents, (url) => shell.openExternal(url))
 
   createAppMenu(current_settings ?? undefined)
@@ -315,6 +371,7 @@ void app
     })
     debugRuntime('[strata-startup] backup manager ready')
 
+    registerLifecycleHandlers(draftCloseGuard)
     registerNotesHandlers(db)
     registerSettingsHandlers(db, (settings) => {
       current_settings = settings
@@ -352,7 +409,11 @@ void app
     app.quit()
   })
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (main_window && !main_window.isDestroyed()) void draftCloseGuard.intercept(event, true)
+})
+
+app.on('will-quit', () => {
   backup_manager?.stop()
   void notes_api_server?.close().catch((error) => {
     console.error('[strata-api] Failed to stop notes API server', runtimeErrorCode(error))

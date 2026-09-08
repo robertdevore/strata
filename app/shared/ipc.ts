@@ -1,4 +1,8 @@
 export const IPC_CHANNELS = {
+  lifecycleReady: 'lifecycle:ready',
+  lifecycleCloseResult: 'lifecycle:close-result',
+  lifecyclePrepareClose: 'lifecycle:prepare-close',
+  lifecycleCloseCancelled: 'lifecycle:close-cancelled',
   notesGet: 'notes:get',
   notesCreate: 'notes:create',
   notesUpdate: 'notes:update',

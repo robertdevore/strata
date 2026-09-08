@@ -3,6 +3,21 @@ import type { StrataApi } from './api'
 import { IPC_CHANNELS } from '../shared/ipc'
 
 const api: StrataApi = {
+  lifecycle: {
+    ready: () => ipcRenderer.invoke(IPC_CHANNELS.lifecycleReady),
+    finishClose: (requestId, saved) =>
+      ipcRenderer.invoke(IPC_CHANNELS.lifecycleCloseResult, { requestId, saved }),
+    onPrepareClose: (listener) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, requestId: string) => listener(requestId)
+      ipcRenderer.on(IPC_CHANNELS.lifecyclePrepareClose, wrapped)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.lifecyclePrepareClose, wrapped)
+    },
+    onCloseCancelled: (listener) => {
+      const wrapped = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.lifecycleCloseCancelled, wrapped)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.lifecycleCloseCancelled, wrapped)
+    },
+  },
   history: {
     storage: () => ipcRenderer.invoke('history:storage'),
     previewPrune: (keep) => ipcRenderer.invoke('history:prune:preview', { keep }),

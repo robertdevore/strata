@@ -23,6 +23,12 @@ export interface BackupListing {
 }
 
 export interface StrataApi {
+  lifecycle: {
+    ready: () => Promise<void>
+    finishClose: (requestId: string, saved: boolean) => Promise<boolean>
+    onPrepareClose: (listener: (requestId: string) => void) => () => void
+    onCloseCancelled: (listener: () => void) => () => void
+  }
   history: {
     storage: () => Promise<{ revisions: number; bytes: number }>
     previewPrune: (keep: number) => Promise<{ count: number; bytes: number; fingerprint: string }>

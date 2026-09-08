@@ -24,7 +24,7 @@ try {
     timeout: 30000,
   })
   expect(await application.evaluate(({ app }) => app.getPath('userData'))).toBe(directory)
-  const page = await application.firstWindow()
+  let page = await application.firstWindow()
   page.on('requestfailed', (req) => console.error('Request failed:', req.url(), req.failure()))
   page.on('pageerror', (error) => console.error('Renderer error:', error.message))
   page.on('console', (message) => {
@@ -259,6 +259,17 @@ try {
   await expect(page.getByText('Could not close this tab. Your draft is preserved.')).toBeVisible()
   await expect(page.locator('.tab-item-pinned')).toHaveCount(1)
   await expect(pinnedPane.locator('.cm-content')).toContainText('Preserved pinned draft')
+  await application.evaluate(({ app, dialog }) => {
+    globalThis.__strataClosePrompts = 0
+    dialog.showMessageBox = async () => {
+      globalThis.__strataClosePrompts++
+      return { response: 0, checkboxChecked: false }
+    }
+    app.quit()
+  })
+  await expect.poll(() => application.evaluate(() => globalThis.__strataClosePrompts)).toBe(1)
+  await expect.poll(() => page.evaluate(() => document.body.inert)).toBe(false)
+  await expect(pinnedPane.locator('.cm-content')).toContainText('Preserved pinned draft')
   await pinnedPane.getByRole('button', { name: 'Save draft as new note and reload', exact: true }).click()
   await expect(pinnedPane.getByRole('alert')).toHaveCount(0)
   await expect(pinnedPane.locator('.cm-content')).toContainText('External update')
@@ -271,6 +282,23 @@ try {
   expect((await page.evaluate((id) => window.strata.notes.get(id), recovered[0].id)).content).toContain(
     'Preserved pinned draft',
   )
+  // Close immediately after input, before the debounce can save it.
+  await activePane.locator('.cm-content[contenteditable="true"]').fill('Saved while quitting')
+  await application.close()
+  application = undefined
+  application = await _electron.launch({
+    args: [process.cwd(), '--use-fake-device-for-media-stream'],
+    env,
+    timeout: 30000,
+  })
+  const reopened = await application.firstWindow()
+  await expect
+    .poll(() => reopened.evaluate(() => Boolean(window.strata?.notes)), { timeout: 20000 })
+    .toBe(true)
+  expect((await reopened.evaluate((id) => window.strata.notes.get(id), distantId)).content).toContain(
+    'Saved while quitting',
+  )
+  page = reopened
   await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute(
     'content',
     /script-src 'self'/,
@@ -318,11 +346,20 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {
-    await application?.close()
+    if (application) {
+      // Fixture-only cleanup must not wait on a native dialog after a failed assertion.
+      await application
+        .evaluate(({ dialog }) => {
+          dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false })
+          dialog.showMessageBoxSync = () => 1
+        })
+        .catch(() => {})
+      await application.close()
+    }
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
   }
