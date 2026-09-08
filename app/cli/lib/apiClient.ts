@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { normalize_api_base_url } from './config'
 import { CliError, map_http_status_to_exit_code } from './errors'
 import { ExitCode } from '../types'
 import {
@@ -31,20 +32,6 @@ const sleep = async (milliseconds: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-const normalize_base_url = (base_url: string): string => {
-  const trimmed = base_url.trim().replace(/\/+$/, '')
-  try {
-    const parsed = new URL(trimmed)
-    return `${parsed.protocol}//${parsed.host}`
-  } catch {
-    throw new CliError({
-      message: `Invalid API base URL: ${base_url}`,
-      exitCode: ExitCode.ValidationError,
-      code: 'INVALID_BASE_URL',
-    })
-  }
-}
-
 export interface ApiClientOptions {
   baseUrl: string
   token: string | null
@@ -67,7 +54,7 @@ export class StrataApiClient {
   private readonly verbose: boolean
 
   constructor(options: ApiClientOptions) {
-    this.baseUrl = normalize_base_url(options.baseUrl)
+    this.baseUrl = normalize_api_base_url(options.baseUrl)
     this.token = options.token
     this.timeoutMs = options.timeoutMs
     this.verbose = Boolean(options.verbose)

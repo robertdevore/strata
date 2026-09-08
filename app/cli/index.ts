@@ -1,6 +1,6 @@
 import { register_protocol_commands } from './commands/protocol'
 import { Command } from 'commander'
-import { resolve_runtime_options } from './lib/config'
+import { resolve_runtime_options, resolve_error_options } from './lib/config'
 import { StrataApiClient } from './lib/apiClient'
 import { CliError, get_exit_code, print_error } from './lib/errors'
 import { ExitCode } from './types'
@@ -78,7 +78,7 @@ const run = async (): Promise<void> => {
   try {
     await program.parseAsync(process.argv)
   } catch (error) {
-    const fallback_options = resolve_runtime_options({})
+    const fallback_options = resolve_error_options(program.opts())
     const error_message = error instanceof Error ? error.message : String(error)
     if (
       error &&
@@ -120,6 +120,20 @@ const run = async (): Promise<void> => {
           exitCode: ExitCode.ValidationError,
           code: 'MISSING_ARGUMENT',
         }),
+        fallback_options,
+      )
+      process.exit(ExitCode.ValidationError)
+      return
+    }
+
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      String(error.code).startsWith('commander.')
+    ) {
+      print_error(
+        new CliError({ message: error_message, exitCode: ExitCode.ValidationError, code: 'INVALID_COMMAND' }),
         fallback_options,
       )
       process.exit(ExitCode.ValidationError)

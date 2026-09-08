@@ -81,10 +81,13 @@ export const get_exit_code = (error: unknown): ExitCode => {
   return ExitCode.GenericFailure
 }
 
-export const print_error = (error: unknown, options: CliRuntimeOptions): void => {
+export const print_error = (
+  error: unknown,
+  options: Pick<CliRuntimeOptions, 'outputMode' | 'quiet' | 'verbose'>,
+): void => {
   const payload = to_error_payload(error)
   if ('json' === options.outputMode) {
-    process.stdout.write(JSON.stringify(payload, null, 2) + '\n')
+    process.stdout.write(JSON.stringify(payload) + '\n')
     return
   }
 

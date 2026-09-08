@@ -22,7 +22,7 @@ describe('cli config resolver', () => {
     process.env.STRATA_API_BASE_URL = 'http://127.0.0.1:3939/'
     process.env.STRATA_API_TOKEN = 'secret-token'
     const options = resolve_runtime_options({})
-    expect(options.baseUrl).toBe('http://127.0.0.1:3939/')
+    expect(options.baseUrl).toBe('http://127.0.0.1:3939')
     expect(options.token).toBe('secret-token')
   })
 

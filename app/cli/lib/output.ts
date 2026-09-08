@@ -13,7 +13,7 @@ export const print_success = <TData extends Record<string, unknown>>(
       data,
     }
     if (extra.dryRun) payload.dryRun = true
-    process.stdout.write(stringify(payload) + '\n')
+    process.stdout.write(JSON.stringify(payload) + '\n')
     return
   }
 

@@ -1,5 +1,7 @@
 import { readLocalCredential, isLoopbackHost } from '../../shared/apiCredential'
 import { z } from 'zod'
+import { CliError } from './errors'
+import { ExitCode } from '../types'
 import type { CliRuntimeOptions, OutputMode } from '../types'
 
 const default_base_url = 'http://127.0.0.1:3939'
@@ -32,16 +34,53 @@ const parse_env_bool = (raw_value: string | undefined, fallback: boolean): boole
 const resolve_output_mode = (raw: { json?: boolean; pretty?: boolean; agent?: boolean }): OutputMode => {
   if (raw.json) return 'json'
   if (raw.pretty) return 'pretty'
+  if (raw.agent) return 'json'
 
   const env_mode = (process.env.STRATA_CLI_OUTPUT || '').trim().toLowerCase()
   if ('json' === env_mode) return 'json'
   if ('pretty' === env_mode) return 'pretty'
 
-  if (raw.agent || parse_env_bool(process.env.STRATA_CLI_AGENT_MODE, false)) {
+  if (parse_env_bool(process.env.STRATA_CLI_AGENT_MODE, false)) {
     return 'json'
   }
 
   return 'pretty'
+}
+
+export const resolve_error_options = (raw: {
+  json?: boolean
+  pretty?: boolean
+  agent?: boolean
+  quiet?: boolean
+  verbose?: boolean
+}) => ({
+  outputMode: resolve_output_mode(raw),
+  quiet: Boolean(raw.quiet),
+  verbose: Boolean(raw.verbose),
+})
+
+export const normalize_api_base_url = (value: string): string => {
+  try {
+    const parsed = new URL(value)
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.pathname !== '/'
+    )
+      throw new Error('Invalid API origin')
+    if (parsed.protocol === 'http:' && !isLoopbackHost(parsed.hostname)) throw new Error('HTTPS required')
+    return parsed.origin
+  } catch {
+    throw new CliError({
+      message:
+        'API base URL must be an HTTPS origin, or HTTP on loopback, without credentials, path, query or fragment.',
+      exitCode: ExitCode.ValidationError,
+      code: 'INVALID_BASE_URL',
+    })
+  }
 }
 
 export const resolve_runtime_options = (raw_input: unknown): CliRuntimeOptions => {
@@ -57,7 +96,9 @@ export const resolve_runtime_options = (raw_input: unknown): CliRuntimeOptions =
   const token_from_env = (process.env.STRATA_API_TOKEN || '').trim()
   const token_from_flag = (raw.token || '').trim()
 
-  const base_url = (raw.baseUrl || process.env.STRATA_API_BASE_URL || default_base_url).trim()
+  const base_url = normalize_api_base_url(
+    (raw.baseUrl || process.env.STRATA_API_BASE_URL || default_base_url).trim(),
+  )
 
   const token =
     token_from_flag ||
@@ -81,7 +122,7 @@ export const resolve_runtime_options = (raw_input: unknown): CliRuntimeOptions =
 export const is_local_base_url = (base_url: string): boolean => {
   try {
     const parsed = new URL(base_url)
-    return ['127.0.0.1', 'localhost'].includes(parsed.hostname)
+    return isLoopbackHost(parsed.hostname)
   } catch {
     return false
   }

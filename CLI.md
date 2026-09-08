@@ -12,7 +12,7 @@ It talks to the local HTTP API, never writes directly to SQLite, and is designed
 
 From a source checkout, run `npm pack` and install the resulting archive with `npm install -g ./strata-0.8.0.tgz`. The installed `strata` command works outside the repository. Open the desktop app, or run `strata server --user-data-dir /path/to/library` to start the separate knowledge server. Use the same library directory as the desktop when sharing a library.
 
-The API requires authentication. The CLI discovers the owner-only local credential automatically; `STRATA_API_TOKEN` or `--token` explicitly overrides it. `STRATA_API_CREDENTIAL_FILE` selects a different credential file. Prefer the environment or credential file over putting secrets in shell history. `strata config doctor` checks connectivity and authentication without requiring a source checkout.
+The API requires authentication. The CLI discovers the owner-only local credential automatically; `STRATA_API_TOKEN` or `--token` explicitly overrides it. `STRATA_API_CREDENTIAL_FILE` selects a different credential file. Prefer the environment or credential file over putting secrets in shell history. API base URLs must be HTTPS origins, or HTTP on loopback; embedded credentials, paths, queries and fragments are rejected. `strata config doctor` checks connectivity and authentication without requiring a source checkout.
 
 ## Quick Start
 
@@ -228,7 +228,7 @@ Batch supports at most 50 validated operations in one transaction. Request IDs m
 
 ## JSON Error Shape
 
-In JSON mode, CLI failures return machine-safe payloads:
+Machine success and failure responses are single-line JSON by default; `--pretty` is for human-readable output. Explicit `--json` and `--agent` also apply to validation/configuration failures. The following error example is expanded for readability:
 
 ```json
 {
