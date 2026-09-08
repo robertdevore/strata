@@ -13,6 +13,6 @@ describe('cli validators', () => {
 	})
 
 	it('supports partial update payloads', () => {
-		expect(note_update_patch_schema.parse({ starred: true }).starred).toBe(true)
+		expect(note_update_patch_schema.parse({ starred: true, expectedRevision: 1 }).starred).toBe(true)
 	})
 })

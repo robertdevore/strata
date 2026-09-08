@@ -24,6 +24,7 @@ const is_effectively_untouched_content = (content: string): boolean => {
 }
 
 /** Maximum number of in-memory drafts before evicting stale entries. */
+const deletedRevisions = new Map<string, number>()
 const savesInFlight = new Map<string, Promise<void>>()
 const NOTE_SUMMARY_LENGTH = 280
 const HYDRATED_NOTE_IDLE_MS = 2 * 60 * 1000
@@ -473,7 +474,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 			!note.archived &&
 			0 === note.tags.length
 		) {
-			if (await notesService.delete(id)) {
+			if (await notesService.delete(id, note.revision)) {
 				set((current) => {
 					const drafts = { ...current.drafts }
 					const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
@@ -530,7 +531,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 	async toggleStar(id) {
 		const current = get().notes.find((note) => note.id === id)
 		if (!current) return
-		const updated = await notesService.star(id, !current.starred)
+		const updated = await notesService.star(id, !current.starred, current.revision)
 		if (!updated) return
 		set((state) => ({
 			notes: state.notes.map((note) => (note.id === id ? updated : note)),
@@ -541,7 +542,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 	async toggleArchive(id) {
 		const current = get().notes.find((note) => note.id === id)
 		if (!current) return
-		const updated = await notesService.archive(id, !current.archived)
+		const updated = await notesService.archive(id, !current.archived, current.revision)
 		if (!updated) return
 		set((state) => ({
 			notes: state.notes.map((note) => (note.id === id ? updated : note)),
@@ -554,7 +555,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const id = get().selectedNoteId
 		if (!id) return null
 		const deleted_note = get().notes.find((note) => note.id === id) ?? null
-		if (!(await notesService.delete(id))) return null
+		if (!deleted_note || !(await notesService.delete(id, deleted_note.revision))) return null
+		deletedRevisions.clear()
+		deletedRevisions.set(id, deleted_note.revision + 1)
 		set((state) => {
 			const notes = state.notes.filter((note) => note.id !== id)
 			const drafts = { ...state.drafts }
@@ -577,7 +580,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 	},
 
 	async restoreDeletedNote(id) {
-		const restored = await notesService.restore(id)
+		const expectedRevision = deletedRevisions.get(id)
+		if (!expectedRevision) return false
+		const restored = await notesService.restore(id, expectedRevision)
+		deletedRevisions.delete(id)
 		if (!restored) return false
 		set((state) => ({
 			notes: upsert_note(state.notes.filter((note) => note.id !== restored.id), restored),

@@ -79,7 +79,7 @@ export const note_create_patch_schema = z.object({
 })
 
 export const note_update_patch_schema = z.object({
-	expectedRevision: z.number().int().positive().optional(),
+	expectedRevision: z.number().int().positive(),
 	content: z.string().trim().min(1).max(500000).optional(),
 	tags: z.array(z.string().trim().min(1).max(64)).max(100).optional(),
 	starred: z.boolean().optional(),

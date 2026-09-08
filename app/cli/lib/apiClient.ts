@@ -248,7 +248,7 @@ export class StrataApiClient {
 	}
 
 	async updateNote(note_id: string, payload: {
-		expectedRevision?: number
+		expectedRevision: number
 		content?: string
 		tags?: string[]
 		starred?: boolean
@@ -257,7 +257,7 @@ export class StrataApiClient {
 		projectName?: string
 	}): Promise<z.infer<typeof note_schema>> {
 		const response = await this.request<z.infer<typeof note_response_schema>>('PATCH', `/notes/${note_id}`, {
-			body: { ...payload, expectedRevision: payload.expectedRevision ?? (await this.getNote(note_id)).revision },
+			body: payload,
 			validate: note_response_schema,
 		})
 		return response.note

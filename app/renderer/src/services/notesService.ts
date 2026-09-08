@@ -27,17 +27,17 @@ export const notesService = {
 	update(id: string, patch: NoteUpdatePatch): Promise<Note | null> {
 		return window.strata.notes.update(id, patch)
 	},
-	delete(id: string): Promise<boolean> {
-		return window.strata.notes.delete(id)
+	delete(id: string, expectedRevision: number): Promise<boolean> {
+		return window.strata.notes.delete(id, expectedRevision)
 	},
-	restore(id: string): Promise<Note | null> {
-		return window.strata.notes.restore(id)
+	restore(id: string, expectedRevision: number): Promise<Note | null> {
+		return window.strata.notes.restore(id, expectedRevision)
 	},
-	archive(id: string, archived: boolean): Promise<Note | null> {
-		return window.strata.notes.archive(id, archived)
+	archive(id: string, archived: boolean, expectedRevision: number): Promise<Note | null> {
+		return window.strata.notes.archive(id, archived, expectedRevision)
 	},
-	star(id: string, starred: boolean): Promise<Note | null> {
-		return window.strata.notes.star(id, starred)
+	star(id: string, starred: boolean, expectedRevision: number): Promise<Note | null> {
+		return window.strata.notes.star(id, starred, expectedRevision)
 	},
 	listTags(): Promise<Array<{ name: string; count: number }>> {
 		return window.strata.tags.list()

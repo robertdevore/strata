@@ -22,6 +22,41 @@ const open = () => {
   return { db, dir, service: new KnowledgeService(db) }
 }
 describe('transactional knowledge contracts', () => {
+  it('rejects stale metadata, deletion and undo after intervening edits', () => {
+    const { db, service } = open()
+    const note = db.createNote({ content: 'original' })
+    db.updateNote(note.id, { content: 'external' })
+    for (const payload of [{ starred: true }, { archived: true }]) {
+      expect(() =>
+        service.mutate({ op: 'update_note', id: note.id, payload: { ...payload, expectedRevision: 1 } }),
+      ).toThrow('changed since')
+    }
+    expect(() => service.mutate({ op: 'delete_note', id: note.id, expectedRevision: 1 })).toThrow(
+      'changed since',
+    )
+    service.mutate({ op: 'delete_note', id: note.id, expectedRevision: 2 })
+    expect(() => service.mutate({ op: 'restore_note', id: note.id, expectedRevision: 2 })).toThrow(
+      'changed since',
+    )
+    service.mutate({ op: 'restore_note', id: note.id, expectedRevision: 3 })
+    service.mutate({ op: 'delete_note', id: note.id, expectedRevision: 4 })
+    expect(() => service.mutate({ op: 'restore_note', id: note.id, expectedRevision: 3 })).toThrow(
+      'changed since',
+    )
+    expect(db.getNote(note.id)).toBeNull()
+    const restored = service.mutate({ op: 'restore_note', id: note.id, expectedRevision: 5 })
+    expect(restored).toMatchObject({ content: 'external', revision: 6 })
+  })
+  it('notifies approval observers once after the pending proposal is resolved', () => {
+    const { db } = open()
+    const pendingCounts: number[] = []
+    const service = new KnowledgeService(db, () => pendingCounts.push(db.listProposals().length))
+    const proposal = service.propose({ op: 'create_note', payload: { content: 'approved' } })
+    expect(pendingCounts).toEqual([])
+    service.approve(proposal.id, true)
+    expect(pendingCounts).toEqual([0])
+  })
+
   it('rejects stale human/agent writes and records all meaningful mutations', () => {
     const { db, service } = open()
     const note = db.createNote({ content: '# Initial' })
@@ -102,24 +137,29 @@ describe('transactional knowledge contracts', () => {
     expect(db.getNote(first.notes[0].id)!.content.length).toBeGreaterThan(1000)
     expect(() => db.listSummaryPage({ tag: 'changed', cursor: first.nextCursor! })).toThrow('Cursor')
   })
-  it('continues substring fallback across multiple pages',()=>{
-    const {db}=open()
-    for(let i=0;i<6;i++) db.createNote({content:`# Category ${i}\ncategory42`})
-    const first=db.listSummaryPage({query:'gory42',limit:2})
-    const second=db.listSummaryPage({query:'gory42',limit:2,cursor:first.nextCursor!})
-    expect(first.notes).toHaveLength(2);expect(second.notes).toHaveLength(2)
-    expect(new Set([...first.notes,...second.notes].map(note=>note.id)).size).toBe(4)
+  it('continues substring fallback across multiple pages', () => {
+    const { db } = open()
+    for (let i = 0; i < 6; i++) db.createNote({ content: `# Category ${i}\ncategory42` })
+    const first = db.listSummaryPage({ query: 'gory42', limit: 2 })
+    const second = db.listSummaryPage({ query: 'gory42', limit: 2, cursor: first.nextCursor! })
+    expect(first.notes).toHaveLength(2)
+    expect(second.notes).toHaveLength(2)
+    expect(new Set([...first.notes, ...second.notes].map((note) => note.id)).size).toBe(4)
   })
 
-  it('refuses a future schema without modifying it',()=>{
-    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'strata-future-'))
-    const db=new StrataDatabase(dir);db.close()
-    const raw=new Database(path.join(dir,'data/strata.sqlite'))
+  it('refuses a future schema without modifying it', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-future-'))
+    const db = new StrataDatabase(dir)
+    db.close()
+    const raw = new Database(path.join(dir, 'data/strata.sqlite'))
     try {
       raw.pragma('user_version=999')
-      expect(()=>new StrataDatabase(dir)).toThrow('newer Strata')
-      expect(raw.pragma('user_version',{simple:true})).toBe(999)
-    } finally {raw.close();fs.rmSync(dir,{recursive:true,force:true})}
+      expect(() => new StrataDatabase(dir)).toThrow('newer Strata')
+      expect(raw.pragma('user_version', { simple: true })).toBe(999)
+    } finally {
+      raw.close()
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('enforces declared foreign keys and cascades', () => {

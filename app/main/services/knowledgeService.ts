@@ -38,6 +38,7 @@ export const operationSchema = z.discriminatedUnion('op', [
     clientId: z.string().max(120).optional(),
   }),
   z.object({ op: z.literal('delete_note'), id: idSchema, expectedRevision: revisionSchema }),
+  z.object({ op: z.literal('restore_note'), id: idSchema, expectedRevision: revisionSchema }),
   z.object({ op: z.literal('create_project'), name: z.string().trim().min(1).max(120) }),
   z.object({ op: z.literal('rename_project'), id: idSchema, name: z.string().trim().min(1).max(120) }),
   z.object({ op: z.literal('delete_project'), id: idSchema }),
@@ -102,6 +103,12 @@ export class KnowledgeService {
         db.assertRevision(note, operation.expectedRevision)
         return { deleted: db.deleteNote(operation.id) }
       }
+      case 'restore_note': {
+        const note = db.aiGetNoteById(operation.id, true)
+        if (!note) throw new DomainError('NOT_FOUND', 'Note not found')
+        db.assertRevision(note, operation.expectedRevision)
+        return db.restoreNote(operation.id)
+      }
       case 'create_project': {
         if (db.getProjectByName(operation.name))
           throw new DomainError('ALREADY_EXISTS', 'Project already exists')
@@ -134,7 +141,7 @@ export class KnowledgeService {
   approve(id: string, approved: boolean): unknown {
     const result = this.db.resolveProposal(idSchema.parse(id), approved, (payload) => {
       const proposal = z.object({ operation: operationSchema }).parse(payload)
-      return this.mutate(proposal.operation, { source: 'ai' })
+      return this.apply(proposal.operation)
     })
     if (approved) this.notify?.(ALL_CHANGED)
     return result

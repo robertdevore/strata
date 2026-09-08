@@ -24,10 +24,10 @@ export interface StrataApi {
 			projectName?: string
 		}) => Promise<Note>
 		update: (id: string, patch: NoteUpdatePatch) => Promise<Note | null>
-		delete: (id: string) => Promise<boolean>
-		restore: (id: string) => Promise<Note | null>
-		archive: (id: string, archived: boolean) => Promise<Note | null>
-		star: (id: string, starred: boolean) => Promise<Note | null>
+		delete: (id: string, expectedRevision: number) => Promise<boolean>
+		restore: (id: string, expectedRevision: number) => Promise<Note | null>
+		archive: (id: string, archived: boolean, expectedRevision: number) => Promise<Note | null>
+		star: (id: string, starred: boolean, expectedRevision: number) => Promise<Note | null>
 	}
 	tags: {
 		list: () => Promise<Array<{ name: string; count: number }>>

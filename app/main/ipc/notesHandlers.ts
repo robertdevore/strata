@@ -6,8 +6,9 @@ import { IPC_CHANNELS } from '../../shared/ipc'
 
 const id_schema = z.object({ id: z.string().uuid() })
 
-const archive_schema = z.object({ id: z.string().uuid(), archived: z.boolean() })
-const star_schema = z.object({ id: z.string().uuid(), starred: z.boolean() })
+const mutation_schema = id_schema.extend({ expectedRevision: z.number().int().positive() })
+const archive_schema = mutation_schema.extend({ archived: z.boolean() })
+const star_schema = mutation_schema.extend({ starred: z.boolean() })
 
 export const registerNotesHandlers = (db: StrataDatabase) => {
   const service = new KnowledgeService(db)
@@ -67,23 +68,32 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
   })
 
   ipcMain.handle(IPC_CHANNELS.notesDelete, (_event, payload) => {
-    const { id } = id_schema.parse(payload)
-    return db.deleteNote(id)
+    const { id, expectedRevision } = mutation_schema.parse(payload)
+    const result = service.mutate({ op: 'delete_note', id, expectedRevision }, { source: 'human' }) as {
+      deleted: boolean
+    }
+    return result.deleted
   })
 
   ipcMain.handle(IPC_CHANNELS.notesRestore, (_event, payload) => {
-    const { id } = id_schema.parse(payload)
-    return db.restoreNote(id)
+    const { id, expectedRevision } = mutation_schema.parse(payload)
+    return service.mutate({ op: 'restore_note', id, expectedRevision }, { source: 'restore' })
   })
 
   ipcMain.handle(IPC_CHANNELS.notesArchive, (_event, payload) => {
-    const { id, archived } = archive_schema.parse(payload)
-    return db.archiveNote(id, archived)
+    const { id, archived, expectedRevision } = archive_schema.parse(payload)
+    return service.mutate(
+      { op: 'update_note', id, payload: { archived, expectedRevision } },
+      { source: 'human' },
+    )
   })
 
   ipcMain.handle(IPC_CHANNELS.notesStar, (_event, payload) => {
-    const { id, starred } = star_schema.parse(payload)
-    return db.starNote(id, starred)
+    const { id, starred, expectedRevision } = star_schema.parse(payload)
+    return service.mutate(
+      { op: 'update_note', id, payload: { starred, expectedRevision } },
+      { source: 'human' },
+    )
   })
 
   ipcMain.handle(IPC_CHANNELS.tagsList, () => db.listTags())

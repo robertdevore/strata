@@ -414,7 +414,8 @@ export const register_notes_commands = (
 			return
 		}
 
-		const note = await client.updateNote(note_id, { archived })
+		const current = await client.getNote(note_id)
+		const note = await client.updateNote(note_id, { archived, expectedRevision: current.revision })
 		print_success(options, { note })
 	}
 
@@ -445,7 +446,8 @@ export const register_notes_commands = (
 			return
 		}
 
-		const note = await client.updateNote(note_id, { starred })
+		const current = await client.getNote(note_id)
+		const note = await client.updateNote(note_id, { starred, expectedRevision: current.revision })
 		print_success(options, { note })
 	}
 
