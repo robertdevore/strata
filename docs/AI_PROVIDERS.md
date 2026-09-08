@@ -21,7 +21,7 @@ This is the original Strata AI backend. It uses the OpenAI Responses API with fu
 - **Role**: Cheap provider
 - **API key**: Set in Settings → `DeepSeek API Key`
 
-DeepSeek V4 Flash is the first cheap provider. It uses the standard Chat Completions API. Recommended for simple note creation, tagging, and search.
+DeepSeek V4 Flash is the first cheap provider. It uses the standard Chat Completions API. The configured cheap route uses it for simple note creation, tagging, and search.
 
 ### DeepSeek V4 Pro
 - **Preset ID**: `deepseek-pro`
@@ -76,11 +76,11 @@ app/main/ai/
   routing.ts                  — Intent-based routing engine
   aiRunner.ts                 — Orchestrator (route → provider → tool loop)
   providers/
-    OpenAiResponsesProvider.ts    — OpenAI /v1/responses
-    ChatCompletionsProvider.ts    — Generic /chat/completions
+    openaiResponsesProvider.ts    — OpenAI /v1/responses
+    chatCompletionsProvider.ts    — Generic /chat/completions
     providerRegistry.ts           — Preset definitions & factory
   evals/
-    routing-examples.json         — 50+ routing eval examples
+    routing-examples.json         — 50 routing eval examples
 ```
 
 ## Normalized Interface
@@ -100,7 +100,7 @@ The AI runner never knows which provider it's talking to — it just calls `send
 ## API Keys
 
 API keys can be set:
-1. In Settings (persisted to SQLite)
+1. In Settings (encrypted with OS-backed Electron safeStorage; SQLite stores only credential-presence markers)
 2. Via environment variable `STRATA_OPENAI_API_KEY` (OpenAI only, takes precedence)
 
 Keys for other providers must be set in Settings.

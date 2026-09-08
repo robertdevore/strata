@@ -1,3 +1,5 @@
+> Historical result for the earlier lexical retrieval task, not a verdict on the full hardening upgrade. Current retrieval uses FTS5 with deterministic fallback. See [the active requirement ledger](../docs/hardening/requirements.md) for current scope and verification.
+
 # Loop Engineering Summary
 
 ## Verdict

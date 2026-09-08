@@ -9,7 +9,7 @@ Strata includes an intent-based routing system that automatically chooses betwee
 | `premium_only` | Always use the premium provider (e.g., GPT-4o) |
 | `cheap_only` | Always use the cheap provider (e.g., DeepSeek Flash) |
 | `auto` | Automatically route based on intent and risk |
-| `ask_each_time` | Prompt user to choose provider per message |
+| `ask_each_time` | Legacy setting; the current implementation does not present a per-message chooser. This remains under audit. |
 
 ## How Routing Works
 
@@ -17,7 +17,7 @@ Strata includes an intent-based routing system that automatically chooses betwee
 2. **Intent classification**: Keyphrase-based matching against the user's message
 3. **Risk assessment**: Low/medium/high based on intent type
 4. **Provider selection**: Cheap for low-risk simple tasks, premium for complex/risky tasks
-5. **Fallback**: On cheap provider failure, automatically retry with premium
+5. **Fallback**: In `auto`, a cheap-provider failure can continue on premium using the same tool loop and execution state. Forced models, cheap-only policy and cancellation do not escalate.
 
 ## Intent Categories
 
@@ -50,7 +50,7 @@ When enabled, every routing decision is logged to `ai_route_logs`:
 SELECT * FROM ai_route_logs ORDER BY created_at DESC LIMIT 10;
 ```
 
-Logs include: intent, route, confidence, risk, provider used, fallback info, and token usage.
+Logs include intent, route, confidence, risk, provider used, fallback metadata, and token usage. They are opt-in, exclude note/chat/prompt bodies, support 7-day/30-day/forever retention, and can be cleared in Settings. Do not access the live database directly for agent memory workflows.
 
 ## Chat UI
 
@@ -64,12 +64,12 @@ Or on fallback:
 
 ## Safety Model
 
-1. **Delete/Destroy is blocked** — AI cannot delete notes
-2. **Update requires explicit request** — AI won't modify notes unless asked
-3. **Confirmation required** for medium-risk updates and high-risk operations
+1. **No note-deletion tool** is exposed. Heuristic routing can also flag destructive language; fixed route modes bypass that classification.
+2. **Runtime validation** requires valid tool arguments and the original note revision. Do not treat intent classification as a security boundary.
+3. **Confirmation enforcement** comes from AI Edit Mode. Router risk/confirmation metadata is advisory and does not grant or revoke mutation permissions.
 4. **AI Edit Mode** setting (read_only/confirm/auto_apply) gates all note modifications
-5. **Fallback on failure** — cheap provider failure always retries with premium
+5. **Fallback policy** — only automatic routing can escalate a failed cheap request; permissions and cumulative tool limits remain in force.
 
 ## Eval Set
 
-`app/main/ai/evals/routing-examples.json` contains 50+ routing examples for testing and validation. Each example includes expected intent, route, risk, and confirmation requirement.
+`app/main/ai/evals/routing-examples.json` contains 50 routing examples for testing and validation. Each example includes expected intent, route, risk, and confirmation requirement.
