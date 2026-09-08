@@ -59,7 +59,7 @@ This is a working gap ledger, not a completion verdict. â€œScoped tests passedâ€
 | 52 | Consider MCP After Core Contracts Stabilize | Considered; optional deferred | MCP is not required to stabilize the core and is intentionally not added; future adapter must use shared services. |
 | 53 | Formalize the Domain Service Layer | Partial | Shared KnowledgeService handles principal writes/proposals/batch/import. Remaining legacy transports and invalidation need consolidation. |
 | 54 | Keep Documentation Agent-Safe | Partial | AGENTS.md/current CLI/README/checkpoints updated. Historical docs and final architecture/contract sweep still needed. |
-| 55 | Consolidate Verification | Implemented; scoped tests passed | npm run verify covers formatting/lint/offline TS+TSX tests/build; heavy CLI/Electron package commands separate. Desktop e2e command still missing. |
+| 55 | Consolidate Verification | Implemented; scoped tests passed | npm run verify covers formatting/lint/offline TS+TSX tests/build; heavy CLI/Electron package commands separate. desktop:verify covers real autosave/history restore/reload/sandbox in an isolated Electron library; broader scenarios remain. |
 | 56 | Add/Improve CI | Partial | Pinned read-only Linux/macOS Actions workflow includes audit and package smoke. Not pushed/executed remotely yet. |
 | 57 | Dependency and Supply-Chain Review | Partial | Compatible dependency patches and zero-vulnerability audit recorded. Final audit/override rationale and release dependency review outstanding. |
 | 58 | Packaging and Release UX | Partial | Tracked release icons; unsigned macOS directory/bundled native SQLite smoke passed. Installers/platform coverage/signing docs/update policy remain. |

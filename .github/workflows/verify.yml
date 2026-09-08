@@ -31,3 +31,6 @@ jobs:
       - name: Verify unsigned macOS Electron directory and native runtime
         if: matrix.os == 'macos-latest'
         run: npm run package:electron:verify
+      - name: Verify isolated desktop interactions
+        if: matrix.os == 'macos-latest'
+        run: node scripts/desktop-verify.mjs
