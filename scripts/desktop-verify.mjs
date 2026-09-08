@@ -76,7 +76,7 @@ try {
       expectedRevision: original.revision,
     })
     const distant = await window.strata.notes.create({
-      content: '# Distant lookup target\n\nRetrieved beyond sidebar page.',
+      content: '# Distant lookup target\n\nRetrieved beyond sidebar page.\n\n[[Desktop verification]]',
       tags: ['navigation-fixture'],
     })
     for (let index = 0; index < 105; index++) {
@@ -97,14 +97,25 @@ try {
   expect(await page.evaluate((id) => window.strata.notes.get(id).then((note) => note.id), distantId)).toBe(
     distantId,
   )
-  await page.getByRole('button', { name: 'Open note actions', exact: true }).click()
-  await page.getByTitle('Related Notes', { exact: true }).click()
-  await page.locator('.related-notes-modal').getByText('Desktop verification', { exact: true }).click()
+  let unexpectedCreatePrompt = false
+  page.on('dialog', async (dialog) => {
+    unexpectedCreatePrompt = true
+    await dialog.dismiss()
+  })
+  await page.getByTitle('Preview', { exact: true }).click()
+  await page.getByRole('link', { name: 'Desktop verification', exact: true }).click()
   await expect(page.locator('.cm-content').first()).toContainText('Persisted through the real editor', {
     timeout: 20000,
   })
+  expect(unexpectedCreatePrompt).toBe(false)
+  await page.getByRole('button', { name: 'Open note actions', exact: true }).click()
+  await page.getByTitle('Related Notes', { exact: true }).click()
+  await page.locator('.related-notes-modal').getByText('Distant lookup target', { exact: true }).click()
+  await expect(page.locator('.cm-content').first()).toContainText('Retrieved beyond sidebar page.', {
+    timeout: 20000,
+  })
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/related navigation beyond 100 notes.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes.',
   )
 } finally {
   try {

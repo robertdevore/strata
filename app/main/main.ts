@@ -314,7 +314,7 @@ void app
     registerExportHandlers()
     registerAiHandlers(db, () => main_window?.webContents.send('notes:changed'))
     registerBackupHandlers(backup_manager, restore_prepared_database)
-    registerLinksHandlers(db)
+    registerLinksHandlers(db, () => main_window?.webContents.send('notes:changed'))
     registerPublishHandlers()
     registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
     backup_manager.start()

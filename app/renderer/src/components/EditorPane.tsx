@@ -17,6 +17,7 @@ import {
   formatRelativeTime,
 } from '@renderer/src/domain/noteUtils'
 import { markdown_from_clipboard } from '@renderer/src/domain/markdownPaste'
+import { openWikiLink } from '../services/wikiNavigation'
 import { aiService } from '@renderer/src/services/aiService'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import { TagsEditor } from './TagsEditor'
@@ -1639,39 +1640,14 @@ export function EditorPane(props: EditorPaneProps) {
 
   // Handle clicks on wiki links in the preview panel
   const handleWikiLinkClick = async (href: string, new_tab = false) => {
-    // Support both #strata-note: and strata-note:// formats
-    const raw = href.startsWith('#strata-note:')
-      ? href.slice('#strata-note:'.length)
-      : href.startsWith('strata-note://')
-        ? href.slice('strata-note://'.length)
-        : ''
-    if (!raw) return false
-    const [target] = raw.split('#')
-    const raw_target = decodeURIComponent(target)
-    // Resolve and open; heading anchors are not yet implemented
-
-    // Resolve target on the renderer side using available notes
-    const normalized = raw_target.trim().toLowerCase().replace(/\s+/g, ' ')
-    const resolved = notes.find((candidate) => {
-      const title = deriveNoteTitle(candidate.content)
-      return title.trim().toLowerCase().replace(/\s+/g, ' ') === normalized
-    })
-
-    if (resolved) {
-      await onOpenNoteFromChat(resolved.id, new_tab)
-    } else {
-      const create = window.confirm(`Note "${raw_target}" does not exist. Create it?`)
-      if (create) {
-        try {
-          const newNote = await window.strata.notes.create()
-          await window.strata.notes.update(newNote.id, { content: `# ${raw_target}\n\n` })
-          await onOpenNoteFromChat(newNote.id, new_tab)
-        } catch {
-          // Silently fail — note creation may not be available
-        }
-      }
+    try {
+      return await openWikiLink(href, new_tab, onOpenNoteFromChat)
+    } catch {
+      useAppStore.setState({
+        navigationError: 'Could not open this wiki link. Your current draft is preserved.',
+      })
+      return true
     }
-    return true
   }
 
   // Preview content with wiki links converted

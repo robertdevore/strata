@@ -109,6 +109,25 @@ export class KnowledgeService {
     this.db = db
     this.notify = notify
   }
+  createMissingLinkedNote(input: unknown) {
+    const title = z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .regex(/^[^\r\n]+$/)
+      .parse(input)
+    let created = false
+    const note = this.db.transaction(() => {
+      const existing = this.db.resolveLinkTarget(title)
+      if (existing) return existing
+      created = true
+      return this.db.createNote({ content: `# ${title}\n\n` })
+    }, 'human')
+    if (created) this.notify?.(ALL_CHANGED)
+    return note
+  }
+
   private apply(operation: Operation): unknown {
     const db = this.db
     switch (operation.op) {
