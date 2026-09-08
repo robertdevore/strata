@@ -5,6 +5,7 @@ import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import type { Settings } from '../../shared/types'
 import { probeDatabase } from '../db/recovery'
+import { StrataDatabase } from '../db'
 
 const frequency_to_ms: Record<Settings['autoBackupFrequency'], number> = {
   off: 0,
@@ -57,34 +58,12 @@ const collect_db_files = (db_file_path: string): string[] => {
   return files
 }
 
-const unique_directory = (parent_directory: string, prefix: string): string => {
-  let candidate = path.join(parent_directory, prefix)
-  let suffix = 1
-  while (fs.existsSync(candidate)) {
-    candidate = path.join(parent_directory, `${prefix}-${suffix}`)
-    suffix += 1
-  }
-  return candidate
-}
-
 const resolve_database_path = (source_path: string): string => {
   const resolved_path = path.resolve(source_path)
   if (fs.existsSync(resolved_path) && fs.statSync(resolved_path).isDirectory()) {
     return path.join(resolved_path, 'strata.sqlite')
   }
   return resolved_path
-}
-
-const copy_database_bundle = async (source_path: string, destination_directory: string): Promise<void> => {
-  const source_database_path = resolve_database_path(source_path)
-  if (!fs.existsSync(source_database_path) || !fs.statSync(source_database_path).isFile()) {
-    throw new Error('The selected backup does not contain a strata.sqlite database file.')
-  }
-
-  ensure_dir(destination_directory)
-  for (const source_file of collect_db_files(source_database_path)) {
-    await fsPromises.copyFile(source_file, path.join(destination_directory, path.basename(source_file)))
-  }
 }
 
 export class BackupManager {
@@ -240,56 +219,74 @@ export class BackupManager {
       throw new Error('The selected backup does not contain a strata.sqlite database file.')
     }
 
-    await this.createBackupNow('pre-restore')
-    const staging_directory = unique_directory(this.backup_dir, `imported-${format_stamp(new Date())}`)
-    await copy_database_bundle(source_database_path, staging_directory)
+    const staging_directory = await fsPromises.mkdtemp(path.join(this.backup_dir, 'imported-'))
+    await fsPromises.chmod(staging_directory, 0o700)
+    const staging_data = path.join(staging_directory, 'data')
+    await fsPromises.mkdir(staging_data, { mode: 0o700 })
     const staged_database_path = path.join(staging_directory, 'strata.sqlite')
-    const probe_error = await probeDatabase(staged_database_path)
-    if (probe_error) {
-      throw new Error(`The selected backup failed SQLite validation: ${probe_error.message}`)
-    }
-
-    return {
-      sourcePath: source_database_path,
-      stagingDirectory: staging_directory,
+    try {
+      // SQLite's online backup captures committed WAL state consistently, regardless of filename.
+      const source = new Database(source_database_path, { readonly: true, fileMustExist: true })
+      try {
+        source
+          .prepare(
+            'SELECT id, content, created_at, updated_at, starred, archived, tags, deleted_at FROM notes LIMIT 0',
+          )
+          .all()
+        source.prepare('SELECT key, value FROM settings LIMIT 0').all()
+        await source.backup(path.join(staging_data, 'strata.sqlite'))
+      } finally {
+        source.close()
+      }
+      const probe_error = await probeDatabase(path.join(staging_data, 'strata.sqlite'))
+      if (probe_error) throw new Error('The selected backup failed SQLite validation.')
+      // Validate/migrate only the copy. The resulting restore file also excludes legacy secrets.
+      const staged = new StrataDatabase(staging_directory)
+      try {
+        await staged.backupTo(staged_database_path)
+      } finally {
+        staged.close()
+      }
+      await fsPromises.chmod(staged_database_path, 0o600)
+      await fsPromises.rm(staging_data, { recursive: true, force: true })
+      await this.createBackupNow('pre-restore')
+      return { sourcePath: source_database_path, stagingDirectory: staging_directory }
+    } catch (error) {
+      await fsPromises.rm(staging_directory, { recursive: true, force: true })
+      throw error
     }
   }
 
+  /** Caller must close all library writers before installing the prepared snapshot. */
   commitRestore(preparation: BackupRestorePreparation): string {
     const data_directory = path.dirname(this.db_file_path)
-    const preserved_directory = unique_directory(
-      data_directory,
-      `pre-restore-current-${format_stamp(new Date())}`,
-    )
-    ensure_dir(preserved_directory)
-
-    for (const current_file of collect_db_files(this.db_file_path)) {
-      if (fs.existsSync(current_file)) {
-        fs.renameSync(current_file, path.join(preserved_directory, path.basename(current_file)))
-      }
-    }
-
+    const staged_file = path.join(preparation.stagingDirectory, 'strata.sqlite')
+    const preserved_directory = fs.mkdtempSync(path.join(data_directory, 'pre-restore-current-'))
+    fs.chmodSync(preserved_directory, 0o700)
+    const installation_file = path.join(preserved_directory, 'replacement.sqlite')
+    const originals = collect_db_files(this.db_file_path).filter((file) => fs.existsSync(file))
+    let replacing = false
     try {
-      for (const staged_file of collect_db_files(path.join(preparation.stagingDirectory, 'strata.sqlite'))) {
-        if (fs.existsSync(staged_file)) {
-          fs.copyFileSync(staged_file, path.join(data_directory, path.basename(staged_file)))
-        }
+      // Finish every fallible copy before touching the current library.
+      fs.copyFileSync(staged_file, installation_file, fs.constants.COPYFILE_EXCL)
+      fs.chmodSync(installation_file, 0o600)
+      for (const original of originals) {
+        const preserved = path.join(preserved_directory, path.basename(original))
+        fs.copyFileSync(original, preserved, fs.constants.COPYFILE_EXCL)
+        fs.chmodSync(preserved, 0o600)
       }
+      replacing = true
+      for (const sidecar of [`${this.db_file_path}-wal`, `${this.db_file_path}-shm`])
+        fs.rmSync(sidecar, { force: true })
+      fs.renameSync(installation_file, this.db_file_path)
     } catch (error) {
-      for (const current_file of collect_db_files(this.db_file_path)) {
-        if (fs.existsSync(current_file))
-          fs.renameSync(
-            current_file,
-            path.join(data_directory, `failed-restore-${path.basename(current_file)}`),
-          )
-      }
-      for (const preserved_file of collect_db_files(path.join(preserved_directory, 'strata.sqlite'))) {
-        if (fs.existsSync(preserved_file))
-          fs.renameSync(preserved_file, path.join(data_directory, path.basename(preserved_file)))
+      if (replacing) {
+        // Keep the recovery copies even if rollback itself fails (for example, a full disk).
+        for (const original of originals)
+          fs.copyFileSync(path.join(preserved_directory, path.basename(original)), original)
       }
       throw error
     }
-
     return preserved_directory
   }
 
