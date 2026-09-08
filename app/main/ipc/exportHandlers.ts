@@ -1,20 +1,12 @@
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { protectNavigation } from '../security/navigation'
+import { exportDocumentSchema, exportDocumentUrl } from '../security/exportDocument'
 import { BrowserWindow } from 'electron'
-import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/ipc'
-
-const export_pdf_schema = z.object({
-  html: z.string().min(1),
-})
-
-const print_html_schema = z.object({
-  html: z.string().min(1),
-})
 
 export const registerExportHandlers = () => {
   handleTrustedIpc(IPC_CHANNELS.exportPdf, async (_event, payload) => {
-    const { html } = export_pdf_schema.parse(payload)
+    const { html } = exportDocumentSchema.parse(payload)
 
     const export_window = new BrowserWindow({
       show: false,
@@ -30,7 +22,7 @@ export const registerExportHandlers = () => {
 
     protectNavigation(export_window.webContents)
     try {
-      await export_window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      await export_window.loadURL(exportDocumentUrl(html))
 
       const pdf_data = await export_window.webContents.printToPDF({
         printBackground: true,
@@ -51,7 +43,7 @@ export const registerExportHandlers = () => {
   })
 
   handleTrustedIpc(IPC_CHANNELS.printHtml, async (event, payload) => {
-    const { html } = print_html_schema.parse(payload)
+    const { html } = exportDocumentSchema.parse(payload)
 
     const parent_window = BrowserWindow.fromWebContents(event.sender)
     const print_window = new BrowserWindow({
@@ -70,7 +62,7 @@ export const registerExportHandlers = () => {
 
     protectNavigation(print_window.webContents)
     try {
-      await print_window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      await print_window.loadURL(exportDocumentUrl(html))
 
       const print_result = await new Promise<boolean>((resolve, reject) => {
         print_window.webContents.print(

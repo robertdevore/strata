@@ -31,6 +31,38 @@ try {
     if (message.type() === 'error') console.error(message.text())
   })
   await expect(page.getByRole('button', { name: 'New Note', exact: true })).toBeVisible()
+  await application.evaluate(({ app, session }) => {
+    globalThis.__strataExportNetworkAttempts = 0
+    globalThis.__strataExportPolicyEmbedded = false
+    app.once('browser-window-created', (_event, window) => {
+      window.webContents.once('did-finish-load', () => {
+        const html = decodeURIComponent(window.webContents.getURL().split(',')[1] ?? '')
+        globalThis.__strataExportPolicyEmbedded = html.startsWith(
+          '<!doctype html><meta http-equiv="Content-Security-Policy"',
+        )
+      })
+    })
+    session.defaultSession.webRequest.onBeforeRequest(
+      { urls: ['http://127.0.0.1:32199/strata-export-test*'] },
+      (_details, callback) => {
+        globalThis.__strataExportNetworkAttempts++
+        callback({ cancel: true })
+      },
+    )
+  })
+  try {
+    const prefix = await page.evaluate(async () => {
+      const pdf = await window.strata.exports.pdf({
+        html: '<html><head><meta http-equiv="Content-Security-Policy" content="default-src *"></head><body><h1>Isolated export</h1><img src="http://127.0.0.1:32199/strata-export-test-image"><style>body { background-image: url(http://127.0.0.1:32199/strata-export-test-css); }</style></body></html>',
+      })
+      return Array.from(pdf.slice(0, 5))
+    })
+    expect(prefix).toEqual([37, 80, 68, 70, 45]) // %PDF-
+    expect(await application.evaluate(() => globalThis.__strataExportPolicyEmbedded)).toBe(true)
+    expect(await application.evaluate(() => globalThis.__strataExportNetworkAttempts)).toBe(0)
+  } finally {
+    await application.evaluate(({ session }) => session.defaultSession.webRequest.onBeforeRequest(null))
+  }
   expect(
     await application.evaluate(async ({ BrowserWindow }, preload) => {
       const auxiliary = new BrowserWindow({
@@ -270,7 +302,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, explicit ambiguous-link choice, sanitized renderer failures, and independent split-pane conflicts, enforced CSP, and blocked renderer navigation/popups.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {
