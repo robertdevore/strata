@@ -343,10 +343,12 @@ export function ChatPanel(props: ChatPanelProps) {
     )
   }, [modelCatalog, modelSearch])
   const display_model_label = useMemo(() => {
-    if (null === optimisticModel) return threadModel || 'Auto'
-    if (!optimisticModel) return 'Auto'
-    const match = modelCatalog.find((entry) => entry.model === optimisticModel)
-    return match ? `${match.providerLabel} — ${match.model}` : optimisticModel
+    const selected = optimisticModel ?? threadModel
+    if (!selected) return 'Auto'
+    const match = modelCatalog.find(
+      (entry) => `${entry.providerId}::${entry.model}` === selected || entry.model === selected,
+    )
+    return match ? `${match.providerLabel} — ${match.model}` : selected
   }, [modelCatalog, optimisticModel, threadModel])
   const wiki_draft_context = useMemo(
     () => get_wiki_draft_context(draft, composeCursor),
@@ -1152,8 +1154,8 @@ export function ChatPanel(props: ChatPanelProps) {
                       if (0 === filtered_models.length) return
                       const option = filtered_models[modelMenuActiveIndex]
                       if (option) {
-                        setOptimisticModel(option.model)
-                        onSetThreadModel(option.model)
+                        setOptimisticModel(`${option.providerId}::${option.model}`)
+                        onSetThreadModel(`${option.providerId}::${option.model}`)
                         setModelMenuOpen(false)
                       }
                       return
@@ -1181,14 +1183,14 @@ export function ChatPanel(props: ChatPanelProps) {
                   <button
                     key={`${entry.providerId}:${entry.model}`}
                     type="button"
-                    className={`chat-model-option ${entry.model === optimisticModel ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
+                    className={`chat-model-option ${`${entry.providerId}::${entry.model}` === optimisticModel ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
                     onClick={() => {
-                      setOptimisticModel(entry.model)
-                      onSetThreadModel(entry.model)
+                      setOptimisticModel(`${entry.providerId}::${entry.model}`)
+                      onSetThreadModel(`${entry.providerId}::${entry.model}`)
                       setModelMenuOpen(false)
                     }}
                     role="option"
-                    aria-selected={entry.model === optimisticModel}
+                    aria-selected={`${entry.providerId}::${entry.model}` === optimisticModel}
                   >
                     <span className="chat-model-option-provider">{entry.providerLabel}</span>
                     <span className="chat-model-option-model">{entry.model}</span>

@@ -12,7 +12,7 @@ const rename_thread_schema = z.object({
   threadId: z.string().uuid(),
   title: z.string().trim().min(1).max(120),
 })
-const set_thread_model_schema = z.object({ threadId: z.string().uuid(), model: z.string().trim().max(120) })
+const set_thread_model_schema = z.object({ threadId: z.string().uuid(), model: z.string().trim().max(240) })
 const search_schema = z.object({
   query: z.string().trim().min(1).max(200),
   limit: z.number().int().min(1).max(100).optional(),
@@ -93,13 +93,6 @@ const build_open_notes_context = (
   )
 }
 
-const resolve_chat_model = (db: StrataDatabase): string => {
-  const ai_settings = db.getSettings()
-  const mode = ai_settings.aiRoutingMode
-  if ('cheap_only' === mode) return ai_settings.aiCheapModel || 'deepseek-v4-flash'
-  return ai_settings.openAiModel || ai_settings.aiPremiumModel || 'gpt-4o'
-}
-
 export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => void) => {
   ipcMain.handle('ai:proposals:list', () => db.listProposals())
   ipcMain.handle('ai:proposals:resolve', (_event, payload) => {
@@ -138,13 +131,12 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
   ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
     const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
     const { threadId, message, openNotes } = send_schema.parse(payload)
-    const configured_model = resolve_chat_model(db)
     const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
     if (!thread) {
       throw new Error('Chat thread was not found.')
     }
-    // Respect user-chosen model; only default to configured when thread model is empty (Auto)
-    const effective_model = thread.model?.trim() || configured_model
+    // An empty thread model leaves provider selection to the configured router.
+    const effective_model = thread.model?.trim() || undefined
 
     db.createAiMessage(thread.id, 'user', message)
     const ai_turn = await run_ai_turn(db, thread, {

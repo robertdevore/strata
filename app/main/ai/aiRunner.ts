@@ -7,7 +7,7 @@ import type { AiProvider, AiRouteLog, AiRoutingMode, AiSettings } from './types'
 import { AI_TOOLS, execute_tool_call } from './tools'
 import { route_ai_request } from './routing'
 import type { RouterConfig } from './routing'
-import { create_provider } from './providers/providerRegistry'
+import { create_provider, resolve_model_selection, get_preset_by_id } from './providers/providerRegistry'
 import { budgetHistory, runProviderToolLoop } from './toolLoop'
 
 // ---- System Prompt ----
@@ -218,71 +218,24 @@ const resolve_provider_for_forced_model = (
   forced_model: string,
 ): { provider: AiProvider; model: string; provider_id: string; route_target: 'cheap' | 'premium' } => {
   const ai_settings = resolve_ai_settings(db)
-  const normalized_model = forced_model.trim().toLowerCase()
-
-  if (!normalized_model) {
-    return {
-      ...resolve_provider_for_route(db, 'premium'),
-      route_target: 'premium',
-    }
-  }
-
-  if (normalized_model === ai_settings.aiCheapModel.trim().toLowerCase()) {
-    const resolved = resolve_provider_for_route(db, 'cheap')
-    return {
-      provider: resolved.provider,
-      model: forced_model,
-      provider_id: resolved.provider_id,
-      route_target: 'cheap',
-    }
-  }
-
-  if (
-    normalized_model === ai_settings.aiPremiumModel.trim().toLowerCase() ||
-    normalized_model === ai_settings.openAiModel.trim().toLowerCase()
-  ) {
-    const resolved = resolve_provider_for_route(db, 'premium')
-    return {
-      provider: resolved.provider,
-      model: forced_model,
-      provider_id: resolved.provider_id,
-      route_target: 'premium',
-    }
-  }
-
-  if (/deepseek/i.test(forced_model)) {
-    const provider = create_provider({
-      presetId: 'deepseek-flash',
-      model: forced_model,
-      apiKeys: build_api_keys_map(ai_settings),
-      customBaseUrl: ai_settings.aiCustomBaseUrl,
-    })
-    return { provider, model: forced_model, provider_id: 'deepseek-flash', route_target: 'cheap' }
-  }
-
-  if (/kimi|moonshot/i.test(forced_model)) {
-    const provider = create_provider({
-      presetId: 'kimi',
-      model: forced_model,
-      apiKeys: build_api_keys_map(ai_settings),
-      customBaseUrl: ai_settings.aiCustomBaseUrl,
-    })
-    return { provider, model: forced_model, provider_id: 'kimi', route_target: 'cheap' }
-  }
-
-  const premium_resolved = resolve_provider_for_route(db, 'premium')
+  const selection = resolve_model_selection(ai_settings, forced_model)
+  const preset = get_preset_by_id(selection.providerId)!
   const provider = create_provider({
-    presetId: premium_resolved.provider_id,
-    model: forced_model,
+    presetId: selection.providerId,
+    model: selection.model,
     apiKeys: build_api_keys_map(ai_settings),
     customBaseUrl: ai_settings.aiCustomBaseUrl,
   })
-
   return {
     provider,
-    model: forced_model,
-    provider_id: premium_resolved.provider_id,
-    route_target: 'premium',
+    model: selection.model,
+    provider_id: selection.providerId,
+    route_target:
+      selection.providerId === ai_settings.aiCheapProvider
+        ? 'cheap'
+        : preset.role === 'cheap'
+          ? 'cheap'
+          : 'premium',
   }
 }
 
@@ -339,12 +292,14 @@ export const run_ai_turn = async (
 
   // 2. Resolve provider
   let effective_route_target: 'cheap' | 'premium' = 'cheap' === decision.route ? 'cheap' : 'premium'
-  let provider_resolution: ResolvedProvider = resolve_provider_for_route(db, effective_route_target)
-  if (options?.forcedModel && options.forcedModel.trim()) {
-    provider_resolution = resolve_provider_for_forced_model(db, options.forcedModel)
+  const forcedModel = options?.forcedModel?.trim()
+  const provider_resolution: ResolvedProvider = forcedModel
+    ? resolve_provider_for_forced_model(db, forcedModel)
+    : resolve_provider_for_route(db, effective_route_target)
+  if (forcedModel) {
     effective_route_target = provider_resolution.route_target || effective_route_target
     route_log.route = effective_route_target
-    route_log.reason = `Thread model locked to ${options.forcedModel}. ${decision.reason}`
+    route_log.reason = `Thread model locked to ${forcedModel}. ${decision.reason}`
   }
 
   let { provider, model, provider_id } = provider_resolution

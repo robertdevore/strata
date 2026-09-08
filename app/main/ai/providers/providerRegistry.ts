@@ -101,11 +101,13 @@ let catalogCacheResult: ModelCatalogEntry[] | null = null
 /** Build the available model list from user-configured per-provider models, falling back to preset defaults. */
 export const build_model_catalog = (ai_settings: {
   aiCheapModel: string
+  aiCheapProvider?: string
+  aiPremiumProvider?: string
   aiPremiumModel: string
   openAiModel: string
   aiModelCatalog?: string
 }): ModelCatalogEntry[] => {
-  const cacheKey = `${ai_settings.aiCheapModel}|${ai_settings.aiPremiumModel}|${ai_settings.openAiModel}|${ai_settings.aiModelCatalog ?? ''}`
+  const cacheKey = `${ai_settings.aiCheapProvider}|${ai_settings.aiPremiumProvider}|${ai_settings.aiCheapModel}|${ai_settings.aiPremiumModel}|${ai_settings.openAiModel}|${ai_settings.aiModelCatalog ?? ''}`
   if (cacheKey === catalogCacheKey && catalogCacheResult) return catalogCacheResult
 
   const seen = new Set<string>()
@@ -166,10 +168,11 @@ export const build_model_catalog = (ai_settings: {
   }
 
   ensure_model('openai', 'OpenAI', ai_settings.openAiModel)
-  ensure_model('openai', 'OpenAI', ai_settings.aiPremiumModel)
+  const premium = get_preset_by_id(ai_settings.aiPremiumProvider ?? 'openai')
+  if (premium?.enabled) ensure_model(premium.id, premium.label, ai_settings.aiPremiumModel)
 
-  const cheap_preset = get_preset_by_id('deepseek-flash')
-  ensure_model('deepseek-flash', cheap_preset?.label || 'DeepSeek Flash', ai_settings.aiCheapModel)
+  const cheap_preset = get_preset_by_id(ai_settings.aiCheapProvider ?? 'deepseek-flash')
+  if (cheap_preset?.enabled) ensure_model(cheap_preset.id, cheap_preset.label, ai_settings.aiCheapModel)
 
   catalogCacheKey = cacheKey
   catalogCacheResult = catalog
@@ -227,4 +230,24 @@ export const create_provider = (input: ProviderFactoryInput): AiProvider => {
   }
 
   return new ChatCompletionsProvider(api_key, base_url, preset.id)
+}
+
+/** Resolve exact catalog identities; never infer a provider from a model substring. */
+export const resolve_model_selection = (
+  settings: Parameters<typeof build_model_catalog>[0],
+  selection: string,
+): ModelCatalogEntry => {
+  const value = selection.trim()
+  const catalog = build_model_catalog(settings)
+  const qualified = value.includes('::')
+  const matches = catalog.filter((entry) =>
+    qualified ? `${entry.providerId}::${entry.model}` === value : entry.model === value,
+  )
+  if (matches.length !== 1)
+    throw new Error(
+      matches.length
+        ? 'Model is available from multiple providers. Select a provider-qualified model.'
+        : 'Model is not in the configured catalog. Add it in Settings before selecting it.',
+    )
+  return matches[0]
 }
