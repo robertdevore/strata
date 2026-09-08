@@ -13,7 +13,7 @@ export const projectsService = {
 	delete(id: string): Promise<boolean> {
 		return window.strata.projects.delete(id)
 	},
-	importFolder(payload: { projectName: string; filePaths: string[] }): Promise<{ project: Project; notes: Note[]; count: number }> {
+	importFolder(payload: { projectName: string; files: Array<{ name: string; content: string }> }): Promise<{ project: Project; notes: Note[]; count: number }> {
 		return window.strata.projects.importFolder(payload)
 	},
 	reorder(projectIds: string[]): Promise<Project[]> {

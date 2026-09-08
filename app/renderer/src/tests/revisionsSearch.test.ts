@@ -22,6 +22,46 @@ const open = () => {
   return { db, dir, service: new KnowledgeService(db) }
 }
 describe('transactional knowledge contracts', () => {
+  it('imports bounded content atomically and rejects privileged path inputs', () => {
+    const { db } = open()
+    let notifications = 0
+    const service = new KnowledgeService(db, () => {
+      notifications += 1
+    })
+    expect(() => service.importFolder({ projectName: 'Paths', filePaths: ['/etc/passwd'] })).toThrow()
+    expect(() =>
+      service.importFolder({
+        projectName: 'Too many',
+        files: Array.from({ length: 51 }, () => ({ name: 'a.md', content: 'a' })),
+      }),
+    ).toThrow()
+    // The second normalized document exceeds the note contract after the first insert.
+    expect(() =>
+      service.importFolder({
+        projectName: 'Rollback',
+        files: [
+          { name: 'good.md', content: '# Good' },
+          { name: 'large.md', content: 'x'.repeat(790000) },
+        ],
+      }),
+    ).toThrow()
+    expect(db.listProjects()).toEqual([])
+    expect(db.listNotes()).toEqual([])
+    expect(db.historyStats().revisions).toBe(0)
+    expect(notifications).toBe(0)
+    const result = service.importFolder({
+      projectName: 'Imported',
+      files: [
+        { name: 'a.md', content: '# A\n[[B]]' },
+        { name: 'b.md', content: '# B' },
+      ],
+    })
+    expect(result.count).toBe(2)
+    expect(db.getBacklinks(result.notes[1].id)).toHaveLength(1)
+    expect(db.listRevisions(result.notes[0].id)[0].source).toBe('import')
+    expect(notifications).toBe(1)
+  })
+
   it('rejects stale metadata, deletion and undo after intervening edits', () => {
     const { db, service } = open()
     const note = db.createNote({ content: 'original' })

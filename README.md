@@ -18,7 +18,7 @@ npm run dev
 ## Use
 
 - Create and edit Markdown notes with autosave, split preview, tags, stars, archive, and undo delete.
-- Organize notes into reorderable projects or import a folder of Markdown files.
+- Organize notes into reorderable projects or import a folder of Markdown files. Desktop folder drops accept up to 50 Markdown files, 790 KB per file and 8 MiB total, and import each folder atomically. Split larger folders before dropping them.
 - Find material through search, Quick Open, related notes, and backlinks.
 - Use AI in read-only, confirm-before-edit, or auto-apply mode with edit history and revert support.
 - Automate local workflows through the CLI or API at `http://127.0.0.1:3939`.

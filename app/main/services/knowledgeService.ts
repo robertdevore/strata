@@ -45,6 +45,44 @@ export const operationSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('reorder_projects'), projectIds: z.array(idSchema).min(1).max(1000) }),
 ])
 
+export const importSchema = z
+  .object({
+    projectName: z.string().trim().min(1).max(120),
+    files: z
+      .array(z.object({ name: z.string().min(1).max(255), content: z.string().max(790000) }).strict())
+      .min(1)
+      .max(50),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.files.reduce((size, file) => size + Buffer.byteLength(file.content), 0) <= 8 * 1024 * 1024,
+    'Import exceeds 8 MiB',
+  )
+
+const derive_title_from_markdown = (content: string, fallback_name: string): string => {
+  const trimmed_lines = content.split(/\r?\n/).map((line) => line.trim())
+  for (const line of trimmed_lines) {
+    if (!line) continue
+    if (line.startsWith('# ')) {
+      return line.slice(2).trim() || fallback_name
+    }
+    return line.replace(/^#+\s*/, '').trim() || fallback_name
+  }
+  return fallback_name
+}
+
+const normalize_markdown_content = (content: string, fallback_name: string): string => {
+  const trimmed = content.trim()
+  if (!trimmed) {
+    return `# ${fallback_name}\n\n`
+  }
+  const first_non_empty = trimmed.split(/\r?\n/).find((line) => line.trim().length > 0) ?? ''
+  if (first_non_empty.startsWith('# ')) return content
+  const title = derive_title_from_markdown(content, fallback_name)
+  return `# ${title}\n\n${content}`
+}
+
 export type Operation = z.infer<typeof operationSchema>
 export const batchSchema = z
   .object({ operations: z.array(operationSchema).min(1).max(50), dryRun: z.boolean().optional() })
@@ -124,6 +162,28 @@ export class KnowledgeService {
         return { deleted: true }
       }
     }
+  }
+  importFolder(input: unknown) {
+    const parsed = importSchema.parse(input)
+    const result = this.db.transaction(() => {
+      const project = this.apply({
+        op: 'create_project',
+        name: parsed.projectName,
+      }) as import('../../shared/types').Project
+      const notes = parsed.files.map(
+        (file) =>
+          this.apply({
+            op: 'create_note',
+            payload: createSchema.parse({
+              content: normalize_markdown_content(file.content, file.name.replace(/\.md$/i, '')),
+              projectId: project.id,
+            }),
+          }) as import('../../shared/types').Note,
+      )
+      return { project, notes, count: notes.length }
+    }, 'import')
+    this.notify?.(ALL_CHANGED)
+    return result
   }
   propose(
     input: unknown,

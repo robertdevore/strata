@@ -142,12 +142,14 @@ const readDirectoryEntries = async (entry: FileSystemDirectoryEntry): Promise<Fi
 const collectDroppedMarkdownImports = async (
   dataTransfer: DataTransfer,
 ): Promise<{
-  projectImports: Array<{ projectName: string; filePaths: string[] }>
+  projectImports: Array<{ projectName: string; files: Array<{ name: string; content: string }> }>
   looseMarkdownFiles: Array<File & { path?: string }>
 }> => {
-  const projectImports: Array<{ projectName: string; filePaths: string[] }> = []
+  const projectImports: Array<{ projectName: string; files: Array<{ name: string; content: string }> }> = []
   const looseMarkdownFiles: Array<File & { path?: string }> = []
   const items = Array.from(dataTransfer.items ?? [])
+  let importBytes = 0
+  let importFiles = 0
 
   const walkEntry = async (entry: FileSystemEntry, project_name?: string): Promise<void> => {
     if (entry.isFile) {
@@ -155,14 +157,17 @@ const collectDroppedMarkdownImports = async (
         ;(entry as FileSystemFileEntry).file(resolve, reject)
       })
       if (!isMarkdownFile(file.name)) return
+      importBytes += file.size
+      importFiles += 1
+      if (file.size > 790000 || importBytes > 8 * 1024 * 1024 || importFiles > 50) throw new Error('Drop exceeds 50 files or 8 MiB')
       if (project_name) {
-        const file_path = file.path
-        if (!file_path) return
+        const imported = { name: file.name, content: await file.text() }
         const target = projectImports.find((item) => item.projectName === project_name)
         if (target) {
-          target.filePaths.push(file_path)
+          if (target.files.length >= 50) throw new Error('Folder import is limited to 50 Markdown files')
+          target.files.push(imported)
         } else {
-          projectImports.push({ projectName: project_name, filePaths: [file_path] })
+          projectImports.push({ projectName: project_name, files: [imported] })
         }
         return
       }
@@ -686,7 +691,7 @@ export function App() {
         let opened_note_id: string | null = null
 
         for (const projectImport of projectImports) {
-          if (0 === projectImport.filePaths.length) continue
+          if (0 === projectImport.files.length) continue
           const result = await window.strata.projects.importFolder(projectImport)
           if (!opened_note_id && result.notes[0]?.id) {
             opened_note_id = result.notes[0].id
@@ -694,6 +699,7 @@ export function App() {
         }
 
         for (const file of looseMarkdownFiles) {
+          if (file.size > 790000) throw new Error('Markdown file exceeds import limit')
           const text = await file.text()
           const file_name = file.name ?? 'untitled.md'
           const firstLine = text.trimStart().split('\n')[0] || ''

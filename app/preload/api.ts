@@ -37,7 +37,7 @@ export interface StrataApi {
 		create: (payload: { name: string }) => Promise<Project>
 		update: (id: string, payload: { name: string }) => Promise<Project | null>
 		delete: (id: string) => Promise<boolean>
-		importFolder: (payload: { projectName: string; filePaths: string[] }) => Promise<{ project: Project; notes: Note[]; count: number }>
+		importFolder: (payload: { projectName: string; files: Array<{ name: string; content: string }> }) => Promise<{ project: Project; notes: Note[]; count: number }>
 		reorder: (projectIds: string[]) => Promise<Project[]>
 	}
 	settings: {
