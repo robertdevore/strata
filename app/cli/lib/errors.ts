@@ -27,7 +27,8 @@ export const map_http_status_to_exit_code = (status: number): ExitCode => {
   if (401 === status || 403 === status) return ExitCode.AuthFailure
   if (404 === status) return ExitCode.NotFound
   if (408 === status) return ExitCode.Timeout
-  if (409 === status || 422 === status) return ExitCode.ValidationError
+  if (409 === status) return ExitCode.UnsafeRefused
+  if (400 === status || 422 === status) return ExitCode.ValidationError
   if (status >= 500) return ExitCode.ApiUnavailable
   return ExitCode.GenericFailure
 }

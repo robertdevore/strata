@@ -18,13 +18,51 @@ import {
 
 const json_record_schema = z.record(z.string(), z.unknown())
 
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+const invalid_response = () =>
+  new CliError({
+    message: 'Strata API returned an invalid JSON response.',
+    code: 'INVALID_RESPONSE',
+    exitCode: ExitCode.ApiUnavailable,
+  })
+
 const safe_get_json = async (response: Response): Promise<unknown> => {
-  const text = await response.text().catch(() => '')
-  if (!text.trim()) return null
+  const oversized = () =>
+    new CliError({
+      message: 'Strata API response exceeds the 4 MiB limit.',
+      code: 'RESPONSE_TOO_LARGE',
+      exitCode: ExitCode.ApiUnavailable,
+    })
+  if (Number(response.headers.get('content-length')) > MAX_RESPONSE_BYTES) {
+    void response.body?.cancel().catch(() => {})
+    throw oversized()
+  }
+  const reader = response.body?.getReader()
+  let text = ''
+  let bytes = 0
+  if (reader) {
+    const decoder = new TextDecoder()
+    try {
+      for (;;) {
+        const chunk = await reader.read()
+        if (chunk.done) break
+        bytes += chunk.value.byteLength
+        if (bytes > MAX_RESPONSE_BYTES) {
+          void reader.cancel().catch(() => {})
+          throw oversized()
+        }
+        text += decoder.decode(chunk.value, { stream: true })
+      }
+      text += decoder.decode()
+    } finally {
+      reader.releaseLock()
+    }
+  }
   try {
     return JSON.parse(text) as unknown
   } catch {
-    return { raw: text }
+    if (!response.ok) return null
+    throw invalid_response()
   }
 }
 
@@ -115,6 +153,7 @@ export class StrataApiClient {
         if (!response.ok) {
           const error_body = await safe_get_json(response)
           if (allow_retry && (response.status >= 500 || 429 === response.status) && attempt < max_attempts) {
+            clearTimeout(timeout)
             await sleep(120 * attempt)
             continue
           }
@@ -137,15 +176,13 @@ export class StrataApiClient {
         }
 
         const raw = await safe_get_json(response)
-        clearTimeout(timeout)
         if (!options.validate) return raw as TResponse
         return options.validate.parse(raw) as TResponse
       } catch (error) {
-        clearTimeout(timeout)
         last_error = error
         if (error instanceof CliError) throw error
 
-        if (error instanceof DOMException && 'AbortError' === error.name) {
+        if (controller.signal.aborted || (error instanceof Error && 'AbortError' === error.name)) {
           throw new CliError({
             message: `Request timed out after ${this.timeoutMs}ms.`,
             exitCode: ExitCode.Timeout,
@@ -153,7 +190,10 @@ export class StrataApiClient {
           })
         }
 
+        if (error instanceof z.ZodError) throw invalid_response()
+
         if (allow_retry && attempt < max_attempts) {
+          clearTimeout(timeout)
           await sleep(120 * attempt)
           continue
         }
@@ -163,8 +203,9 @@ export class StrataApiClient {
           exitCode: ExitCode.ApiUnavailable,
           code: 'STRATA_API_UNAVAILABLE',
           hint: 'Start Strata, then try again.',
-          details: error instanceof Error ? error.message : String(error),
         })
+      } finally {
+        clearTimeout(timeout)
       }
     }
 

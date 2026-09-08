@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createServer } from 'node:http'
 import { StrataApiClient } from '../../../../cli/lib/apiClient'
 
 describe('cli API client', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   it('normalizes base URL and sends auth headers when token exists', async () => {
@@ -82,7 +85,7 @@ describe('cli API client', () => {
     const client = new StrataApiClient({ baseUrl: 'http://127.0.0.1:3939', token: 'test', timeoutMs: 1000 })
     await expect(
       client.updateNote('00000000-0000-0000-0000-000000000000', { content: 'draft', expectedRevision: 5 }),
-    ).rejects.toMatchObject({ code: 'REVISION_CONFLICT' })
+    ).rejects.toMatchObject({ code: 'REVISION_CONFLICT', exitCode: 6 })
     expect(fetch_mock).toHaveBeenCalledTimes(1)
     expect(fetch_mock.mock.calls[0][1].method).toBe('PATCH')
     expect(JSON.parse(fetch_mock.mock.calls[0][1].body)).toMatchObject({
@@ -113,4 +116,74 @@ describe('cli API client', () => {
     expect(result.ok).toBe(true)
     expect(fetch_mock).toHaveBeenCalledTimes(2)
   })
+})
+
+it.each(['not JSON', '{"wrong":"shape"}'])(
+  'reports malformed successful responses without retrying: %s',
+  async (body) => {
+    const fetch = vi.fn(async () => new Response(body))
+    vi.stubGlobal('fetch', fetch)
+    try {
+      const client = new StrataApiClient({ baseUrl: 'http://127.0.0.1:3939', token: null, timeoutMs: 1000 })
+      await expect(client.health()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+      expect(fetch).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  },
+)
+
+it.each([true, false])('bounds API response bytes with or without Content-Length: %s', async (header) => {
+  const response = new Response(new Uint8Array(4 * 1024 * 1024 + 1), {
+    headers: header ? { 'Content-Length': String(4 * 1024 * 1024 + 1) } : {},
+  })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => response),
+  )
+  try {
+    const client = new StrataApiClient({ baseUrl: 'http://127.0.0.1:3939', token: null, timeoutMs: 1000 })
+    await expect(client.health()).rejects.toMatchObject({ code: 'RESPONSE_TOO_LARGE' })
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it('clears retry timers after a transient HTTP failure succeeds', async () => {
+  vi.useFakeTimers()
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+    .mockResolvedValueOnce(new Response('{"ok":true}'))
+  vi.stubGlobal('fetch', fetch)
+  try {
+    const client = new StrataApiClient({ baseUrl: 'http://127.0.0.1:3939', token: null, timeoutMs: 1000 })
+    const result = client.health()
+    await vi.advanceTimersByTimeAsync(121)
+    await expect(result).resolves.toEqual({ ok: true })
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  }
+})
+
+it('preserves timeout classification when the server stalls after sending headers', async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.write('{')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const address = server.address() as { port: number }
+    const client = new StrataApiClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      token: null,
+      timeoutMs: 50,
+    })
+    await expect(client.health()).rejects.toMatchObject({ code: 'REQUEST_TIMEOUT', exitCode: 8 })
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
 })
