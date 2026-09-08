@@ -74,6 +74,7 @@ interface AppState {
   setSplitLayout: (layout: 'columns' | 'grid') => void
   setSplitGridColumns: (cols: number) => void
   load: () => Promise<void>
+  ensureNote: (id: string) => Promise<void>
   hydrateNote: (id: string) => Promise<void>
   touchNote: (id: string) => void
   evictInactiveNoteBodies: () => void
@@ -302,6 +303,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       saveState: 'saved',
     }))
     await get().load()
+  },
+
+  async ensureNote(id) {
+    if (get().notes.some((note) => note.id === id)) return
+    const note = await notesService.get(id)
+    if (!note || note.deletedAt) throw new Error('Note unavailable')
+    set((state) =>
+      state.notes.some((current) => current.id === id)
+        ? state
+        : {
+            notes: upsert_note(state.notes, note),
+            noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(note.content) },
+          },
+    )
   },
 
   async hydrateNote(id) {

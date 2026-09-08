@@ -69,8 +69,30 @@ try {
       shell: typeof window.strata.shell,
     })),
   ).toEqual({ require: 'undefined', process: 'undefined', shell: 'undefined' })
+  const distantId = await page.evaluate(async () => {
+    const distant = await window.strata.notes.create({
+      content: '# Distant lookup target\n\nRetrieved beyond sidebar page.',
+    })
+    for (let index = 0; index < 105; index++) {
+      await window.strata.notes.create({ content: `# Recent filler ${index}` })
+    }
+    const firstPage = await window.strata.notes.page({ limit: 100 })
+    if (firstPage.notes.some((note) => note.id === distant.id))
+      throw new Error('Fixture did not exceed first page')
+    return distant.id
+  })
+  await page.reload()
+  await page.getByRole('button', { name: /^Quick Open/ }).click()
+  await page.getByRole('textbox', { name: 'Quick open notes' }).fill('Distant lookup target')
+  await page.getByText('Distant lookup target', { exact: true }).click()
+  await expect(page.locator('.cm-content').first()).toContainText('Retrieved beyond sidebar page.', {
+    timeout: 20000,
+  })
+  expect(await page.evaluate((id) => window.strata.notes.get(id).then((note) => note.id), distantId)).toBe(
+    distantId,
+  )
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, and sandboxed preload.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open beyond 100 notes.',
   )
 } finally {
   try {

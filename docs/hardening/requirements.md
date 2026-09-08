@@ -46,7 +46,7 @@ This is a working gap ledger, not a completion verdict. â€œScoped tests passedâ€
 | 39 | Renderer Performance Audit | Incomplete | No complete renderer profiling/e2e artifact; list/editor/chat/preview responsiveness still requires measurement. |
 | 40 | Review Autosave Semantics | Partial | Serialized autosaves/draft preservation/history and hydration races covered. Split panes/global save status and navigation interactions remain. |
 | 41 | Improve External Mutation Refresh | Partial | External and AI writes trigger refresh; failure-after-write notifications fixed. Granular domain refresh and full desktop checks remain. |
-| 42 | Review Search UX | Partial | Main sidebar uses FTS pages. Quick Open and navigation beyond currently loaded notes need closure. |
+| 42 | Review Search UX | Partial | Main sidebar and Quick Open use bounded FTS pages; Quick Open hydrates selected uncached notes and rejects stale search responses. Other link/chat navigation beyond loaded notes remains. |
 | 43 | Review Link UX | Partial | Indexed title resolution preserves ambiguity in DB. Full wiki-link UX/unresolved/duplicate selection/rename behavior remains to validate. |
 | 44 | Tighten AI System Prompt Token Usage | Partial | System prompt compacted; source size/representative before-after token measurement outstanding. |
 | 45 | Tool Selection Efficiency | Incomplete | Dynamic subsets deliberately not added yet; measure catalog overhead and justify decision before completion. |

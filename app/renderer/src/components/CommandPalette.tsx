@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Note } from '@shared/types'
 import { deriveNoteTitle, formatRelativeTime } from '@renderer/src/domain/noteUtils'
+import { notesService } from '../services/notesService'
 import type { UiCommand } from '@renderer/src/utils/commands'
 
 export type PaletteMode = 'quick-open' | 'commands'
@@ -28,10 +29,9 @@ const COMMANDS: PaletteCommand[] = [
 
 interface CommandPaletteProps {
   mode: PaletteMode
-  notes: Note[]
   selectedNoteId: string | null
   onClose: () => void
-  onOpenNote: (id: string) => void
+  onOpenNote: (id: string) => void | Promise<void>
   onRunCommand: (command: UiCommand) => void
   onTogglePreview: () => void
   onToggleChatPanel: () => void
@@ -40,7 +40,6 @@ interface CommandPaletteProps {
 
 export function CommandPalette({
   mode,
-  notes,
   selectedNoteId,
   onClose,
   onOpenNote,
@@ -60,20 +59,42 @@ export function CommandPalette({
     return () => window.clearTimeout(timer)
   }, [])
 
-  // Filtered note results (quick-open mode)
-  const noteResults = useMemo(() => {
-    if ('quick-open' !== mode) return []
-    if (!query.trim()) return notes.slice(0, 30)
-    const q = query.toLowerCase()
-    return notes
-      .filter((n) => {
-        const title = deriveNoteTitle(n.content).toLowerCase()
-        const body = n.content.toLowerCase()
-        const tags = n.tags.join(' ').toLowerCase()
-        return title.includes(q) || body.includes(q) || tags.includes(q)
-      })
-      .slice(0, 30)
-  }, [mode, notes, query])
+  const [result, setResult] = useState<{ query: string; notes: Note[]; error: string } | null>(null)
+  const [opening, setOpening] = useState(false)
+  const [openError, setOpenError] = useState('')
+  useEffect(() => {
+    if (mode !== 'quick-open') return
+    let active = true
+    const timer = window.setTimeout(() => {
+      void notesService.page({ query: query.trim(), limit: 30 }).then(
+        (page) => {
+          if (active) setResult({ query, notes: page.notes, error: '' })
+        },
+        () => {
+          if (active) setResult({ query, notes: [], error: 'Could not search notes. Try again.' })
+        },
+      )
+    }, 180)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [mode, query])
+  const loading = mode === 'quick-open' && result?.query !== query
+  const noteResults = result?.query === query ? result.notes : []
+  const openNote = async (id: string) => {
+    if (opening) return
+    setOpening(true)
+    setOpenError('')
+    try {
+      await onOpenNote(id)
+      onClose()
+    } catch {
+      setOpenError('Could not open this note. Your current draft is preserved.')
+    } finally {
+      setOpening(false)
+    }
+  }
 
   // Filtered command results (commands mode)
   const commandResults = useMemo(() => {
@@ -110,8 +131,7 @@ export function CommandPalette({
     if ('quick-open' === mode) {
       const note = noteResults[selectedIndex]
       if (note) {
-        onOpenNote(note.id)
-        onClose()
+        void openNote(note.id)
       }
     } else {
       const cmd = commandResults[selectedIndex]
@@ -171,11 +191,10 @@ export function CommandPalette({
                     className={`palette-item ${index === selectedIndex ? 'palette-item-selected' : ''}`}
                     onMouseEnter={() => setSelectedIndex(index)}
                     onClick={() => {
-                      onOpenNote(note.id)
-                      onClose()
+                      void openNote(note.id)
                     }}
                   >
-                    <div className="palette-item-title">{deriveNoteTitle(note.content)}</div>
+                    <div className="palette-item-title">{note.title ?? deriveNoteTitle(note.content)}</div>
                     <div className="palette-item-meta">
                       {note.tags.length > 0 && (
                         <span className="palette-item-tags">{note.tags.slice(0, 3).join(' ')}</span>
@@ -200,7 +219,14 @@ export function CommandPalette({
                 ))}
           </div>
         )}
-        {0 === totalItems && query.trim() && <div className="palette-empty">No results</div>}
+        {loading && <div role="status">Searching…</div>}
+        {opening && <div role="status">Opening…</div>}
+        {(openError || (result?.query === query ? result.error : '')) && (
+          <div role="alert">{openError || (result?.query === query ? result.error : '')}</div>
+        )}
+        {!loading && !result?.error && 0 === totalItems && query.trim() && (
+          <div className="palette-empty">No results</div>
+        )}
       </div>
     </div>
   )

@@ -1166,12 +1166,17 @@ export function App() {
       {paletteMode && (
         <CommandPalette
           mode={paletteMode}
-          notes={store.notes}
           selectedNoteId={store.selectedNoteId}
           onClose={() => setPaletteMode(null)}
           onOpenNote={async (id) => {
-            if (store.selectedNoteId && store.selectedNoteId !== id)
+            await store.ensureNote(id)
+            if (store.selectedNoteId && store.selectedNoteId !== id) {
               await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
+              const current = useAppStore.getState()
+              const draft = current.drafts[store.selectedNoteId]
+              const saved = current.notes.find((note) => note.id === store.selectedNoteId)
+              if (draft !== undefined && draft !== saved?.content) throw new Error('Draft not saved')
+            }
             store.openNoteInTab(id)
           }}
           onRunCommand={(cmd) => void runCommand(cmd)}
