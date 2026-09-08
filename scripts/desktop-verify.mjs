@@ -505,8 +505,67 @@ try {
     .poll(() => failureLogs.some((message) => message.includes('Global renderer error:')))
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
+  // Reset Playwright's pending-navigation state after the intentionally denied file navigation.
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'New Note', exact: true }).click()
+  const restoreEditor = page.locator('.cm-content[contenteditable="true"]').last()
+  await restoreEditor.fill('# Restore fixture\nOriginal backup content')
+  let restoreNoteId
+  await expect
+    .poll(async () => {
+      const result = await page.evaluate(() =>
+        window.strata.notes.page({ query: 'Restore fixture', limit: 10 }),
+      )
+      restoreNoteId = result.notes.find((note) => note.title === 'Restore fixture')?.id
+      return Boolean(restoreNoteId)
+    })
+    .toBe(true)
+  const originalRestoreContent = (await page.evaluate((id) => window.strata.notes.get(id), restoreNoteId))
+    .content
+  const selectedBackup = await page.evaluate(() => window.strata.backups.createNow())
+  const restoreAndRestart = async (backupName) => {
+    // Fixture owns relaunch explicitly so no untracked Electron process survives the test.
+    await application.evaluate(({ app }) => {
+      app.relaunch = () => {}
+    })
+    const closed = application.waitForEvent('close', { timeout: 30000 })
+    await Promise.all([
+      closed,
+      page
+        .evaluate((name) => window.strata.backups.restoreNamed(name), backupName)
+        .catch((error) => {
+          if (!/closed|destroyed/i.test(error.message)) throw error
+        }),
+    ])
+    application = undefined
+    application = await _electron.launch({ args: [process.cwd()], env, timeout: 30000 })
+    page = await application.firstWindow()
+    await expect(page.getByRole('button', { name: 'New Note', exact: true })).toBeVisible({ timeout: 20000 })
+  }
+  // Trigger restore before autosave's debounce; the safety backup must include this draft.
+  await restoreEditor.fill('# Restore fixture\nSaved immediately before restore')
+  await restoreAndRestart(path.basename(selectedBackup.directory))
+  expect((await page.evaluate((id) => window.strata.notes.get(id), restoreNoteId)).content).toBe(
+    originalRestoreContent,
+  )
+  const recoveryPoints = []
+  for (const name of await fs.readdir(path.join(directory, 'backups'))) {
+    try {
+      const manifest = JSON.parse(
+        await fs.readFile(path.join(directory, 'backups', name, 'manifest.json'), 'utf8'),
+      )
+      if (manifest.reason === 'pre-restore') recoveryPoints.push(name)
+    } catch {
+      /* Imported snapshots do not have backup manifests. */
+    }
+  }
+  expect(recoveryPoints).toHaveLength(1)
+  await restoreAndRestart(recoveryPoints[0])
+  expect((await page.evaluate((id) => window.strata.notes.get(id), restoreNoteId)).content).toMatch(
+    /# Restore fixture\s+Saved immediately before restore$/,
+  )
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation, per-message model choice, proposal rejection/approval and chat deletion, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts, graceful quit persistence and backup restore draft recovery, domain and backlink refresh, AI Stop cancellation, per-message model choice, proposal rejection/approval and chat deletion, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {
