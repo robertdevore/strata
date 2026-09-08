@@ -1,0 +1,133 @@
+{
+  "kind": "deterministic-payload-contracts",
+  "generatedAt": "2026-09-08T21:37:39.647Z",
+  "baselineCommit": "e2ca89b9b38efc71cb4c1652649b5297f5f67310",
+  "currentCommit": "1f3858f0544af3fbfe4e414b272f23bf6783f4f8",
+  "fixture": {
+    "notes": 100,
+    "noteContentBytes": 6966,
+    "openNotes": 12,
+    "historyMessages": 40,
+    "hash": "998a777cfb02c8c61bea7db8d8a74ce51aa1c9ff2c103381e881b64ce71e9404"
+  },
+  "sourceHashes": {
+    "app/main/ai/tools.ts": {
+      "before": "8eedebc7f79f3de1d07cde7d9e28c405c1c359a3467e27d3dc4aad76bc5b3451",
+      "after": "d02adf24ce5129f0870518173255384e69db02e7bfe9bbcf1426ee7f6559ff52"
+    },
+    "app/main/ai/aiRunner.ts": {
+      "before": "b07aceb482f803f46d61f8db849deb74bffec8877d8ea49bdd785c6f2031fe47",
+      "after": "ca2a7598dc2b5004fca41ccf8602286891d9b526984ab7a868800be124a2bbfa"
+    },
+    "app/main/ipc/aiHandlers.ts": {
+      "before": "cfc6e58cebcdabe52ed290808c64a8bdbae8a7c2675139758061468cc3100de9",
+      "after": "6b3a8b276987d5303898c7300e6f71fd1749c87dd72ba08e7226551bd72327c5"
+    },
+    "app/main/ai/toolLoop.ts": {
+      "before": "6f9b38de5842866c6eb2d3623aa1283052bf9e18077aa17dca63e1a1d69ebdba",
+      "after": "2a99c26d74e2356fd97df9bb2cd279235cb4f1a93d67503a665a4efcf6b1909f"
+    }
+  },
+  "toolOutputs": [
+    {
+      "tool": "list_notes",
+      "args": {},
+      "beforeBytes": 45182,
+      "afterBytes": 6872,
+      "reductionPercent": 84.79,
+      "beforeNotes": 60,
+      "afterNotes": 15
+    },
+    {
+      "tool": "search_notes",
+      "args": {
+        "query": "provider"
+      },
+      "beforeBytes": 18827,
+      "afterBytes": 6872,
+      "reductionPercent": 63.5,
+      "beforeNotes": 25,
+      "afterNotes": 15
+    },
+    {
+      "tool": "search_notes_by_tag",
+      "args": {
+        "tag": "provider"
+      },
+      "beforeBytes": 37652,
+      "afterBytes": 6872,
+      "reductionPercent": 81.75,
+      "beforeNotes": 50,
+      "afterNotes": 15
+    },
+    {
+      "tool": "search_notes_by_project",
+      "args": {
+        "project_id": "10000000-0000-4000-8000-000000000001"
+      },
+      "beforeBytes": 37823,
+      "afterBytes": 7043,
+      "reductionPercent": 81.38,
+      "beforeNotes": 50,
+      "afterNotes": 15
+    },
+    {
+      "tool": "get_project",
+      "args": {
+        "project_id": "10000000-0000-4000-8000-000000000001"
+      },
+      "beforeBytes": 75474,
+      "afterBytes": 172,
+      "reductionPercent": 99.77,
+      "beforeNotes": 100,
+      "afterNotes": 0
+    },
+    {
+      "tool": "get_note",
+      "args": {
+        "note_id": "00000000-0000-4000-8000-000000000001"
+      },
+      "beforeBytes": 7309,
+      "afterBytes": 7372,
+      "reductionPercent": -0.86,
+      "beforeNotes": 1,
+      "afterNotes": 1
+    }
+  ],
+  "systemPrompt": {
+    "beforeBytes": 1659,
+    "afterBytes": 462,
+    "reductionPercent": 72.15
+  },
+  "toolCatalog": {
+    "beforeBytes": 4925,
+    "afterBytes": 5302,
+    "reductionPercent": -7.65,
+    "beforeTools": 17,
+    "afterTools": 17,
+    "readOnlyCandidateTools": 10,
+    "readOnlyCandidateBytes": 2732
+  },
+  "openNoteContext": {
+    "beforeBytes": 38343,
+    "afterBytes": 3548,
+    "reductionPercent": 90.75
+  },
+  "historyContext": {
+    "beforeBytes": 142092,
+    "afterBytes": 24678,
+    "reductionPercent": 82.63
+  },
+  "combinedContextAndCatalog": {
+    "beforeBytes": 187019,
+    "afterBytes": 33990,
+    "reductionPercent": 81.83
+  },
+  "limitations": [
+    "UTF-8 bytes, not model-specific token counts or latency; transport envelopes are excluded.",
+    "Read-only deterministic fixture adapters supply identical ordered knowledge. This does not measure SQLite ranking or query performance.",
+    "Default result counts and get_project semantics changed. Smaller outputs do not imply equivalent recall; callers can request more summaries or full notes explicitly.",
+    "Current revisions/title/contentLoaded metadata increase the explicit full-note payload.",
+    "The read-only catalog is a measured candidate, not an enabled runtime policy in this snapshot."
+  ]
+}
