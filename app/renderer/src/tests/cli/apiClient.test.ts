@@ -7,14 +7,12 @@ describe('cli API client', () => {
   })
 
   it('normalizes base URL and sends auth headers when token exists', async () => {
-    const fetch_mock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
+    const fetch_mock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
     vi.stubGlobal('fetch', fetch_mock)
 
     const client = new StrataApiClient({
@@ -71,17 +69,15 @@ describe('cli API client', () => {
   })
 
   it('preserves the callers revision without a refresh or mutation retry', async () => {
-    const fetch_mock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            ok: false,
-            error: { code: 'REVISION_CONFLICT', message: 'stale revision', details: { actual: 9 } },
-          }),
-          { status: 409, headers: { 'Content-Type': 'application/json' } },
-        ),
-      )
+    const fetch_mock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          error: { code: 'REVISION_CONFLICT', message: 'stale revision', details: { actual: 9 } },
+        }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
     vi.stubGlobal('fetch', fetch_mock)
     const client = new StrataApiClient({ baseUrl: 'http://127.0.0.1:3939', token: 'test', timeoutMs: 1000 })
     await expect(

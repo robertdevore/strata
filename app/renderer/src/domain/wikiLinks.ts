@@ -3,11 +3,11 @@
  */
 
 export interface ParsedWikiLink {
-	rawTarget: string
-	label: string | null
-	heading: string | null
-	startIndex: number
-	endIndex: number
+  rawTarget: string
+  label: string | null
+  heading: string | null
+  startIndex: number
+  endIndex: number
 }
 
 /**
@@ -16,24 +16,24 @@ export interface ParsedWikiLink {
 const WIKI_LINK_RE = /(?<!!)\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g
 
 export const parseWikiLinks = (content: string): ParsedWikiLink[] => {
-	const links: ParsedWikiLink[] = []
-	let match: RegExpExecArray | null
-	// Reset regex state
-	WIKI_LINK_RE.lastIndex = 0
-	while ((match = WIKI_LINK_RE.exec(content)) !== null) {
-		const rawTarget = (match[1] ?? '').trim()
-		if (!rawTarget) continue
-		const heading = match[2]?.trim() ?? null
-		const label = match[3]?.trim() ?? null
-		links.push({
-			rawTarget,
-			label,
-			heading,
-			startIndex: match.index,
-			endIndex: match.index + match[0].length,
-		})
-	}
-	return links
+  const links: ParsedWikiLink[] = []
+  let match: RegExpExecArray | null
+  // Reset regex state
+  WIKI_LINK_RE.lastIndex = 0
+  while ((match = WIKI_LINK_RE.exec(content)) !== null) {
+    const rawTarget = (match[1] ?? '').trim()
+    if (!rawTarget) continue
+    const heading = match[2]?.trim() ?? null
+    const label = match[3]?.trim() ?? null
+    links.push({
+      rawTarget,
+      label,
+      heading,
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
+    })
+  }
+  return links
 }
 
 /**
@@ -41,5 +41,5 @@ export const parseWikiLinks = (content: string): ParsedWikiLink[] => {
  * Mirrors the title derivation used elsewhere but for raw wiki-link targets.
  */
 export const normalizeWikiTarget = (raw: string): string => {
-	return raw.trim().toLowerCase().replace(/\s+/g, ' ')
+  return raw.trim().toLowerCase().replace(/\s+/g, ' ')
 }

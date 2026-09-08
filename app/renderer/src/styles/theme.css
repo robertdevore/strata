@@ -1161,7 +1161,7 @@ body.theme-dark .tag-pin-btn.pin-active {
 .home-screen-card .project-grid-note-pill,
 .home-screen-card .project-grid-create-button,
 .home-screen-card .project-grid-card-button {
-	-webkit-app-region: no-drag;
+  -webkit-app-region: no-drag;
 }
 
 .home-screen-kicker {

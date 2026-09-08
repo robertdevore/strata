@@ -2,40 +2,46 @@ import { requestProviderJson, validateProviderUrl } from '../providerRequest'
 // Generic Chat Completions provider (OpenAI-compatible)
 // Supports DeepSeek, Kimi/Moonshot, OpenRouter, custom endpoints, llama.cpp
 
-import type { AiProvider, AiProviderTurnInput, AiProviderTurnOutput, NormalizedToolCall, ProviderMessage } from '../types'
+import type {
+  AiProvider,
+  AiProviderTurnInput,
+  AiProviderTurnOutput,
+  NormalizedToolCall,
+  ProviderMessage,
+} from '../types'
 
 interface ChatCompletionsResponse {
-	choices: Array<{
-		message: {
-			role: string
-			content: string | null
-			tool_calls?: Array<{
-				id: string
-				type: 'function'
-				function: {
-					name: string
-					arguments: string
-				}
-			}>
-		}
-		finish_reason: string
-	}>
-	usage?: {
-		prompt_tokens?: number
-		completion_tokens?: number
-		total_tokens?: number
-	}
+  choices: Array<{
+    message: {
+      role: string
+      content: string | null
+      tool_calls?: Array<{
+        id: string
+        type: 'function'
+        function: {
+          name: string
+          arguments: string
+        }
+      }>
+    }
+    finish_reason: string
+  }>
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
 }
 
 interface ChatCompletionsMessage {
-	role: 'system' | 'user' | 'assistant' | 'tool'
-	content?: string | null
-	tool_calls?: Array<{
-		id: string
-		type: 'function'
-		function: { name: string; arguments: string }
-	}>
-	tool_call_id?: string
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content?: string | null
+  tool_calls?: Array<{
+    id: string
+    type: 'function'
+    function: { name: string; arguments: string }
+  }>
+  tool_call_id?: string
 }
 
 /**
@@ -49,126 +55,126 @@ interface ChatCompletionsMessage {
  *   it, providers reject the result or silently drop it, breaking the
  *   multi-step tool loop.
  */
-const to_chat_completions_message = (msg: ProviderMessage): ChatCompletionsMessage | ChatCompletionsMessage[] => {
-	if (msg.role === 'tool') {
-		return {
-			role: 'tool',
-			content: msg.content,
-			tool_call_id: msg.toolCallId,
-		}
-	}
-	if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls.length > 0) {
-		return {
-			role: 'assistant',
-			content: msg.content,
-			tool_calls: msg.toolCalls.map((tc) => ({
-				id: tc.id,
-				type: 'function' as const,
-				function: {
-					name: tc.name,
-					arguments: tc.argumentsJson || '{}',
-				},
-			})),
-		}
-	}
-	return {
-		role: msg.role,
-		content: msg.content,
-	}
+const to_chat_completions_message = (
+  msg: ProviderMessage,
+): ChatCompletionsMessage | ChatCompletionsMessage[] => {
+  if (msg.role === 'tool') {
+    return {
+      role: 'tool',
+      content: msg.content,
+      tool_call_id: msg.toolCallId,
+    }
+  }
+  if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls.length > 0) {
+    return {
+      role: 'assistant',
+      content: msg.content,
+      tool_calls: msg.toolCalls.map((tc) => ({
+        id: tc.id,
+        type: 'function' as const,
+        function: {
+          name: tc.name,
+          arguments: tc.argumentsJson || '{}',
+        },
+      })),
+    }
+  }
+  return {
+    role: msg.role,
+    content: msg.content,
+  }
 }
 
 export class ChatCompletionsProvider implements AiProvider {
-	public readonly providerId: string
-	public readonly kind = 'openai_chat_completions'
-	private readonly apiKey: string
-	private readonly baseUrl: string
+  public readonly providerId: string
+  public readonly kind = 'openai_chat_completions'
+  private readonly apiKey: string
+  private readonly baseUrl: string
 
-	constructor(
-		apiKey: string,
-		baseUrl: string,
-		providerId: string,
-	) {
-		this.apiKey = apiKey
-		this.baseUrl = validateProviderUrl(baseUrl)
-		this.providerId = providerId
-	}
+  constructor(apiKey: string, baseUrl: string, providerId: string) {
+    this.apiKey = apiKey
+    this.baseUrl = validateProviderUrl(baseUrl)
+    this.providerId = providerId
+  }
 
-	async sendTurn(input: AiProviderTurnInput): Promise<AiProviderTurnOutput> {
-		const messages: ChatCompletionsMessage[] = [
-			{ role: 'system', content: input.systemPrompt },
-			...input.messages.flatMap((msg) => to_chat_completions_message(msg)),
-		]
+  async sendTurn(input: AiProviderTurnInput): Promise<AiProviderTurnOutput> {
+    const messages: ChatCompletionsMessage[] = [
+      { role: 'system', content: input.systemPrompt },
+      ...input.messages.flatMap((msg) => to_chat_completions_message(msg)),
+    ]
 
-		// Convert Strata tools to OpenAI Chat Completions format
-		const openai_tools = input.tools.map((tool) => ({
-			type: 'function' as const,
-			function: {
-				name: tool.name,
-				description: tool.description,
-				parameters: tool.parameters,
-			},
-		}))
+    // Convert Strata tools to OpenAI Chat Completions format
+    const openai_tools = input.tools.map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      },
+    }))
 
-		const base_url = this.normalize_base_url(this.baseUrl)
-		const body: Record<string, unknown> = {
-			model: input.model,
-			messages,
-			tools: openai_tools,
-			tool_choice: 'auto',
-		}
+    const base_url = this.normalize_base_url(this.baseUrl)
+    const body: Record<string, unknown> = {
+      model: input.model,
+      messages,
+      tools: openai_tools,
+      tool_choice: 'auto',
+    }
 
-		if (undefined !== input.temperature) {
-			body.temperature = input.temperature
-		}
+    if (undefined !== input.temperature) {
+      body.temperature = input.temperature
+    }
 
-		const payload = await requestProviderJson(`${base_url}/chat/completions`, {
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${this.apiKey}`,
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(body),
-		})
+    const payload = await requestProviderJson(`${base_url}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
 
-		return this.normalize(payload as ChatCompletionsResponse)
-	}
+    return this.normalize(payload as ChatCompletionsResponse)
+  }
 
-	private normalize(payload: ChatCompletionsResponse): AiProviderTurnOutput {
-		const choice = payload.choices?.[0]
-		const content = choice?.message?.content?.trim() || ''
-		const toolCalls: NormalizedToolCall[] = []
+  private normalize(payload: ChatCompletionsResponse): AiProviderTurnOutput {
+    const choice = payload.choices?.[0]
+    const content = choice?.message?.content?.trim() || ''
+    const toolCalls: NormalizedToolCall[] = []
 
-		if (choice?.message?.tool_calls) {
-			for (const tc of choice.message.tool_calls) {
-				toolCalls.push({
-					id: tc.id,
-					name: tc.function.name,
-					argumentsJson: tc.function.arguments || '{}',
-				})
-			}
-		}
+    if (choice?.message?.tool_calls) {
+      for (const tc of choice.message.tool_calls) {
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          argumentsJson: tc.function.arguments || '{}',
+        })
+      }
+    }
 
-		return {
-			content,
-			toolCalls,
-			raw: payload,
-			usage: payload.usage ? {
-				inputTokens: payload.usage.prompt_tokens,
-				outputTokens: payload.usage.completion_tokens,
-				totalTokens: payload.usage.total_tokens,
-			} : undefined,
-		}
-	}
+    return {
+      content,
+      toolCalls,
+      raw: payload,
+      usage: payload.usage
+        ? {
+            inputTokens: payload.usage.prompt_tokens,
+            outputTokens: payload.usage.completion_tokens,
+            totalTokens: payload.usage.total_tokens,
+          }
+        : undefined,
+    }
+  }
 
-	/**
-	 * Normalize base URLs that may or may not include the /v1 suffix.
-	 * Strips trailing slash, appends /v1 if not present.
-	 */
-	private normalize_base_url(raw: string): string {
-		let url = raw.replace(/\/+$/, '')
-		if (!url.endsWith('/v1')) {
-			url = `${url}/v1`
-		}
-		return url
-	}
+  /**
+   * Normalize base URLs that may or may not include the /v1 suffix.
+   * Strips trailing slash, appends /v1 if not present.
+   */
+  private normalize_base_url(raw: string): string {
+    let url = raw.replace(/\/+$/, '')
+    if (!url.endsWith('/v1')) {
+      url = `${url}/v1`
+    }
+    return url
+  }
 }

@@ -65,9 +65,7 @@ export function HomePane(props: HomePaneProps) {
 
   return (
     <section className="editor empty-editor home-screen">
-      <div
-        className={`home-screen-card ${'projects' === homeScreenMode ? 'home-screen-card-projects' : ''}`}
-      >
+      <div className={`home-screen-card ${'projects' === homeScreenMode ? 'home-screen-card-projects' : ''}`}>
         <div className="home-screen-mode-row">
           <div>
             <p className="home-screen-kicker">Welcome to Strata</p>
@@ -119,8 +117,8 @@ export function HomePane(props: HomePaneProps) {
           <div className="project-grid-panel">
             <div className="project-grid-toolbar">
               <p className="home-screen-copy project-grid-copy">
-                Use these cards to jump into a project, inspect recent activity, or spin up a new note
-                inside the right bucket.
+                Use these cards to jump into a project, inspect recent activity, or spin up a new note inside
+                the right bucket.
               </p>
               <button
                 type="button"

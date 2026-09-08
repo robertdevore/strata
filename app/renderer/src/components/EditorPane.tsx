@@ -631,7 +631,7 @@ export function EditorPane(props: EditorPaneProps) {
   }, [])
 
   useEffect(() => {
-    if (['saving','failed','conflict','unsaved'].includes(saveState)) {
+    if (['saving', 'failed', 'conflict', 'unsaved'].includes(saveState)) {
       if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
       window.setTimeout(() => setShowSaveStatus(true), 0)
       return

@@ -159,7 +159,8 @@ const collectDroppedMarkdownImports = async (
       if (!isMarkdownFile(file.name)) return
       importBytes += file.size
       importFiles += 1
-      if (file.size > 790000 || importBytes > 8 * 1024 * 1024 || importFiles > 50) throw new Error('Drop exceeds 50 files or 8 MiB')
+      if (file.size > 790000 || importBytes > 8 * 1024 * 1024 || importFiles > 50)
+        throw new Error('Drop exceeds 50 files or 8 MiB')
       if (project_name) {
         const imported = { name: file.name, content: await file.text() }
         const target = projectImports.find((item) => item.projectName === project_name)
@@ -858,119 +859,10 @@ export function App() {
                   <div className="split-pane" key={`pinned-${pinned.id}`}>
                     <Suspense fallback={<section className="editor" />}>
                       <EditorPane
-                      note={pinned.note}
-                      notes={store.notes}
-                      allNotes={store.notes}
-                      openTabIds={store.openTabs}
-                      drafts={store.drafts}
-                      openAiModel={store.settings.openAiModel}
-                      content={pinned.content}
-                      tags={store.tags}
-                      saveState={store.saveState}
-                      lastSavedAt={store.lastSavedAt}
-                      sidebarCollapsed={sidebarCollapsed}
-                      theme={store.settings.theme}
-                      onChangeDraft={store.setDraft}
-                      onFlush={store.flushDraft}
-                      onToggleStar={(id) => void store.toggleStar(id)}
-                      onToggleArchive={(id) => void store.toggleArchive(id)}
-                      onDelete={(id) => void onDelete(id)}
-                      onSetTags={(tags) => {
-                        void store.setTagsForNote(pinned.id, tags)
-                      }}
-                      onOpenNoteFromChat={openNoteFromChat}
-                      onShowRelatedNotes={() => {
-                        window.strata.links
-                          .relatedNotes(pinned.id)
-                          .then(setRelatedNotes)
-                          .catch(() => setRelatedNotes([]))
-                        setShowRelatedNotes(true)
-                      }}
-                      onOpenSettings={() => store.setShowSettings(true)}
-                      onThemeToggle={() =>
-                        void store.updateSettings({
-                          theme: 'dark' === store.settings.theme ? 'light' : 'dark',
-                        })
-                      }
-                      homeTiles={homeTiles}
-                      onHomeTileAction={runHomeTileAction}
-                      projects={store.projects}
-                      homeScreenMode={homeScreenMode}
-                      onHomeScreenModeChange={setHomeScreenMode}
-                      onCreateProjectNote={createProjectNote}
-                      onOpenProjectNote={openLatestProjectNote}
-                      />
-                    </Suspense>
-                  </div>
-                ))}
-                <div className="split-pane">
-                  <Suspense fallback={<section className="editor" />}>
-                    <EditorPane
-                    note={store.selectedNote()}
-                    notes={store.notes}
-                    allNotes={store.notes}
-                    openTabIds={store.openTabs}
-                    drafts={store.drafts}
-                    openAiModel={store.settings.openAiModel}
-                    content={store.effectiveContent()}
-                    tags={store.tags}
-                    saveState={store.saveState}
-                    lastSavedAt={store.lastSavedAt}
-                    sidebarCollapsed={sidebarCollapsed}
-                    theme={store.settings.theme}
-                    onChangeDraft={store.setDraft}
-                    onFlush={store.flushDraft}
-                    onToggleStar={(id) => void store.toggleStar(id)}
-                    onToggleArchive={(id) => void store.toggleArchive(id)}
-                    onDelete={(id) => void onDelete(id)}
-                    onSetTags={(tags) => void store.setTagsForSelected(tags)}
-                    onOpenNoteFromChat={openNoteFromChat}
-                    onShowRelatedNotes={() => {
-                      if (store.selectedNoteId) {
-                        window.strata.links
-                          .relatedNotes(store.selectedNoteId)
-                          .then(setRelatedNotes)
-                          .catch(() => setRelatedNotes([]))
-                        setShowRelatedNotes(true)
-                      }
-                    }}
-                    onOpenSettings={() => store.setShowSettings(true)}
-                    onThemeToggle={() =>
-                      void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })
-                    }
-                    homeTiles={homeTiles}
-                    onHomeTileAction={runHomeTileAction}
-                    projects={store.projects}
-                    homeScreenMode={homeScreenMode}
-                    onHomeScreenModeChange={setHomeScreenMode}
-                    onCreateProjectNote={createProjectNote}
-                    onOpenProjectNote={openLatestProjectNote}
-                    />
-                  </Suspense>
-                </div>
-              </div>
-            ) : (
-              <div
-                className="split-panes"
-                style={{
-                  gridTemplateColumns: splitRatios
-                    .map((r, i) =>
-                      i === splitRatios.length - 1
-                        ? `${(r * 100).toFixed(1)}%`
-                        : `${(r * 100).toFixed(1)}% 3px`,
-                    )
-                    .join(' '),
-                }}
-              >
-                {splitNotes.map((pinned, i) => (
-                  <Fragment key={`pinned-${pinned.id}`}>
-                    <div className="split-pane">
-                    <Suspense fallback={<section className="editor" />}>
-                      <EditorPane
-                      note={pinned.note}
-                      notes={store.notes}
-                      allNotes={store.notes}
-                      openTabIds={store.openTabs}
+                        note={pinned.note}
+                        notes={store.notes}
+                        allNotes={store.notes}
+                        openTabIds={store.openTabs}
                         drafts={store.drafts}
                         openAiModel={store.settings.openAiModel}
                         content={pinned.content}
@@ -1010,6 +902,117 @@ export function App() {
                         onOpenProjectNote={openLatestProjectNote}
                       />
                     </Suspense>
+                  </div>
+                ))}
+                <div className="split-pane">
+                  <Suspense fallback={<section className="editor" />}>
+                    <EditorPane
+                      note={store.selectedNote()}
+                      notes={store.notes}
+                      allNotes={store.notes}
+                      openTabIds={store.openTabs}
+                      drafts={store.drafts}
+                      openAiModel={store.settings.openAiModel}
+                      content={store.effectiveContent()}
+                      tags={store.tags}
+                      saveState={store.saveState}
+                      lastSavedAt={store.lastSavedAt}
+                      sidebarCollapsed={sidebarCollapsed}
+                      theme={store.settings.theme}
+                      onChangeDraft={store.setDraft}
+                      onFlush={store.flushDraft}
+                      onToggleStar={(id) => void store.toggleStar(id)}
+                      onToggleArchive={(id) => void store.toggleArchive(id)}
+                      onDelete={(id) => void onDelete(id)}
+                      onSetTags={(tags) => void store.setTagsForSelected(tags)}
+                      onOpenNoteFromChat={openNoteFromChat}
+                      onShowRelatedNotes={() => {
+                        if (store.selectedNoteId) {
+                          window.strata.links
+                            .relatedNotes(store.selectedNoteId)
+                            .then(setRelatedNotes)
+                            .catch(() => setRelatedNotes([]))
+                          setShowRelatedNotes(true)
+                        }
+                      }}
+                      onOpenSettings={() => store.setShowSettings(true)}
+                      onThemeToggle={() =>
+                        void store.updateSettings({
+                          theme: 'dark' === store.settings.theme ? 'light' : 'dark',
+                        })
+                      }
+                      homeTiles={homeTiles}
+                      onHomeTileAction={runHomeTileAction}
+                      projects={store.projects}
+                      homeScreenMode={homeScreenMode}
+                      onHomeScreenModeChange={setHomeScreenMode}
+                      onCreateProjectNote={createProjectNote}
+                      onOpenProjectNote={openLatestProjectNote}
+                    />
+                  </Suspense>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="split-panes"
+                style={{
+                  gridTemplateColumns: splitRatios
+                    .map((r, i) =>
+                      i === splitRatios.length - 1
+                        ? `${(r * 100).toFixed(1)}%`
+                        : `${(r * 100).toFixed(1)}% 3px`,
+                    )
+                    .join(' '),
+                }}
+              >
+                {splitNotes.map((pinned, i) => (
+                  <Fragment key={`pinned-${pinned.id}`}>
+                    <div className="split-pane">
+                      <Suspense fallback={<section className="editor" />}>
+                        <EditorPane
+                          note={pinned.note}
+                          notes={store.notes}
+                          allNotes={store.notes}
+                          openTabIds={store.openTabs}
+                          drafts={store.drafts}
+                          openAiModel={store.settings.openAiModel}
+                          content={pinned.content}
+                          tags={store.tags}
+                          saveState={store.saveState}
+                          lastSavedAt={store.lastSavedAt}
+                          sidebarCollapsed={sidebarCollapsed}
+                          theme={store.settings.theme}
+                          onChangeDraft={store.setDraft}
+                          onFlush={store.flushDraft}
+                          onToggleStar={(id) => void store.toggleStar(id)}
+                          onToggleArchive={(id) => void store.toggleArchive(id)}
+                          onDelete={(id) => void onDelete(id)}
+                          onSetTags={(tags) => {
+                            void store.setTagsForNote(pinned.id, tags)
+                          }}
+                          onOpenNoteFromChat={openNoteFromChat}
+                          onShowRelatedNotes={() => {
+                            window.strata.links
+                              .relatedNotes(pinned.id)
+                              .then(setRelatedNotes)
+                              .catch(() => setRelatedNotes([]))
+                            setShowRelatedNotes(true)
+                          }}
+                          onOpenSettings={() => store.setShowSettings(true)}
+                          onThemeToggle={() =>
+                            void store.updateSettings({
+                              theme: 'dark' === store.settings.theme ? 'light' : 'dark',
+                            })
+                          }
+                          homeTiles={homeTiles}
+                          onHomeTileAction={runHomeTileAction}
+                          projects={store.projects}
+                          homeScreenMode={homeScreenMode}
+                          onHomeScreenModeChange={setHomeScreenMode}
+                          onCreateProjectNote={createProjectNote}
+                          onOpenProjectNote={openLatestProjectNote}
+                        />
+                      </Suspense>
                     </div>
                     <div
                       className="panel-resizer panel-resizer-split"
@@ -1023,108 +1026,108 @@ export function App() {
                 <div className="split-pane">
                   <Suspense fallback={<section className="editor" />}>
                     <EditorPane
-                    note={store.selectedNote()}
-                    notes={store.notes}
-                    allNotes={store.notes}
-                    openTabIds={store.openTabs}
-                    drafts={store.drafts}
-                    openAiModel={store.settings.openAiModel}
-                    content={store.effectiveContent()}
-                    tags={store.tags}
-                    saveState={store.saveState}
-                    lastSavedAt={store.lastSavedAt}
-                    sidebarCollapsed={sidebarCollapsed}
-                    theme={store.settings.theme}
-                    onChangeDraft={store.setDraft}
-                    onFlush={store.flushDraft}
-                    onToggleStar={(id) => void store.toggleStar(id)}
-                    onToggleArchive={(id) => void store.toggleArchive(id)}
-                    onDelete={(id) => void onDelete(id)}
-                    onSetTags={(tags) => void store.setTagsForSelected(tags)}
-                    onOpenNoteFromChat={openNoteFromChat}
-                    onShowRelatedNotes={() => {
-                      if (store.selectedNoteId) {
-                        window.strata.links
-                          .relatedNotes(store.selectedNoteId)
-                          .then(setRelatedNotes)
-                          .catch(() => setRelatedNotes([]))
-                        setShowRelatedNotes(true)
+                      note={store.selectedNote()}
+                      notes={store.notes}
+                      allNotes={store.notes}
+                      openTabIds={store.openTabs}
+                      drafts={store.drafts}
+                      openAiModel={store.settings.openAiModel}
+                      content={store.effectiveContent()}
+                      tags={store.tags}
+                      saveState={store.saveState}
+                      lastSavedAt={store.lastSavedAt}
+                      sidebarCollapsed={sidebarCollapsed}
+                      theme={store.settings.theme}
+                      onChangeDraft={store.setDraft}
+                      onFlush={store.flushDraft}
+                      onToggleStar={(id) => void store.toggleStar(id)}
+                      onToggleArchive={(id) => void store.toggleArchive(id)}
+                      onDelete={(id) => void onDelete(id)}
+                      onSetTags={(tags) => void store.setTagsForSelected(tags)}
+                      onOpenNoteFromChat={openNoteFromChat}
+                      onShowRelatedNotes={() => {
+                        if (store.selectedNoteId) {
+                          window.strata.links
+                            .relatedNotes(store.selectedNoteId)
+                            .then(setRelatedNotes)
+                            .catch(() => setRelatedNotes([]))
+                          setShowRelatedNotes(true)
+                        }
+                      }}
+                      onOpenSettings={() => store.setShowSettings(true)}
+                      onThemeToggle={() =>
+                        void store.updateSettings({
+                          theme: 'dark' === store.settings.theme ? 'light' : 'dark',
+                        })
                       }
-                    }}
-                    onOpenSettings={() => store.setShowSettings(true)}
-                    onThemeToggle={() =>
-                      void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })
-                    }
-                    homeTiles={homeTiles}
-                    onHomeTileAction={runHomeTileAction}
-                    projects={store.projects}
-                    homeScreenMode={homeScreenMode}
-                    onHomeScreenModeChange={setHomeScreenMode}
-                    onCreateProjectNote={createProjectNote}
-                    onOpenProjectNote={openLatestProjectNote}
+                      homeTiles={homeTiles}
+                      onHomeTileAction={runHomeTileAction}
+                      projects={store.projects}
+                      homeScreenMode={homeScreenMode}
+                      onHomeScreenModeChange={setHomeScreenMode}
+                      onCreateProjectNote={createProjectNote}
+                      onOpenProjectNote={openLatestProjectNote}
                     />
                   </Suspense>
                 </div>
               </div>
             )
-          ) : (
-            store.selectedNote() ? (
-              <Suspense fallback={<section className="editor" />}>
-                <EditorPane
-                  note={store.selectedNote()}
-                  notes={store.notes}
-                  allNotes={store.notes}
-                  openTabIds={store.openTabs}
-                  drafts={store.drafts}
-                  openAiModel={store.settings.openAiModel}
-                  content={store.effectiveContent()}
-                  tags={store.tags}
-                  saveState={store.saveState}
-                  lastSavedAt={store.lastSavedAt}
-                  sidebarCollapsed={sidebarCollapsed}
-                  theme={store.settings.theme}
-                  onChangeDraft={store.setDraft}
-                  onFlush={store.flushDraft}
-                  onToggleStar={(id) => void store.toggleStar(id)}
-                  onToggleArchive={(id) => void store.toggleArchive(id)}
-                  onDelete={(id) => void onDelete(id)}
-                  onSetTags={(tags) => void store.setTagsForSelected(tags)}
-                  onOpenNoteFromChat={openNoteFromChat}
-                  onShowRelatedNotes={() => {
-                    if (store.selectedNoteId) {
-                      window.strata.links
-                        .relatedNotes(store.selectedNoteId)
-                        .then(setRelatedNotes)
-                        .catch(() => setRelatedNotes([]))
-                      setShowRelatedNotes(true)
-                    }
-                  }}
-                  onOpenSettings={() => store.setShowSettings(true)}
-                  onThemeToggle={() =>
-                    void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })
-                  }
-                  homeTiles={homeTiles}
-                  onHomeTileAction={runHomeTileAction}
-                  projects={store.projects}
-                  homeScreenMode={homeScreenMode}
-                  onHomeScreenModeChange={setHomeScreenMode}
-                  onCreateProjectNote={createProjectNote}
-                  onOpenProjectNote={openLatestProjectNote}
-                />
-              </Suspense>
-            ) : (
-              <HomePane
+          ) : store.selectedNote() ? (
+            <Suspense fallback={<section className="editor" />}>
+              <EditorPane
+                note={store.selectedNote()}
                 notes={store.notes}
+                allNotes={store.notes}
+                openTabIds={store.openTabs}
+                drafts={store.drafts}
+                openAiModel={store.settings.openAiModel}
+                content={store.effectiveContent()}
+                tags={store.tags}
+                saveState={store.saveState}
+                lastSavedAt={store.lastSavedAt}
+                sidebarCollapsed={sidebarCollapsed}
+                theme={store.settings.theme}
+                onChangeDraft={store.setDraft}
+                onFlush={store.flushDraft}
+                onToggleStar={(id) => void store.toggleStar(id)}
+                onToggleArchive={(id) => void store.toggleArchive(id)}
+                onDelete={(id) => void onDelete(id)}
+                onSetTags={(tags) => void store.setTagsForSelected(tags)}
+                onOpenNoteFromChat={openNoteFromChat}
+                onShowRelatedNotes={() => {
+                  if (store.selectedNoteId) {
+                    window.strata.links
+                      .relatedNotes(store.selectedNoteId)
+                      .then(setRelatedNotes)
+                      .catch(() => setRelatedNotes([]))
+                    setShowRelatedNotes(true)
+                  }
+                }}
+                onOpenSettings={() => store.setShowSettings(true)}
+                onThemeToggle={() =>
+                  void store.updateSettings({ theme: 'dark' === store.settings.theme ? 'light' : 'dark' })
+                }
+                homeTiles={homeTiles}
+                onHomeTileAction={runHomeTileAction}
                 projects={store.projects}
                 homeScreenMode={homeScreenMode}
-                homeTiles={homeTiles}
                 onHomeScreenModeChange={setHomeScreenMode}
-                onHomeTileAction={runHomeTileAction}
                 onCreateProjectNote={createProjectNote}
                 onOpenProjectNote={openLatestProjectNote}
-                onOpenNote={openNoteFromChat}
               />
-            )
+            </Suspense>
+          ) : (
+            <HomePane
+              notes={store.notes}
+              projects={store.projects}
+              homeScreenMode={homeScreenMode}
+              homeTiles={homeTiles}
+              onHomeScreenModeChange={setHomeScreenMode}
+              onHomeTileAction={runHomeTileAction}
+              onCreateProjectNote={createProjectNote}
+              onOpenProjectNote={openLatestProjectNote}
+              onOpenNote={openNoteFromChat}
+            />
           )}
         </div>
       </div>

@@ -431,12 +431,10 @@ export const execute_tool_call = (
         break
       case 'search_chats':
         result = {
-          results: db
-            .searchAiMessages(String(args.query), limit)
-            .map((row) => ({
-              ...row,
-              message: { ...row.message, content: row.message.content.slice(0, 240) },
-            })),
+          results: db.searchAiMessages(String(args.query), limit).map((row) => ({
+            ...row,
+            message: { ...row.message, content: row.message.content.slice(0, 240) },
+          })),
         }
         break
       case 'get_chat_thread':

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-	root: path.resolve(__dirname, 'app/renderer'),
+  root: path.resolve(__dirname, 'app/renderer'),
   build: {
     outDir: path.resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
@@ -16,7 +16,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          codemirror: ['@codemirror/view', '@codemirror/state', '@codemirror/lang-markdown', '@codemirror/autocomplete', '@codemirror/theme-one-dark', '@uiw/react-codemirror'],
+          codemirror: [
+            '@codemirror/view',
+            '@codemirror/state',
+            '@codemirror/lang-markdown',
+            '@codemirror/autocomplete',
+            '@codemirror/theme-one-dark',
+            '@uiw/react-codemirror',
+          ],
           markdown: ['react-markdown', 'remark-gfm'],
         },
       },

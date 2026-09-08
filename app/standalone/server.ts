@@ -4,57 +4,59 @@ import { openStrataDatabaseWithRecovery } from '../main/db/recovery'
 import { startNotesApiServer } from '../main/api/notesApiServer'
 
 const default_user_data_dir = (): string => {
-	if ('darwin' === process.platform) {
-		return path.join(os.homedir(), 'Library', 'Application Support', 'Strata')
-	}
-	if ('win32' === process.platform) {
-		return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Strata')
-	}
-	return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'Strata')
+  if ('darwin' === process.platform) {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'Strata')
+  }
+  if ('win32' === process.platform) {
+    return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Strata')
+  }
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'Strata')
 }
 
 const run = async (): Promise<void> => {
-	const user_data_dir = (process.env.STRATA_USER_DATA_DIR || default_user_data_dir()).trim()
-	const database_recovery = await openStrataDatabaseWithRecovery(user_data_dir)
-	const db = database_recovery.db
+  const user_data_dir = (process.env.STRATA_USER_DATA_DIR || default_user_data_dir()).trim()
+  const database_recovery = await openStrataDatabaseWithRecovery(user_data_dir)
+  const db = database_recovery.db
 
-	const shutdown = async (server: { close: () => Promise<void> }) => {
-		process.off('SIGINT', on_sigint)
-		process.off('SIGTERM', on_sigterm)
-		await server.close()
-		db.close()
-	}
+  const shutdown = async (server: { close: () => Promise<void> }) => {
+    process.off('SIGINT', on_sigint)
+    process.off('SIGTERM', on_sigterm)
+    await server.close()
+    db.close()
+  }
 
-	let active_server: { close: () => Promise<void> } | null = null
+  let active_server: { close: () => Promise<void> } | null = null
 
-	const on_sigint = () => {
-		if (!active_server) process.exit(0)
-		void shutdown(active_server).finally(() => process.exit(0))
-	}
+  const on_sigint = () => {
+    if (!active_server) process.exit(0)
+    void shutdown(active_server).finally(() => process.exit(0))
+  }
 
-	const on_sigterm = () => {
-		if (!active_server) process.exit(0)
-		void shutdown(active_server).finally(() => process.exit(0))
-	}
+  const on_sigterm = () => {
+    if (!active_server) process.exit(0)
+    void shutdown(active_server).finally(() => process.exit(0))
+  }
 
-	process.on('SIGINT', on_sigint)
-	process.on('SIGTERM', on_sigterm)
+  process.on('SIGINT', on_sigint)
+  process.on('SIGTERM', on_sigterm)
 
-	active_server = await startNotesApiServer(db)
-	if (database_recovery.recovered && database_recovery.backupDir) {
-		console.warn(`[strata-server] Recovered damaged database files to ${database_recovery.backupDir}`)
-		if (database_recovery.restoredFromBackupPath) {
-			console.warn(`[strata-server] Restored latest healthy backup from ${database_recovery.restoredFromBackupPath}`)
-		}
-	}
-	console.info(`[strata-server] Using data from ${user_data_dir}`)
+  active_server = await startNotesApiServer(db)
+  if (database_recovery.recovered && database_recovery.backupDir) {
+    console.warn(`[strata-server] Recovered damaged database files to ${database_recovery.backupDir}`)
+    if (database_recovery.restoredFromBackupPath) {
+      console.warn(
+        `[strata-server] Restored latest healthy backup from ${database_recovery.restoredFromBackupPath}`,
+      )
+    }
+  }
+  console.info(`[strata-server] Using data from ${user_data_dir}`)
 
-	await new Promise<void>(() => {
-		// Keep the process alive until interrupted.
-	})
+  await new Promise<void>(() => {
+    // Keep the process alive until interrupted.
+  })
 }
 
 void run().catch((error) => {
-	console.error('[strata-server] Failed to start', error)
-	process.exit(1)
+  console.error('[strata-server] Failed to start', error)
+  process.exit(1)
 })
