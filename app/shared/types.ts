@@ -62,6 +62,7 @@ export interface Settings {
   sortMode: SortMode
   openAiApiKey: string
   openAiModel: string
+  autoBackupKeepCount: number
   autoBackupFrequency: AutoBackupFrequency
   lastAutoBackupAt: string | null
   aiEditMode: AiEditMode

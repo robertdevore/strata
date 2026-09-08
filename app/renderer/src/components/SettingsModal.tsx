@@ -939,6 +939,22 @@ export function SettingsModal({
             <>
               <HistoryStorage />
               <label>
+                Automatic backups to keep
+                <select
+                  value={settings.autoBackupKeepCount ?? 0}
+                  onChange={(event) => onUpdate({ autoBackupKeepCount: Number(event.target.value) })}
+                >
+                  <option value={0}>All (no automatic deletion)</option>
+                  <option value={7}>Newest 7</option>
+                  <option value={30}>Newest 30</option>
+                  <option value={90}>Newest 90</option>
+                </select>
+              </label>
+              <p>
+                Retention applies after a successful automatic backup. Manual, pre-restore and older
+                unrecognized backups are preserved.
+              </p>
+              <label>
                 Auto Backup Frequency
                 <select
                   value={settings.autoBackupFrequency}

@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import Database from 'better-sqlite3'
 import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import type { Settings } from '../../shared/types'
@@ -149,17 +150,78 @@ export class BackupManager {
 
   async createBackupNow(reason: 'manual' | 'auto' | 'pre-restore' = 'manual'): Promise<BackupResult> {
     const now = new Date()
-    const backup_folder = unique_directory(this.backup_dir, `${format_stamp(now)}-${reason}`)
-    ensure_dir(backup_folder)
-
+    const backup_folder = await fsPromises.mkdtemp(
+      path.join(this.backup_dir, `${format_stamp(now)}-${reason}-`),
+    )
     const destination_file = path.join(backup_folder, path.basename(this.db_file_path))
-    await this.backup_database(destination_file)
-
-    return {
-      createdAt: now.toISOString(),
-      directory: backup_folder,
-      files: [destination_file],
+    try {
+      await this.backup_database(destination_file)
+      const probeError = await probeDatabase(destination_file)
+      if (probeError) throw new Error('Backup failed SQLite validation')
+      const copied = new Database(destination_file, { readonly: true })
+      let schemaVersion: number
+      try {
+        schemaVersion = copied.pragma('user_version', { simple: true }) as number
+      } finally {
+        copied.close()
+      }
+      await fsPromises.chmod(backup_folder, 0o700)
+      await fsPromises.chmod(destination_file, 0o600)
+      await fsPromises.writeFile(
+        path.join(backup_folder, 'manifest.json'),
+        JSON.stringify({
+          format: 'strata-backup-v1',
+          createdAt: now.toISOString(),
+          reason,
+          schemaVersion,
+          integrity: 'ok',
+        }) + '\n',
+        { mode: 0o600 },
+      )
+      if (reason === 'auto')
+        await this.pruneAutomaticBackups(backup_folder).catch(() =>
+          console.warn('[strata-backup] Retention cleanup failed; verified backup preserved'),
+        )
+      return {
+        createdAt: now.toISOString(),
+        directory: backup_folder,
+        files: [destination_file, path.join(backup_folder, 'manifest.json')],
+      }
+    } catch (error) {
+      await fsPromises.rm(backup_folder, { recursive: true, force: true })
+      throw error
     }
+  }
+
+  private async pruneAutomaticBackups(currentDirectory: string): Promise<void> {
+    const keep = this.get_settings().autoBackupKeepCount
+    if (![7, 30, 90].includes(keep)) return
+    const candidates: Array<{ directory: string; createdAt: string }> = []
+    for (const entry of await fsPromises.readdir(this.backup_dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const directory = path.join(this.backup_dir, entry.name)
+      try {
+        const manifest = JSON.parse(await fsPromises.readFile(path.join(directory, 'manifest.json'), 'utf8'))
+        if (
+          manifest.format === 'strata-backup-v1' &&
+          manifest.reason === 'auto' &&
+          manifest.integrity === 'ok' &&
+          Number.isFinite(Date.parse(manifest.createdAt))
+        )
+          candidates.push({ directory, createdAt: manifest.createdAt })
+      } catch {
+        /* Preserve unknown or unreadable backups. */
+      }
+    }
+    candidates.sort((a, b) =>
+      a.directory === currentDirectory
+        ? -1
+        : b.directory === currentDirectory
+          ? 1
+          : b.createdAt.localeCompare(a.createdAt) || b.directory.localeCompare(a.directory),
+    )
+    for (const item of candidates.slice(keep))
+      await fsPromises.rm(item.directory, { recursive: true, force: true })
   }
 
   getBackupPath(name: string): string {

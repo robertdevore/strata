@@ -112,6 +112,7 @@ const DEFAULT_SETTINGS: Settings = {
   sortMode: 'updated_desc',
   openAiApiKey: '',
   openAiModel: 'gpt-4o',
+  autoBackupKeepCount: 0,
   autoBackupFrequency: '24h',
   lastAutoBackupAt: null,
   aiEditMode: 'confirm',

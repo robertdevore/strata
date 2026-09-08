@@ -52,6 +52,7 @@ const settings_patch_schema = z.object({
   sortMode: z.enum(['updated_desc', 'created_desc', 'title_asc']).optional(),
   openAiApiKey: z.string().max(2048).optional(),
   openAiModel: z.string().trim().min(1).max(120).optional(),
+  autoBackupKeepCount: z.union([z.literal(0), z.literal(7), z.literal(30), z.literal(90)]).optional(),
   autoBackupFrequency: z.enum(['off', '12h', '24h', '168h']).optional(),
   lastAutoBackupAt: z.string().datetime().nullable().optional(),
   aiEditMode: z.enum(['read_only', 'confirm', 'auto_apply']).optional(),

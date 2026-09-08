@@ -80,3 +80,5 @@ Chat model choices retain their provider identity. “Auto” uses the configure
 `npm run package:electron:verify` builds an unsigned temporary Electron directory and checks its bundled assets and native SQLite/FTS runtime without opening the live library. It requires Electron build dependencies/download access. It does not sign, notarize, publish, or prove installer and renderer behavior. The macOS CI job runs this separately from normal source verification.
 
 For custom OpenAI-compatible endpoints, Advanced AI settings let you disable unsupported tool calls, system messages, or temperature parameters. Text-only endpoints cannot retrieve or edit notes through tools. When system roles are unavailable, instructions are included as user text; mutation permissions remain enforced by Strata.
+
+Desktop Backup settings can retain all automatic backups (default) or the newest 7, 30, or 90. Retention runs only after a verified automatic backup and preserves manual, pre-restore and unrecognized older backups. New backups include schema/integrity metadata; failed attempts are removed rather than offered as recovery points.
