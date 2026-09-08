@@ -22,6 +22,32 @@ const open = () => {
   return { db, dir, service: new KnowledgeService(db) }
 }
 describe('transactional knowledge contracts', () => {
+  it('deduplicates captures by exact normalized content and project without merging', () => {
+    const { db, service } = open()
+    const input = {
+      payload: { content: '# Decision\r\nKeep SQLite', tags: ['decision'], projectName: 'Project A' },
+    }
+    const first = service.capture(input)
+    const duplicate = service.capture({
+      payload: { ...input.payload, content: '# Decision\nKeep SQLite  ', tags: ['different'] },
+    })
+    expect(duplicate.duplicate).toBe(true)
+    expect(duplicate.note.id).toBe(first.note.id)
+    expect(duplicate.note.tags).toEqual(['decision'])
+    expect(duplicate.note.revision).toBe(1)
+    expect(db.listRevisions(first.note.id)[0].source).toBe('agent')
+    const other = service.capture({ payload: { ...input.payload, projectName: 'Project B' } })
+    expect(other.duplicate).toBe(false)
+    db.updateNote(first.note.id, { content: 'changed' })
+    expect(service.capture(input).duplicate).toBe(false)
+    const count = db.listNotes().length
+    service.capture({ payload: { content: 'dry', projectName: 'Rolled back' }, dryRun: true })
+    expect(db.listNotes()).toHaveLength(count)
+    expect(db.getProjectByName('Rolled back')).toBeNull()
+    expect(service.capture({ ...input, dedupe: false }).duplicate).toBe(false)
+    expect(db.listNotes()).toHaveLength(count + 1)
+  })
+
   it('previews history cleanup and rejects changed plans while preserving recovery', () => {
     const { db } = open()
     const a = db.createNote({ content: 'a0' })

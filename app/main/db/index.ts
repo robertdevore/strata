@@ -147,6 +147,9 @@ export class StrataDatabase {
     const db_path = path.join(data_dir, 'strata.sqlite')
     this.db = new Database(db_path)
     try {
+      this.db.function('strata_content_hash', { deterministic: true }, (content: string) =>
+        createHash('sha256').update(content.replace(/\r\n/g, '\n').trim()).digest('hex'),
+      )
       this.db.function('strata_title', { deterministic: true }, deriveNoteTitle)
       this.db.function('strata_normalize', { deterministic: true }, (value: string) =>
         this.normalizeTitle(value),
@@ -708,6 +711,16 @@ export class StrataDatabase {
             ).toString('base64url')
           : null,
     }
+  }
+
+  findCaptureDuplicate(content: string, projectId: string | null): Note | null {
+    const hash = createHash('sha256').update(content.replace(/\r\n/g, '\n').trim()).digest('hex')
+    const row = this.db
+      .prepare(
+        'SELECT id FROM notes WHERE content_hash=? AND project_id IS ? AND deleted_at IS NULL ORDER BY created_at,id LIMIT 1',
+      )
+      .get(hash, projectId) as { id: string } | undefined
+    return row ? this.getNote(row.id) : null
   }
 
   getNote(id: string): Note | null {

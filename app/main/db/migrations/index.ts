@@ -226,4 +226,19 @@ export const migrations: Migration[] = [
       END;
     `,
   },
+  {
+    version: 12,
+    description: 'indexed deterministic capture deduplication',
+    upSql: `
+      ALTER TABLE notes ADD COLUMN content_hash TEXT NOT NULL DEFAULT '';
+      UPDATE notes SET content_hash=strata_content_hash(content);
+      CREATE INDEX idx_notes_content_hash ON notes(content_hash,project_id) WHERE deleted_at IS NULL;
+      CREATE TRIGGER notes_content_hash_insert AFTER INSERT ON notes BEGIN
+        UPDATE notes SET content_hash=strata_content_hash(new.content) WHERE id=new.id;
+      END;
+      CREATE TRIGGER notes_content_hash_update AFTER UPDATE OF content ON notes BEGIN
+        UPDATE notes SET content_hash=strata_content_hash(new.content) WHERE id=new.id;
+      END;
+    `,
+  },
 ]

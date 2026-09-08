@@ -50,10 +50,28 @@ describe('CLI protocol integration', () => {
       expect(search.data.notes[0]).toMatchObject({ title: 'Updated', revision: 2 })
       const full = await run(['agent', 'context', 'search', 'Updated', '--full'])
       expect(full.data.notes[0].content).toBe('# Updated')
+      const captureArgs = [
+        'agent',
+        'decision',
+        '# Durable decision',
+        '--source',
+        'repository:test',
+        '--session',
+        'session-1',
+      ]
+      const capture = await run(captureArgs)
+      const retry = await run(captureArgs)
+      expect(retry.data.duplicate).toBe(true)
+      expect(retry.data.noteId).toBe(capture.data.noteId)
+      expect(db.getNote(capture.data.noteId)?.content).toContain('repository:test')
+      expect(db.getNote(capture.data.noteId)?.tags).not.toContain('codex')
+      const count = db.listNotes().length
+      await run(['--dry-run', 'agent', 'capture', '# Dry capture'])
+      expect(db.listNotes()).toHaveLength(count)
     } finally {
       await server.close()
       db.close()
       fs.rmSync(dir, { recursive: true, force: true })
     }
-  }, 20000)
+  }, 40000)
 })

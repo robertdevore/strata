@@ -107,7 +107,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
       return ok({
         version: '0.8.0',
         apiVersion: 1,
-        schemaVersion: 11,
+        schemaVersion: 12,
         auth: 'local-token',
         search: 'fts5-with-substring-fallback',
         capabilities: [
@@ -117,6 +117,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
           'optimistic-concurrency',
           'history',
           'batch',
+          'memory_capture_dedupe',
           'idempotency',
         ],
         limits: { list: 100, batch: 50, bodyBytes: MAX_BODY },
@@ -125,6 +126,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
       })
     if (method === 'GET' && (route === 'notes' || route === 'search'))
       return ok(db.listSummaryPage(filters()))
+    if (method === 'POST' && route === 'memory/capture') return ok(service.capture(await body(request)))
     if (method === 'POST' && route === 'batch') return ok(service.batch(await body(request), mutationOptions))
     if (method === 'POST' && route === 'notes')
       return ok(

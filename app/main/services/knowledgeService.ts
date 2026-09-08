@@ -163,6 +163,38 @@ export class KnowledgeService {
       }
     }
   }
+  capture(input: unknown) {
+    const parsed = z
+      .object({
+        payload: createSchema,
+        dedupe: z.boolean().default(true),
+        dryRun: z.boolean().default(false),
+      })
+      .strict()
+      .parse(input)
+    const result = this.db.executeOperation(
+      () => {
+        const { projectName, ...payload } = parsed.payload
+        if (projectName && payload.projectId !== undefined)
+          throw new DomainError('VALIDATION_ERROR', 'Specify projectId or projectName, not both')
+        if (projectName)
+          payload.projectId =
+            this.db.getProjectByName(projectName)?.id ?? this.db.createProject(projectName).id
+        const existing = parsed.dedupe
+          ? this.db.findCaptureDuplicate(payload.content ?? '', payload.projectId ?? null)
+          : null
+        const note = existing ?? this.db.createNote(payload)
+        return { note: this.db.summarize(note), duplicate: Boolean(existing), dryRun: parsed.dryRun }
+      },
+      {
+        source: 'agent',
+        dryRun: parsed.dryRun,
+        fingerprint: createHash('sha256').update(JSON.stringify(parsed)).digest('hex'),
+      },
+    )
+    if (!parsed.dryRun && !result.duplicate) this.notify?.(ALL_CHANGED)
+    return result
+  }
   importFolder(input: unknown) {
     const parsed = importSchema.parse(input)
     const result = this.db.transaction(() => {
