@@ -1,3 +1,4 @@
+import { LibraryAccess } from './libraryAccess'
 import { DomainError } from '../../shared/errors'
 import type { NoteSummary, NoteRevision } from '../../shared/types'
 import { SECRET_KEYS, SECRET_PRESENT, type SecretStore } from '../security/secretStore'
@@ -141,14 +142,28 @@ const DEFAULT_SETTINGS: Settings = {
   sidebarLayout: DEFAULT_SIDEBAR_LAYOUT,
 }
 
+export const createLibraryAccess = (userDataPath: string): LibraryAccess => {
+  const dataDirectory = path.join(userDataPath, 'data')
+  fs.mkdirSync(dataDirectory, { recursive: true })
+  return new LibraryAccess(path.join(dataDirectory, '.strata-access.sqlite'), Database)
+}
+
 export class StrataDatabase {
   private db: import('better-sqlite3').Database
   private secretStore?: SecretStore
-  constructor(user_data_path: string) {
+  private access: LibraryAccess
+
+  constructor(user_data_path: string, access?: LibraryAccess) {
     const data_dir = path.join(user_data_path, 'data')
     if (!fs.existsSync(data_dir)) fs.mkdirSync(data_dir, { recursive: true })
     const db_path = path.join(data_dir, 'strata.sqlite')
-    this.db = new Database(db_path)
+    this.access = access ?? createLibraryAccess(user_data_path)
+    try {
+      this.db = new Database(db_path)
+    } catch (error) {
+      if (!access) this.access.close()
+      throw error
+    }
     try {
       this.db.function('strata_content_hash', { deterministic: true }, (content: string) =>
         createHash('sha256').update(content.replace(/\r\n/g, '\n').trim()).digest('hex'),
@@ -170,6 +185,7 @@ export class StrataDatabase {
       this.pruneRouteLogs()
     } catch (error) {
       this.db.close()
+      if (!access) this.access.close()
       throw error
     }
   }
@@ -430,6 +446,14 @@ export class StrataDatabase {
       /* ignore — db may already be in bad state */
     }
     this.db.close()
+    this.access.close()
+  }
+
+  /** Keep the coordination lease alive across physical database replacement. */
+  closeForRestore(): () => void {
+    this.access.exclusive()
+    this.db.close()
+    return () => this.access.close()
   }
 
   async backupTo(destination_path: string): Promise<void> {

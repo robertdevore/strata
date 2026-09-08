@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { Worker } from 'node:worker_threads'
-import { StrataDatabase } from './index'
+import { StrataDatabase, createLibraryAccess } from './index'
+import type { LibraryAccess } from './libraryAccess'
 
 const require = createRequire(import.meta.url)
 
@@ -173,15 +174,19 @@ const restore_first_healthy_database = async (
 const recover_from_corruption = async (
   user_data_path: string,
   error: unknown,
+  access: LibraryAccess,
 ): Promise<DatabaseRecoveryResult> => {
+  access.exclusive()
   const backup_dir = quarantine_database_files(user_data_path)
   const quarantined_database_path = path.join(backup_dir, 'strata.sqlite')
   const restored_backup_path = await restore_first_healthy_database(user_data_path, [
     quarantined_database_path,
     ...list_backup_database_paths(user_data_path),
   ])
+  const db = new StrataDatabase(user_data_path, access)
+  access.shared()
   return {
-    db: new StrataDatabase(user_data_path),
+    db,
     recovered: true,
     backupDir: backup_dir,
     restoredFromBackupPath: restored_backup_path,
@@ -192,21 +197,24 @@ const recover_from_corruption = async (
 export const openStrataDatabaseWithRecovery = async (
   user_data_path: string,
 ): Promise<DatabaseRecoveryResult> => {
-  const preflight_error = await preflight_database_error(user_data_path)
-  if (preflight_error) {
-    return await recover_from_corruption(user_data_path, preflight_error)
-  }
-
+  const access = createLibraryAccess(user_data_path)
   try {
-    return {
-      db: new StrataDatabase(user_data_path),
-      recovered: false,
-      backupDir: null,
-      restoredFromBackupPath: null,
-      originalError: null,
+    const preflight_error = await preflight_database_error(user_data_path)
+    if (preflight_error) return await recover_from_corruption(user_data_path, preflight_error, access)
+    try {
+      return {
+        db: new StrataDatabase(user_data_path, access),
+        recovered: false,
+        backupDir: null,
+        restoredFromBackupPath: null,
+        originalError: null,
+      }
+    } catch (error) {
+      if (!is_database_corruption_error(error)) throw error
+      return await recover_from_corruption(user_data_path, error, access)
     }
   } catch (error) {
-    if (!is_database_corruption_error(error)) throw error
-    return await recover_from_corruption(user_data_path, error)
+    access.close()
+    throw error
   }
 }

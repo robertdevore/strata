@@ -116,7 +116,15 @@ const restore_prepared_database = async (preparation: BackupRestorePreparation):
       await startApi()
       throw error
     }
-    db.close()
+    let releaseLibrary: () => void
+    try {
+      releaseLibrary = db.closeForRestore()
+    } catch (error) {
+      ipc.resume()
+      backup_manager.start()
+      await startApi()
+      throw error
+    }
     db = null
     current_settings = null
     try {
@@ -128,6 +136,7 @@ const restore_prepared_database = async (preparation: BackupRestorePreparation):
         'The backup could not be installed. Strata will restart. Recovery copies of the previous library are preserved in its data folder.',
       )
     }
+    releaseLibrary()
     app.relaunch()
     app.exit(0)
   })
