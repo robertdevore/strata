@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url'
 import { _electron, expect } from '@playwright/test'
 import fs from 'node:fs/promises'
 import os from 'node:os'
@@ -167,6 +168,41 @@ try {
   expect((await page.evaluate((id) => window.strata.notes.get(id), saved.id)).content).toContain(
     'External update',
   )
+  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute(
+    'content',
+    /script-src 'self'/,
+  )
+  await page.evaluate(() => {
+    window.__strataCspViolations = []
+    document.addEventListener('securitypolicyviolation', (event) =>
+      window.__strataCspViolations.push(event.violatedDirective),
+    )
+    const script = document.createElement('script')
+    script.textContent = 'window.__strataInlineExecuted = true'
+    document.head.append(script)
+  })
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__strataCspViolations.some((value) => value.startsWith('script-src'))),
+    )
+    .toBe(true)
+  expect(await page.evaluate(() => window.__strataInlineExecuted)).toBeUndefined()
+  const originalUrl = page.url()
+  await application.evaluate(({ BrowserWindow }) => {
+    globalThis.__strataNavigationChecks = []
+    BrowserWindow.getAllWindows()[0].webContents.on('will-navigate', (event) =>
+      globalThis.__strataNavigationChecks.push(event.defaultPrevented),
+    )
+  })
+  const deniedFile = path.join(directory, 'denied-navigation.html')
+  await fs.writeFile(deniedFile, '<h1>This must not load</h1>')
+  await page.evaluate((url) => {
+    window.location.assign(url)
+  }, pathToFileURL(deniedFile).href)
+  await expect.poll(() => application.evaluate(() => globalThis.__strataNavigationChecks)).toEqual([true])
+  expect(page.url()).toBe(originalUrl)
+  expect(await page.evaluate((url) => window.open(url) === null, pathToFileURL(deniedFile).href)).toBe(true)
+  expect(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
   const failureLogs = []
   page.on('console', (message) => failureLogs.push(message.text()))
   await page.evaluate(() => {
@@ -179,7 +215,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, explicit ambiguous-link choice, sanitized renderer failures, and independent split-pane conflicts.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, explicit ambiguous-link choice, sanitized renderer failures, and independent split-pane conflicts, enforced CSP, and blocked renderer navigation/popups.',
   )
 } finally {
   try {

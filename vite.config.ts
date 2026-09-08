@@ -1,3 +1,4 @@
+import { PRODUCTION_CSP } from './app/shared/contentSecurityPolicy'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron/simple'
@@ -30,6 +31,20 @@ export default defineConfig({
     },
   },
   plugins: [
+    {
+      name: 'strata-production-csp',
+      apply: 'build',
+      transformIndexHtml: {
+        order: 'post',
+        handler: () => [
+          {
+            tag: 'meta',
+            attrs: { 'http-equiv': 'Content-Security-Policy', content: PRODUCTION_CSP },
+            injectTo: 'head-prepend',
+          },
+        ],
+      },
+    },
     react(),
     electron({
       main: {

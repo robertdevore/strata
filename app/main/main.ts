@@ -1,3 +1,4 @@
+import { PRODUCTION_CSP } from '../shared/contentSecurityPolicy'
 import { debugRuntime, runtimeErrorCode } from '../shared/runtimeLogging'
 import { EncryptedSecretStore } from './security/secretStore'
 import { protectNavigation } from './security/navigation'
@@ -206,7 +207,7 @@ const setCspHeaders = () => {
   const is_dev = Boolean(process.env.VITE_DEV_SERVER_URL)
   const csp = is_dev
     ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:* http://localhost:*;"
-    : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';"
+    : PRODUCTION_CSP
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
