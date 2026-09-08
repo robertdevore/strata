@@ -80,6 +80,13 @@ export const budgetHistory = (
   return selected
 }
 
+export const createToolLoopState = () => ({
+  steps: 0,
+  toolCalls: 0,
+  notesChanged: false,
+  proposalIds: [] as string[],
+})
+
 export const runProviderToolLoop = async (options: {
   provider: import('./types').AiProvider
   model: string
@@ -92,14 +99,19 @@ export const runProviderToolLoop = async (options: {
     proposalId?: string
   }
   onUsage?: (usage: AiProviderTurnOutput['usage']) => void
+  state?: ReturnType<typeof createToolLoopState>
 }): Promise<{ content: string; notesChanged: boolean; proposalIds: string[]; toolCalls: number }> => {
-  let notesChanged = false
-  let toolCalls = 0
-  const proposalIds: string[] = []
-  for (let step = 0; step < 6; step++) {
+  const state = options.state ?? createToolLoopState()
+  let notesChanged = state.notesChanged
+  let toolCalls = state.toolCalls
+  const proposalIds = state.proposalIds
+  while (state.steps < 6) {
+    state.steps++
     if (JSON.stringify(options.messages).length + options.systemPrompt.length > 100000)
       return {
-        content: 'Context budget reached. Narrow the request to continue.',
+        content: proposalIds.length
+          ? 'Context budget reached. Edits are awaiting your approval in the proposal panel.'
+          : 'Context budget reached. Narrow the request to continue.',
         notesChanged,
         proposalIds,
         toolCalls,
@@ -122,7 +134,9 @@ export const runProviderToolLoop = async (options: {
       }
     if (output.toolCalls.length > 20 || toolCalls + output.toolCalls.length > 30)
       return {
-        content: 'Tool-call limit reached. Narrow the request to continue.',
+        content: proposalIds.length
+          ? 'Tool-call limit reached. Edits are awaiting your approval in the proposal panel.'
+          : 'Tool-call limit reached. Narrow the request to continue.',
         notesChanged,
         proposalIds,
         toolCalls,
@@ -131,7 +145,9 @@ export const runProviderToolLoop = async (options: {
     for (const call of output.toolCalls) {
       const execution = options.execute(call)
       toolCalls++
+      state.toolCalls = toolCalls
       notesChanged ||= execution.notesChanged
+      state.notesChanged = notesChanged
       if (execution.proposalId) proposalIds.push(execution.proposalId)
       results.push({ id: call.id, output: execution.output })
     }

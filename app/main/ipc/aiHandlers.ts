@@ -142,10 +142,8 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
     const ai_turn = await run_ai_turn(db, thread, {
       openNotesContext: build_open_notes_context(openNotes),
       forcedModel: effective_model,
+      onNotesChanged: on_notes_changed,
     })
-    if (ai_turn.notesChanged) {
-      on_notes_changed?.()
-    }
     const assistant_message = db.createAiMessage(thread.id, 'assistant', ai_turn.content)
     const refreshed_thread = db.getAiThread(thread.id)
     if (!refreshed_thread) throw new Error('Chat thread was not found after response generation.')

@@ -8,7 +8,7 @@ import { AI_TOOLS, execute_tool_call } from './tools'
 import { route_ai_request } from './routing'
 import type { RouterConfig } from './routing'
 import { create_provider, resolve_model_selection, get_preset_by_id } from './providers/providerRegistry'
-import { budgetHistory, runProviderToolLoop } from './toolLoop'
+import { budgetHistory, runProviderToolLoop, createToolLoopState } from './toolLoop'
 
 // ---- System Prompt ----
 
@@ -206,6 +206,7 @@ export interface AiRunnerResult {
 interface AiRunnerOptions {
   openNotesContext?: string
   forcedModel?: string
+  onNotesChanged?: () => void
 }
 
 const build_system_prompt = (open_notes_context?: string): string => {
@@ -311,12 +312,15 @@ export const run_ai_turn = async (
   const execute = (call: import('./types').NormalizedToolCall) => {
     const result = execute_tool_call(db, call, { threadId: thread.id, model })
     notes_changed ||= result.notesChanged
+    if (result.notesChanged) options?.onNotesChanged?.()
     return result
   }
+  const toolState = createToolLoopState()
   const run = () =>
     runProviderToolLoop({
       provider,
       model,
+      state: toolState,
       systemPrompt: system_prompt,
       messages: input_messages,
       tools: AI_TOOLS,
@@ -332,7 +336,7 @@ export const run_ai_turn = async (
   try {
     result = await run()
   } catch (error) {
-    if (effective_route_target !== 'cheap') throw error
+    if (effective_route_target !== 'cheap' || forcedModel || ai_settings.aiRoutingMode !== 'auto') throw error
     const premium = resolve_provider_for_route(db, 'premium')
     provider = premium.provider
     model = premium.model

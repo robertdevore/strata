@@ -121,3 +121,10 @@ Forced models now resolve exact provider-qualified catalog identities instead of
 
 Fixed Auto chat selection: IPC no longer converts an empty selection into a forced OpenAI model, so configured routing executes. Forced selection no longer initializes an unrelated routed provider first (and fails on that provider's missing key). Added exact-selection, ambiguity, unknown-model, catalog-cache and IPC Auto/qualified-selection tests. Provider capability conformance and end-to-end fallback evaluation remain outstanding parts of the full goal.
 Verification: format check, lint and all 123 tests/26 files passed. Typecheck found an optional-options reference in the route explanation; replaced it with the already narrowed local selection. Final production build/typecheck and changed-file lint passed after correction.
+
+### Provider fallback execution-state checkpoint
+
+Cheap/premium fallback now shares turn count, total tool-call count, applied-write state and pending proposal IDs. A failed cheap response no longer erases approval state or resets the global tool budget. Budget-exhaustion responses still surface pending approvals. Premium escalation is restricted to Auto routing without an explicit model selection; cheap-only and locked-model choices are respected.
+
+Committed tool writes now notify the desktop immediately, including when both providers later fail, rather than waiting for a successful final response. Added actual runner tests with scripted offline providers covering pending proposals across fallback, existing tool-result protocol, applied writes without replay, cumulative tool limits, cheap-only policy and notifications after double failure. No live provider calls were used. Full goal remains active; capability conformance and remaining release/desktop requirements are not yet complete.
+Final consolidated verification passed formatting, lint, 128 tests/27 files, TypeScript and production build.
