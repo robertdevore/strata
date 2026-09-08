@@ -164,3 +164,63 @@ it('keeps each pane status independent when another note finishes saving', async
   await useAppStore.getState().flushDraft(note.id)
   expect(window.strata.notes.update).toHaveBeenCalledTimes(2)
 })
+
+it('keeps a tab and its draft open when closing cannot save', async () => {
+  const update = vi.fn().mockRejectedValue(new Error('Service unavailable'))
+  vi.stubGlobal('window', { strata: { notes: { update } } })
+  useAppStore.getState().setDraft(note.id, 'Must not disappear')
+  expect(await useAppStore.getState().closeTab(note.id)).toBe(false)
+  expect(useAppStore.getState().drafts[note.id]).toBe('Must not disappear')
+  expect(useAppStore.getState().openTabs).toEqual([note.id])
+  expect(useAppStore.getState().navigationError).toContain('draft is preserved')
+  useAppStore.setState({ saveStates: { [note.id]: 'conflict' } })
+  expect(await useAppStore.getState().closeTab(note.id)).toBe(false)
+  expect(update).toHaveBeenCalledTimes(1)
+})
+
+it('waits for the draft acknowledgement before closing its tab', async () => {
+  let finish!: (value: Note) => void
+  vi.stubGlobal('window', {
+    strata: {
+      notes: {
+        update: vi.fn(
+          () =>
+            new Promise<Note>((resolve) => {
+              finish = resolve
+            }),
+        ),
+      },
+    },
+  })
+  useAppStore.getState().setDraft(note.id, 'Saved before closing')
+  const closing = useAppStore.getState().closeTab(note.id)
+  expect(useAppStore.getState().openTabs).toEqual([note.id])
+  finish({ ...note, revision: 6, content: 'Saved before closing' })
+  expect(await closing).toBe(true)
+  expect(useAppStore.getState().openTabs).toEqual([])
+  expect(useAppStore.getState().drafts[note.id]).toBeUndefined()
+  expect(useAppStore.getState().notes[0].content).toBe('Saved before closing')
+})
+
+it('refuses to close if more text arrives during the closing save', async () => {
+  let finish!: (value: Note) => void
+  vi.stubGlobal('window', {
+    strata: {
+      notes: {
+        update: vi.fn(
+          () =>
+            new Promise<Note>((resolve) => {
+              finish = resolve
+            }),
+        ),
+      },
+    },
+  })
+  useAppStore.getState().setDraft(note.id, 'First text')
+  const closing = useAppStore.getState().closeTab(note.id)
+  useAppStore.getState().setDraft(note.id, 'Newer text while waiting')
+  finish({ ...note, revision: 6, content: 'First text' })
+  expect(await closing).toBe(false)
+  expect(useAppStore.getState().openTabs).toEqual([note.id])
+  expect(useAppStore.getState().drafts[note.id]).toBe('Newer text while waiting')
+})

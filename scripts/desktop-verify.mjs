@@ -255,6 +255,10 @@ try {
   expect((await page.evaluate((id) => window.strata.notes.get(id), saved.id)).content).toContain(
     'External update',
   )
+  await page.locator('.tab-item-pinned').getByTitle('Close Tab').click()
+  await expect(page.getByText('Could not close this tab. Your draft is preserved.')).toBeVisible()
+  await expect(page.locator('.tab-item-pinned')).toHaveCount(1)
+  await expect(pinnedPane.locator('.cm-content')).toContainText('Preserved pinned draft')
   await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute(
     'content',
     /script-src 'self'/,

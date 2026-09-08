@@ -831,13 +831,8 @@ export function App() {
             splitNoteIds={splitNoteIds}
             splitLayout={store.splitLayout}
             splitGridColumns={store.splitGridColumns}
-            onSelectTab={async (id) => {
-              if (store.selectedNoteId && store.selectedNoteId !== id) {
-                await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
-              }
-              store.activateTab(id)
-            }}
-            onCloseTab={(id) => store.closeTab(id)}
+            onSelectTab={(id) => void store.navigateToNote(id, true)}
+            onCloseTab={(id) => void store.closeTab(id)}
             onReorderTabs={(from_id, to_id) => store.reorderTabs(from_id, to_id)}
             onSplitNote={(id) => store.toggleSplitNote(id)}
             onSetSplitLayout={(layout) => store.setSplitLayout(layout)}

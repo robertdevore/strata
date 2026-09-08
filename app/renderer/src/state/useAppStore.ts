@@ -87,7 +87,7 @@ interface AppState {
   setSelectedTag: (value: string | null) => void
   selectNote: (id: string | null) => void
   openNoteInTab: (id: string) => void
-  closeTab: (id: string) => void
+  closeTab: (id: string) => Promise<boolean>
   activateTab: (id: string) => void
   reorderTabs: (from_id: string, to_id: string) => void
   navigateBack: () => void
@@ -460,8 +460,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     void get().hydrateNote(id)
   },
 
-  closeTab(id) {
+  async closeTab(id) {
+    await get().flushDraft(id)
     const state = get()
+    if (state.drafts[id] !== undefined) {
+      set({ navigationError: 'Could not close this tab. Your draft is preserved.' })
+      return false
+    }
     const tabs = state.openTabs.filter((t) => t !== id)
     const drafts = { ...state.drafts }
     const untouched_new_note_ids = { ...state.untouchedNewNoteIds }
@@ -487,6 +492,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       splitNoteIds: split_note_ids,
       splitRatios: split_ratios,
     })
+    return true
   },
 
   activateTab(id) {
