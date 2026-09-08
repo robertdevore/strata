@@ -35,6 +35,16 @@ Include the following in your report:
 
 ## Security Boundaries
 
-- Strata is local-first by design.
-- The local HTTP API can be protected with `STRATA_API_TOKEN`.
-- `window.strata.shell.run` is a privileged local IPC capability and should only be used with trusted command strings.
+- Strata is a local-first Electron application with a SQLite library, a loopback automation API and an HTTP-only CLI. Notes, revision history and provider credentials are sensitive assets.
+- The local HTTP API requires a random local credential by default. Explicit `STRATA_API_TOKEN` configuration is supported; non-loopback bindings and browser-origin requests are rejected. Localhost alone is not authentication.
+- The renderer is sandboxed with context isolation and no Node integration. The arbitrary `window.strata.shell.run` bridge has been removed. Publishing uses narrow operations and a native-selected destination.
+- Production HTML embeds a restrictive CSP because the application loads a `file://` document. Unexpected document navigation and new windows are denied; intentionally opened external URLs are protocol-validated.
+- Permission checks and requests allow only audio capture and sanitized clipboard writes from the application main frame. Camera, location, other device access, child frames and auxiliary windows are denied. Audio still requires applicable OS authorization.
+- Provider credentials use OS-encrypted storage. Ordinary settings expose presence markers, and generated backups are sanitized. Legacy standalone libraries must complete desktop credential migration before serving requests.
+- Notes, imported Markdown, AI tool arguments and provider responses are untrusted input. Rendered content must not gain privileged execution, and AI writes must obey the configured mode, validated service contracts and original revision preconditions.
+
+## Review Guidance
+
+Review the API authentication boundary, preload/IPC capabilities, content rendering, filesystem exports, provider requests, credential migration, backup recovery and concurrent mutations. A local deployment does not make browser-origin attacks, credential exposure or silent stale-write data loss harmless. Establish reachability and impact from current code; historical audit documents are not evidence that a control works.
+
+The ongoing hardening work and remaining validation gaps are tracked in `docs/hardening/requirements.md`. Those gaps are not exclusions or accepted risks. Platform packaging, OS credential behavior and actual desktop controls require their own verification; unit tests alone do not establish release readiness.

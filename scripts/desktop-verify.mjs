@@ -18,7 +18,11 @@ try {
   }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.VITE_DEV_SERVER_URL
-  application = await _electron.launch({ args: [process.cwd()], env, timeout: 30000 })
+  application = await _electron.launch({
+    args: [process.cwd(), '--use-fake-device-for-media-stream'],
+    env,
+    timeout: 30000,
+  })
   expect(await application.evaluate(({ app }) => app.getPath('userData'))).toBe(directory)
   const page = await application.firstWindow()
   page.on('requestfailed', (req) => console.error('Request failed:', req.url(), req.failure()))
@@ -27,6 +31,28 @@ try {
     if (message.type() === 'error') console.error(message.text())
   })
   await expect(page.getByRole('button', { name: 'New Note', exact: true })).toBeVisible()
+  expect(
+    await page.evaluate(async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const kinds = stream.getTracks().map((track) => track.kind)
+      stream.getTracks().forEach((track) => track.stop())
+      return kinds
+    }),
+  ).toEqual(['audio'])
+  expect(
+    await page.evaluate(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        stream.getTracks().forEach((track) => track.stop())
+        return 'unexpectedly allowed'
+      } catch (error) {
+        return error.name
+      }
+    }),
+  ).toBe('NotAllowedError')
+  expect(
+    await page.evaluate(async () => (await navigator.permissions.query({ name: 'geolocation' })).state),
+  ).toBe('denied')
   await page.getByRole('button', { name: 'New Note', exact: true }).click()
   const editor = page.locator('.cm-content[contenteditable="true"]').first()
   await expect(editor).toBeVisible({ timeout: 20000 })
