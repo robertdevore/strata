@@ -8,7 +8,7 @@ import { debugRuntime, runtimeErrorCode } from '../shared/runtimeLogging'
 import { EncryptedSecretStore } from './security/secretStore'
 import { protectNavigation } from './security/navigation'
 import { installPermissionPolicy } from './security/permissions'
-import { configureTrustedIpc } from './security/trustedIpc'
+import { configureTrustedIpc, suspendTrustedIpc } from './security/trustedIpc'
 import path from 'node:path'
 import fs from 'node:fs'
 import { app, BrowserWindow, dialog, Menu, session, shell, safeStorage } from 'electron'
@@ -46,6 +46,7 @@ let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
 let database_recovery: DatabaseRecoveryResult | null = null
 let api_start: Promise<void> | null = null
+let cancelAiRequests: (() => void) | null = null
 
 const notifyDataChanged = (changed: ChangedDomains) => {
   const contents = main_window?.webContents
@@ -98,14 +99,19 @@ const draftCloseGuard = new DraftCloseGuard({
 const restore_prepared_database = async (preparation: BackupRestorePreparation): Promise<void> => {
   await draftCloseGuard.withSavedDrafts(async () => {
     if (!backup_manager || !db) throw new Error('The library is unavailable.')
+    const ipc = suspendTrustedIpc([IPC_CHANNELS.backupRestoreSelect, IPC_CHANNELS.backupRestoreNamed])
     backup_manager.stop()
     try {
+      cancelAiRequests?.()
+      await ipc.drain()
+      await backup_manager.stopAndDrain()
       await api_start
       await notes_api_server?.close()
       notes_api_server = null
       // Capture drafts acknowledged by the renderer, after stopping this API's writers.
       await backup_manager.createBackupNow('pre-restore')
     } catch (error) {
+      ipc.resume()
       backup_manager.start()
       await startApi()
       throw error
@@ -423,7 +429,7 @@ void app
       createAppMenu(current_settings)
     })
     registerExportHandlers()
-    registerAiHandlers(db, notifyDataChanged)
+    cancelAiRequests = registerAiHandlers(db, notifyDataChanged)
     registerBackupHandlers(backup_manager, restore_prepared_database)
     registerLinksHandlers(db, notifyDataChanged)
     registerPublishHandlers()

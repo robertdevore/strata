@@ -74,6 +74,8 @@ export class BackupManager {
   private readonly on_auto_backup_created: (created_at: string) => void
   private timer_id: NodeJS.Timeout | null = null
   private running = false
+  private activeBackups = new Set<Promise<BackupResult>>()
+  private automaticWork: Promise<void> | null = null
 
   constructor(options: BackupManagerOptions) {
     this.db_file_path = options.dbFilePath
@@ -128,7 +130,17 @@ export class BackupManager {
     return entries
   }
 
-  async createBackupNow(reason: 'manual' | 'auto' | 'pre-restore' = 'manual'): Promise<BackupResult> {
+  createBackupNow(reason: 'manual' | 'auto' | 'pre-restore' = 'manual'): Promise<BackupResult> {
+    const work = this.createBackup(reason)
+    this.activeBackups.add(work)
+    void work.then(
+      () => this.activeBackups.delete(work),
+      () => this.activeBackups.delete(work),
+    )
+    return work
+  }
+
+  private async createBackup(reason: 'manual' | 'auto' | 'pre-restore'): Promise<BackupResult> {
     const now = new Date()
     const backup_folder = await fsPromises.mkdtemp(
       path.join(this.backup_dir, `${format_stamp(now)}-${reason}-`),
@@ -289,7 +301,15 @@ export class BackupManager {
     return preserved_directory
   }
 
-  async checkAutoBackup(): Promise<void> {
+  checkAutoBackup(): Promise<void> {
+    if (this.automaticWork) return this.automaticWork
+    this.automaticWork = this.runAutoBackup().finally(() => {
+      this.automaticWork = null
+    })
+    return this.automaticWork
+  }
+
+  private async runAutoBackup(): Promise<void> {
     if (this.running) return
     this.running = true
 
@@ -322,6 +342,12 @@ export class BackupManager {
       },
       15 * 60 * 1000,
     )
+  }
+
+  async stopAndDrain(): Promise<void> {
+    this.stop()
+    await this.automaticWork
+    await Promise.allSettled([...this.activeBackups])
   }
 
   stop(): void {

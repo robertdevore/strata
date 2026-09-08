@@ -8,7 +8,7 @@ vi.mock('electron', () => ({
     handle: (channel: string, listener: (...args: unknown[]) => unknown) => handlers.set(channel, listener),
   },
 }))
-import { configureTrustedIpc, handleTrustedIpc } from '../../../main/security/trustedIpc'
+import { configureTrustedIpc, handleTrustedIpc, suspendTrustedIpc } from '../../../main/security/trustedIpc'
 
 it('fails closed before configuration and rejects foreign windows, frames and documents before dispatch', () => {
   const url = 'file:///application/index.html'
@@ -47,5 +47,37 @@ it('keeps every handler registration behind the sender boundary', () => {
     const source = fs.readFileSync(path.join(directory, name), 'utf8')
     expect(source, name).not.toMatch(/\bipcMain\b/)
     expect(source, name).toContain('handleTrustedIpc(')
+  }
+})
+
+it('suspends new work and drains active work, including rejected operations', async () => {
+  const frame = { url: 'file:///application/index.html' }
+  const contents = { mainFrame: frame } as Electron.WebContents
+  configureTrustedIpc(() => contents, frame.url)
+  const event = { sender: contents, senderFrame: frame }
+  let finish!: () => void
+  const work = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  handleTrustedIpc('test:async', () => work)
+  const invoke = handlers.get('test:async')!
+  expect(invoke(event)).toBe(work)
+  const suspension = suspendTrustedIpc([])
+  try {
+    expect(() => invoke(event)).toThrow('LIBRARY_BUSY')
+    await expect(suspension.drain(1)).rejects.toThrow('not stopped')
+    finish()
+    await suspension.drain()
+  } finally {
+    suspension.resume()
+  }
+  expect(invoke(event)).toBe(work)
+  handleTrustedIpc('test:rejected', () => Promise.reject(new Error('failed')))
+  await expect(handlers.get('test:rejected')!(event)).rejects.toThrow('failed')
+  const final = suspendTrustedIpc([])
+  try {
+    await final.drain()
+  } finally {
+    final.resume()
   }
 })

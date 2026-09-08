@@ -298,4 +298,5 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
     }
     return load_catalog()
   })
+  return () => requests.cancelAll()
 }

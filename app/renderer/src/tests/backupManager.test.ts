@@ -167,3 +167,40 @@ it('preserves the current database when installation fails', async () => {
     fs.rmSync(root, { recursive: true, force: true })
   }
 })
+
+it('drains an automatic backup through its final settings callback', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-backup-drain-'))
+  const db = new StrataDatabase(root)
+  let finish!: () => void
+  const waiting = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  const callback = vi.fn()
+  const manager = new BackupManager({
+    dbFilePath: path.join(root, 'data/strata.sqlite'),
+    backupDir: path.join(root, 'backups'),
+    getSettings: () => ({ ...db.getSettings(), autoBackupFrequency: '12h' }),
+    backupDatabase: async (destination) => {
+      await waiting
+      await db.backupTo(destination)
+    },
+    onAutoBackupCreated: callback,
+  })
+  try {
+    manager.start()
+    let drained = false
+    const drain = manager.stopAndDrain().then(() => {
+      drained = true
+    })
+    await Promise.resolve()
+    expect(drained).toBe(false)
+    expect(callback).not.toHaveBeenCalled()
+    finish()
+    await drain
+    expect(callback).toHaveBeenCalledOnce()
+  } finally {
+    manager.stop()
+    db.close()
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})

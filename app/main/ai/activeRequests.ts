@@ -36,6 +36,10 @@ export class ActiveAiRequests {
     for (const entry of this.requests.values()) if (entry.threadId === threadId) entry.controller.abort()
   }
 
+  cancelAll(): void {
+    for (const entry of this.requests.values()) entry.controller.abort()
+  }
+
   cancel(id: string, owner: number): boolean {
     const entry = this.requests.get(id)
     if (!entry || entry.owner !== owner) return false

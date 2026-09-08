@@ -7,6 +7,17 @@ export const registerBackupHandlers = (
   backup_manager: BackupManager,
   on_restore_prepared: (preparation: BackupRestorePreparation) => Promise<void>,
 ) => {
+  let restoring = false
+  const restore = async (sourcePath: string) => {
+    if (restoring) throw new Error('A backup restore is already in progress.')
+    restoring = true
+    try {
+      const preparation = await backup_manager.prepareRestore(sourcePath)
+      await on_restore_prepared(preparation)
+    } finally {
+      restoring = false
+    }
+  }
   handleTrustedIpc(IPC_CHANNELS.backupCreateNow, () => {
     return backup_manager.createBackupNow('manual')
   })
@@ -33,15 +44,13 @@ export const registerBackupHandlers = (
       : await dialog.showOpenDialog(options)
     if (result.canceled || !result.filePaths[0]) return { canceled: true }
 
-    const preparation = await backup_manager.prepareRestore(result.filePaths[0])
-    await on_restore_prepared(preparation)
+    await restore(result.filePaths[0])
     return { canceled: false }
   })
 
   handleTrustedIpc(IPC_CHANNELS.backupRestoreNamed, async (_event, payload: { name?: unknown }) => {
     if ('string' !== typeof payload?.name) throw new Error('Backup name is required.')
-    const preparation = await backup_manager.prepareRestore(backup_manager.getBackupPath(payload.name))
-    await on_restore_prepared(preparation)
+    await restore(backup_manager.getBackupPath(payload.name))
     return { canceled: false }
   })
 }
