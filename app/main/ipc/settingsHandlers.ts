@@ -10,81 +10,85 @@ import type { StrataDatabase } from '../db/index'
 import { IPC_CHANNELS } from '../../shared/ipc'
 
 const hotkeys_schema: z.ZodType<HotkeysSettings> = z.object({
-	quickOpen: z.string().max(40),
-	commandPalette: z.string().max(40),
-	newNote: z.string().max(40),
-	editNoteTags: z.string().max(40),
-	allTagsModal: z.string().max(40),
-	togglePreview: z.string().max(40),
-	findOrSearch: z.string().max(40),
-	toggleFilters: z.string().max(40),
-	saveNote: z.string().max(40),
-	toggleStar: z.string().max(40),
-	toggleArchive: z.string().max(40),
-	copyRichText: z.string().max(40),
-	deleteNote: z.string().max(40),
-	toggleSidebar: z.string().max(40),
-	toggleSettings: z.string().max(40),
-	relatedNotes: z.string().max(40),
-	navigateBack: z.string().max(40),
-	navigateForward: z.string().max(40),
+  quickOpen: z.string().max(40),
+  commandPalette: z.string().max(40),
+  newNote: z.string().max(40),
+  editNoteTags: z.string().max(40),
+  allTagsModal: z.string().max(40),
+  togglePreview: z.string().max(40),
+  findOrSearch: z.string().max(40),
+  toggleFilters: z.string().max(40),
+  saveNote: z.string().max(40),
+  toggleStar: z.string().max(40),
+  toggleArchive: z.string().max(40),
+  copyRichText: z.string().max(40),
+  deleteNote: z.string().max(40),
+  toggleSidebar: z.string().max(40),
+  toggleSettings: z.string().max(40),
+  relatedNotes: z.string().max(40),
+  navigateBack: z.string().max(40),
+  navigateForward: z.string().max(40),
 })
 
 const home_tile_schema = z.object({
-	action: z.enum(HOME_TILE_ACTIONS),
+  action: z.enum(HOME_TILE_ACTIONS),
 })
 
 const sidebar_layout_schema = z.object({
-	showSearch: z.boolean(),
-	sectionOrder: z.array(z.enum(SIDEBAR_SECTION_IDS)).max(4),
-	sectionVisibility: z.object({
-		tags: z.boolean(),
-		projects: z.boolean(),
-		pinned: z.boolean(),
-		notes: z.boolean(),
-	}),
+  showSearch: z.boolean(),
+  sectionOrder: z.array(z.enum(SIDEBAR_SECTION_IDS)).max(4),
+  sectionVisibility: z.object({
+    tags: z.boolean(),
+    projects: z.boolean(),
+    pinned: z.boolean(),
+    notes: z.boolean(),
+  }),
 })
 
 const settings_patch_schema = z.object({
-	theme: z.enum(['dark', 'light', 'system']).optional(),
-	defaultView: z.enum(['all', 'starred']).optional(),
-	confirmDelete: z.boolean().optional(),
-	sortMode: z.enum(['updated_desc', 'created_desc', 'title_asc']).optional(),
-	openAiApiKey: z.string().max(2048).optional(),
-	openAiModel: z.string().trim().min(1).max(120).optional(),
-	autoBackupFrequency: z.enum(['off', '12h', '24h', '168h']).optional(),
-	lastAutoBackupAt: z.string().datetime().nullable().optional(),
-	aiEditMode: z.enum(['read_only', 'confirm', 'auto_apply']).optional(),
-	// AI provider settings
-	aiRoutingMode: z.enum(['premium_only', 'cheap_only', 'auto', 'ask_each_time']).optional(),
-	aiCheapProvider: z.string().trim().min(1).max(60).optional(),
-	aiCheapModel: z.string().trim().max(120).optional(),
-	aiPremiumProvider: z.string().trim().min(1).max(60).optional(),
-	aiPremiumModel: z.string().trim().max(120).optional(),
-	aiDeepseekApiKey: z.string().max(2048).optional(),
-	aiKimiApiKey: z.string().max(2048).optional(),
-	aiOpenrouterApiKey: z.string().max(2048).optional(),
-	aiCustomApiKey: z.string().max(2048).optional(),
-	aiCustomBaseUrl: z.string().max(512).optional(),
-	aiShowRoutingDecisions: z.boolean().optional(),
-	aiEnableRouteLogs: z.boolean().optional(),
-	aiCheapConfidenceThreshold: z.number().min(0).max(1).optional(),
-	aiPremiumFallbackThreshold: z.number().min(0).max(1).optional(),
-	aiModelCatalog: z.string().max(8192).optional(),
-	pinnedTags: z.array(z.string()).optional(),
-	pinnedNotes: z.array(z.string().uuid()).optional(),
-	hotkeys: hotkeys_schema.optional(),
-	homeTiles: z.array(home_tile_schema).max(3).optional(),
-	sidebarLayout: sidebar_layout_schema.optional(),
+  theme: z.enum(['dark', 'light', 'system']).optional(),
+  defaultView: z.enum(['all', 'starred']).optional(),
+  confirmDelete: z.boolean().optional(),
+  sortMode: z.enum(['updated_desc', 'created_desc', 'title_asc']).optional(),
+  openAiApiKey: z.string().max(2048).optional(),
+  openAiModel: z.string().trim().min(1).max(120).optional(),
+  autoBackupFrequency: z.enum(['off', '12h', '24h', '168h']).optional(),
+  lastAutoBackupAt: z.string().datetime().nullable().optional(),
+  aiEditMode: z.enum(['read_only', 'confirm', 'auto_apply']).optional(),
+  // AI provider settings
+  aiRoutingMode: z.enum(['premium_only', 'cheap_only', 'auto', 'ask_each_time']).optional(),
+  aiCheapProvider: z.string().trim().min(1).max(60).optional(),
+  aiCheapModel: z.string().trim().max(120).optional(),
+  aiPremiumProvider: z.string().trim().min(1).max(60).optional(),
+  aiPremiumModel: z.string().trim().max(120).optional(),
+  aiDeepseekApiKey: z.string().max(2048).optional(),
+  aiKimiApiKey: z.string().max(2048).optional(),
+  aiOpenrouterApiKey: z.string().max(2048).optional(),
+  aiCustomApiKey: z.string().max(2048).optional(),
+  aiCustomBaseUrl: z.string().max(512).optional(),
+  aiShowRoutingDecisions: z.boolean().optional(),
+  aiEnableRouteLogs: z.boolean().optional(),
+  aiRouteLogRetentionDays: z.union([z.literal(7), z.literal(30), z.literal(0)]).optional(),
+  aiCheapConfidenceThreshold: z.number().min(0).max(1).optional(),
+  aiPremiumFallbackThreshold: z.number().min(0).max(1).optional(),
+  aiModelCatalog: z.string().max(8192).optional(),
+  pinnedTags: z.array(z.string()).optional(),
+  pinnedNotes: z.array(z.string().uuid()).optional(),
+  hotkeys: hotkeys_schema.optional(),
+  homeTiles: z.array(home_tile_schema).max(3).optional(),
+  sidebarLayout: sidebar_layout_schema.optional(),
 })
 
-export const registerSettingsHandlers = (db: StrataDatabase, on_settings_set?: (settings: Settings) => void) => {
-	ipcMain.handle(IPC_CHANNELS.settingsGet, () => redactSettings(db.getSettings()))
-	ipcMain.handle(IPC_CHANNELS.settingsSet, (_event, patch) => {
-		const parsed = settings_patch_schema.parse(patch)
-		if (parsed.aiCustomBaseUrl) validateProviderUrl(parsed.aiCustomBaseUrl)
-		const updated = db.setSettings(parsed)
-		on_settings_set?.(updated)
-		return redactSettings(updated)
-	})
+export const registerSettingsHandlers = (
+  db: StrataDatabase,
+  on_settings_set?: (settings: Settings) => void,
+) => {
+  ipcMain.handle(IPC_CHANNELS.settingsGet, () => redactSettings(db.getSettings()))
+  ipcMain.handle(IPC_CHANNELS.settingsSet, (_event, patch) => {
+    const parsed = settings_patch_schema.parse(patch)
+    if (parsed.aiCustomBaseUrl) validateProviderUrl(parsed.aiCustomBaseUrl)
+    const updated = db.setSettings(parsed)
+    on_settings_set?.(updated)
+    return redactSettings(updated)
+  })
 }

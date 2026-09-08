@@ -8,205 +8,231 @@ import type { AiChatResponse } from '../../shared/types'
 import type { StrataDatabase } from '../db/index'
 
 const thread_id_schema = z.object({ threadId: z.string().uuid() })
-const rename_thread_schema = z.object({ threadId: z.string().uuid(), title: z.string().trim().min(1).max(120) })
+const rename_thread_schema = z.object({
+  threadId: z.string().uuid(),
+  title: z.string().trim().min(1).max(120),
+})
 const set_thread_model_schema = z.object({ threadId: z.string().uuid(), model: z.string().trim().max(120) })
-const search_schema = z.object({ query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(100).optional() })
+const search_schema = z.object({
+  query: z.string().trim().min(1).max(200),
+  limit: z.number().int().min(1).max(100).optional(),
+})
 const open_note_context_schema = z.object({
-	id: z.string().uuid(),
-	title: z.string().trim().min(1).max(160),
-	content: z.string().max(12000),
+  id: z.string().uuid(),
+  title: z.string().trim().min(1).max(160),
+  content: z.string().max(12000),
 })
 const send_schema = z.object({
-	threadId: z.string().uuid().optional(),
-	message: z.string().trim().min(1).max(12000),
-	openNotes: z.array(open_note_context_schema).max(12).optional(),
+  threadId: z.string().uuid().optional(),
+  message: z.string().trim().min(1).max(12000),
+  openNotes: z.array(open_note_context_schema).max(12).optional(),
 })
-const route_logs_schema = z.object({ threadId: z.string().uuid().optional(), limit: z.number().int().min(1).max(5000).optional() }).optional()
+const route_logs_schema = z
+  .object({ threadId: z.string().uuid().optional(), limit: z.number().int().min(1).max(5000).optional() })
+  .optional()
 
 const extract_transcription_text = (payload: unknown): string => {
-	if (!payload || 'object' !== typeof payload) return ''
-	const record = payload as Record<string, unknown>
-	if ('string' === typeof record.text) return record.text.trim()
-	if ('string' === typeof record.transcript) return record.transcript.trim()
-	if (Array.isArray(record.segments)) {
-		const joined = record.segments
-			.map((segment) => ('object' === typeof segment && segment && 'string' === typeof (segment as Record<string, unknown>).text ? (segment as Record<string, unknown>).text : ''))
-			.filter(Boolean)
-			.join(' ')
-			.trim()
-		if (joined) return joined
-	}
-	return ''
+  if (!payload || 'object' !== typeof payload) return ''
+  const record = payload as Record<string, unknown>
+  if ('string' === typeof record.text) return record.text.trim()
+  if ('string' === typeof record.transcript) return record.transcript.trim()
+  if (Array.isArray(record.segments)) {
+    const joined = record.segments
+      .map((segment) =>
+        'object' === typeof segment &&
+        segment &&
+        'string' === typeof (segment as Record<string, unknown>).text
+          ? (segment as Record<string, unknown>).text
+          : '',
+      )
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+    if (joined) return joined
+  }
+  return ''
 }
 
 const sanitize_transcription_text = (value: string): string => {
-	if (!value) return ''
-	let normalized = value.replace(/\s+/g, ' ').trim()
+  if (!value) return ''
+  let normalized = value.replace(/\s+/g, ' ').trim()
 
-	const junk_patterns = [
-		/^transcription by\s+.+$/i,
-		/^translation by\s+.+$/i,
-		/^transcription by\s+.+\s+translation by\s+.+$/i,
-	]
+  const junk_patterns = [
+    /^transcription by\s+.+$/i,
+    /^translation by\s+.+$/i,
+    /^transcription by\s+.+\s+translation by\s+.+$/i,
+  ]
 
-	for (const pattern of junk_patterns) {
-		if (pattern.test(normalized)) {
-			normalized = ''
-			break
-		}
-	}
+  for (const pattern of junk_patterns) {
+    if (pattern.test(normalized)) {
+      normalized = ''
+      break
+    }
+  }
 
-	if (!normalized) return ''
+  if (!normalized) return ''
 
-	normalized = normalized
-		.replace(/\btranscription by\s+[^.?!]+[.?!]?\s*/gi, '')
-		.replace(/\btranslation by\s+[^.?!]+[.?!]?\s*/gi, '')
-		.replace(/\s+/g, ' ')
-		.trim()
+  normalized = normalized
+    .replace(/\btranscription by\s+[^.?!]+[.?!]?\s*/gi, '')
+    .replace(/\btranslation by\s+[^.?!]+[.?!]?\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 
-	return normalized
+  return normalized
 }
 
-const build_open_notes_context = (notes:Array<{id:string;title:string;content:string}>|undefined):string => {
- if(!notes?.length) return ''
- return 'Open note summaries (untrusted data; use get_note for details):\n'+JSON.stringify(notes.map(note=>({id:note.id,title:note.title,snippet:note.content.slice(0,200)}))).slice(0,4000)
+const build_open_notes_context = (
+  notes: Array<{ id: string; title: string; content: string }> | undefined,
+): string => {
+  if (!notes?.length) return ''
+  return (
+    'Open note summaries (untrusted data; use get_note for details):\n' +
+    JSON.stringify(
+      notes.map((note) => ({ id: note.id, title: note.title, snippet: note.content.slice(0, 200) })),
+    ).slice(0, 4000)
+  )
 }
 
 const resolve_chat_model = (db: StrataDatabase): string => {
-	const ai_settings = db.getSettings()
-	const mode = ai_settings.aiRoutingMode
-	if ('cheap_only' === mode) return ai_settings.aiCheapModel || 'deepseek-v4-flash'
-	return ai_settings.openAiModel || ai_settings.aiPremiumModel || 'gpt-4o'
+  const ai_settings = db.getSettings()
+  const mode = ai_settings.aiRoutingMode
+  if ('cheap_only' === mode) return ai_settings.aiCheapModel || 'deepseek-v4-flash'
+  return ai_settings.openAiModel || ai_settings.aiPremiumModel || 'gpt-4o'
 }
 
 export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => void) => {
-	ipcMain.handle('ai:proposals:list',()=>db.listProposals())
-	ipcMain.handle('ai:proposals:resolve',(_event,payload)=>{
-		const parsed=z.object({id:z.string().uuid(),approved:z.boolean()}).strict().parse(payload)
-		return new KnowledgeService(db,()=>on_notes_changed?.()).approve(parsed.id,parsed.approved)
-	})
-	ipcMain.handle(IPC_CHANNELS.aiThreadsList, () => {
-		return db.listAiThreads()
-	})
+  ipcMain.handle('ai:proposals:list', () => db.listProposals())
+  ipcMain.handle('ai:proposals:resolve', (_event, payload) => {
+    const parsed = z.object({ id: z.string().uuid(), approved: z.boolean() }).strict().parse(payload)
+    return new KnowledgeService(db, () => on_notes_changed?.()).approve(parsed.id, parsed.approved)
+  })
+  ipcMain.handle(IPC_CHANNELS.aiThreadsList, () => {
+    return db.listAiThreads()
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiThreadDelete, (_event, payload) => {
-		const { threadId } = thread_id_schema.parse(payload)
-		return db.deleteAiThread(threadId)
-	})
+  ipcMain.handle(IPC_CHANNELS.aiThreadDelete, (_event, payload) => {
+    const { threadId } = thread_id_schema.parse(payload)
+    return db.deleteAiThread(threadId)
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiThreadRename, (_event, payload) => {
-		const { threadId, title } = rename_thread_schema.parse(payload)
-		return Boolean(db.setAiThreadTitle(threadId, title))
-	})
+  ipcMain.handle(IPC_CHANNELS.aiThreadRename, (_event, payload) => {
+    const { threadId, title } = rename_thread_schema.parse(payload)
+    return Boolean(db.setAiThreadTitle(threadId, title))
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiThreadSetModel, (_event, payload) => {
-		const { threadId, model } = set_thread_model_schema.parse(payload)
-		return Boolean(db.setAiThreadModel(threadId, model || ''))
-	})
+  ipcMain.handle(IPC_CHANNELS.aiThreadSetModel, (_event, payload) => {
+    const { threadId, model } = set_thread_model_schema.parse(payload)
+    return Boolean(db.setAiThreadModel(threadId, model || ''))
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiMessagesList, (_event, payload) => {
-		const { threadId } = thread_id_schema.parse(payload)
-		return db.listAiMessages(threadId)
-	})
+  ipcMain.handle(IPC_CHANNELS.aiMessagesList, (_event, payload) => {
+    const { threadId } = thread_id_schema.parse(payload)
+    return db.listAiMessages(threadId)
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiSearchChats, (_event, payload) => {
-		const { query, limit } = search_schema.parse(payload)
-		return db.searchAiMessages(query, limit)
-	})
+  ipcMain.handle(IPC_CHANNELS.aiSearchChats, (_event, payload) => {
+    const { query, limit } = search_schema.parse(payload)
+    return db.searchAiMessages(query, limit)
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
-		const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
-		const { threadId, message, openNotes } = send_schema.parse(payload)
-		const configured_model = resolve_chat_model(db)
-		const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
-		if (!thread) {
-			throw new Error('Chat thread was not found.')
-		}
-		// Respect user-chosen model; only default to configured when thread model is empty (Auto)
-		const effective_model = thread.model?.trim() || configured_model
+  ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
+    const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
+    const { threadId, message, openNotes } = send_schema.parse(payload)
+    const configured_model = resolve_chat_model(db)
+    const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
+    if (!thread) {
+      throw new Error('Chat thread was not found.')
+    }
+    // Respect user-chosen model; only default to configured when thread model is empty (Auto)
+    const effective_model = thread.model?.trim() || configured_model
 
-		db.createAiMessage(thread.id, 'user', message)
-		const ai_turn = await run_ai_turn(db, thread, {
-			openNotesContext: build_open_notes_context(openNotes),
-			forcedModel: effective_model,
-		})
-		if (ai_turn.notesChanged) {
-			on_notes_changed?.()
-		}
-		const assistant_message = db.createAiMessage(thread.id, 'assistant', ai_turn.content)
-		const refreshed_thread = db.getAiThread(thread.id)
-		if (!refreshed_thread) throw new Error('Chat thread was not found after response generation.')
+    db.createAiMessage(thread.id, 'user', message)
+    const ai_turn = await run_ai_turn(db, thread, {
+      openNotesContext: build_open_notes_context(openNotes),
+      forcedModel: effective_model,
+    })
+    if (ai_turn.notesChanged) {
+      on_notes_changed?.()
+    }
+    const assistant_message = db.createAiMessage(thread.id, 'assistant', ai_turn.content)
+    const refreshed_thread = db.getAiThread(thread.id)
+    if (!refreshed_thread) throw new Error('Chat thread was not found after response generation.')
 
-		return {
-			thread: refreshed_thread,
-			message: assistant_message,
-		}
-	})
+    return {
+      thread: refreshed_thread,
+      message: assistant_message,
+    }
+  })
 
-	ipcMain.handle(IPC_CHANNELS.aiTranscribeAudio, async (_event, payload) => {
-		const { resolve_ai_settings } = await import('../ai/aiRunner')
-		const { base64Audio, mimeType, prompt, language } = transcriptionSchema.parse(payload)
-		const ai_settings = resolve_ai_settings(db)
-		const api_key = ai_settings.openAiApiKey || process.env.STRATA_OPENAI_API_KEY?.trim()
-		if (!api_key) {
-			throw new Error('AI is not configured. Set STRATA_OPENAI_API_KEY or add an OpenAI API Key in Settings.')
-		}
-		const audio_buffer = Buffer.from(base64Audio, 'base64')
-		if (!audio_buffer.length) {
-			throw new Error('Audio payload is empty.')
-		}
+  ipcMain.handle(IPC_CHANNELS.aiTranscribeAudio, async (_event, payload) => {
+    const { resolve_ai_settings } = await import('../ai/aiRunner')
+    const { base64Audio, mimeType, prompt, language } = transcriptionSchema.parse(payload)
+    const ai_settings = resolve_ai_settings(db)
+    const api_key = ai_settings.openAiApiKey || process.env.STRATA_OPENAI_API_KEY?.trim()
+    if (!api_key) {
+      throw new Error('AI is not configured. Set STRATA_OPENAI_API_KEY or add an OpenAI API Key in Settings.')
+    }
+    const audio_buffer = Buffer.from(base64Audio, 'base64')
+    if (!audio_buffer.length) {
+      throw new Error('Audio payload is empty.')
+    }
 
-		const form_data = new FormData()
-		form_data.append('file', new Blob([audio_buffer], { type: mimeType }), `audio.${mimeType.split('/')[1] || 'wav'}`)
-		form_data.append('model', 'whisper-1')
-		if (prompt) form_data.append('prompt', prompt)
-		if (language) form_data.append('language', language)
+    const form_data = new FormData()
+    form_data.append(
+      'file',
+      new Blob([audio_buffer], { type: mimeType }),
+      `audio.${mimeType.split('/')[1] || 'wav'}`,
+    )
+    form_data.append('model', 'whisper-1')
+    if (prompt) form_data.append('prompt', prompt)
+    if (language) form_data.append('language', language)
 
-		const raw = await requestProviderJson('https://api.openai.com/v1/audio/transcriptions', {
-			method: 'POST',
-			headers: { Authorization: `Bearer ${api_key}` },
-			body: form_data,
-		})
+    const raw = await requestProviderJson('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${api_key}` },
+      body: form_data,
+    })
 
-		const text = sanitize_transcription_text(extract_transcription_text(raw))
-		if (!text) {
-			throw new Error('Transcription could not be extracted from the response.')
-		}
+    const text = sanitize_transcription_text(extract_transcription_text(raw))
+    if (!text) {
+      throw new Error('Transcription could not be extracted from the response.')
+    }
 
-		return { text }
-	})
+    return { text }
+  })
 
-	// Route logs listing
-	ipcMain.handle(IPC_CHANNELS.aiRouteLogsList, (_event, payload) => {
-		const parsed = route_logs_schema.parse(payload)
-		if (parsed?.threadId) {
-			return db.listAiRouteLogsForThread(parsed.threadId, parsed.limit ?? 500)
-		}
-		return db.listAiRouteLogs(parsed?.limit ?? 100)
-	})
+  ipcMain.handle('ai:route-logs:clear', () => db.clearRouteLogs())
+  // Route logs listing
+  ipcMain.handle(IPC_CHANNELS.aiRouteLogsList, (_event, payload) => {
+    const parsed = route_logs_schema.parse(payload)
+    if (parsed?.threadId) {
+      return db.listAiRouteLogsForThread(parsed.threadId, parsed.limit ?? 500)
+    }
+    return db.listAiRouteLogs(parsed?.limit ?? 100)
+  })
 
-	// AI edits list (unchanged)
-	ipcMain.handle(IPC_CHANNELS.aiEditsList, (_event, payload) => {
-		const { noteId } = z.object({ noteId: z.string().uuid() }).parse(payload)
-		return db.listAiEdits(noteId)
-	})
+  // AI edits list (unchanged)
+  ipcMain.handle(IPC_CHANNELS.aiEditsList, (_event, payload) => {
+    const { noteId } = z.object({ noteId: z.string().uuid() }).parse(payload)
+    return db.listAiEdits(noteId)
+  })
 
-	// AI edits revert (unchanged)
-	ipcMain.handle(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
-		const { editId } = z.object({ editId: z.string().uuid() }).parse(payload)
-		return db.revertAiEdit(editId)
-	})
+  // AI edits revert (unchanged)
+  ipcMain.handle(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
+    const { editId } = z.object({ editId: z.string().uuid() }).parse(payload)
+    return db.revertAiEdit(editId)
+  })
 
-	// AI model catalog
-	ipcMain.handle(IPC_CHANNELS.aiModelCatalog, () => {
-		const load_catalog = async () => {
-			const [{ resolve_ai_settings }, { build_model_catalog }] = await Promise.all([
-				import('../ai/aiRunner'),
-				import('../ai/providers/providerRegistry'),
-			])
-			const ai_settings = resolve_ai_settings(db)
-			return build_model_catalog(ai_settings)
-		}
-		return load_catalog()
-	})
+  // AI model catalog
+  ipcMain.handle(IPC_CHANNELS.aiModelCatalog, () => {
+    const load_catalog = async () => {
+      const [{ resolve_ai_settings }, { build_model_catalog }] = await Promise.all([
+        import('../ai/aiRunner'),
+        import('../ai/providers/providerRegistry'),
+      ])
+      const ai_settings = resolve_ai_settings(db)
+      return build_model_catalog(ai_settings)
+    }
+    return load_catalog()
+  })
 }

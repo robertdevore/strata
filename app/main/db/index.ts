@@ -125,7 +125,8 @@ const DEFAULT_SETTINGS: Settings = {
   aiCustomApiKey: '',
   aiCustomBaseUrl: '',
   aiShowRoutingDecisions: true,
-  aiEnableRouteLogs: true,
+  aiEnableRouteLogs: false,
+  aiRouteLogRetentionDays: 30,
   aiCheapConfidenceThreshold: 0.85,
   aiPremiumFallbackThreshold: 0.65,
   pinnedTags: [],
@@ -145,20 +146,25 @@ export class StrataDatabase {
     const db_path = path.join(data_dir, 'strata.sqlite')
     this.db = new Database(db_path)
     try {
-    this.db.function('strata_title', { deterministic: true }, deriveNoteTitle)
-    this.db.function('strata_normalize', { deterministic: true }, (value: string) =>
-      this.normalizeTitle(value),
-    )
-    this.db.pragma('foreign_keys = ON')
-    this.db.pragma('journal_mode = WAL')
-    this.db.pragma('cache_size = -8000')
-    this.db.pragma('busy_timeout = 5000')
-    this.db.pragma('synchronous = NORMAL')
-    this.db.pragma('temp_store = MEMORY')
-    this.db.pragma('journal_size_limit = 10000000')
-    this.runMigrations()
-    this.ensureSettings()
-    } catch(error) { this.db.close(); throw error }
+      this.db.function('strata_title', { deterministic: true }, deriveNoteTitle)
+      this.db.function('strata_normalize', { deterministic: true }, (value: string) =>
+        this.normalizeTitle(value),
+      )
+      this.db.pragma('foreign_keys = ON')
+      this.db.pragma('journal_mode = WAL')
+      this.db.pragma('cache_size = -8000')
+      this.db.pragma('busy_timeout = 5000')
+      this.db.pragma('synchronous = NORMAL')
+      this.db.pragma('temp_store = MEMORY')
+      this.db.pragma('journal_size_limit = 10000000')
+      this.runMigrations()
+      this.ensureSettings()
+      this.sanitizeRouteLogs()
+      this.pruneRouteLogs()
+    } catch (error) {
+      this.db.close()
+      throw error
+    }
   }
 
   private mutationSource = 'system'
@@ -439,7 +445,8 @@ export class StrataDatabase {
   private runMigrations() {
     const current_version_row = this.db.prepare('PRAGMA user_version').get() as Record<string, number>
     let current_version = current_version_row.user_version ?? 0
-    if(current_version>(migrations.at(-1)?.version??0)) throw new Error('This database requires a newer Strata version')
+    if (current_version > (migrations.at(-1)?.version ?? 0))
+      throw new Error('This database requires a newer Strata version')
 
     for (const migration of migrations) {
       if (migration.version <= current_version) continue
@@ -572,7 +579,11 @@ export class StrataDatabase {
     }
     const terms = filters.query?.match(/[\p{L}\p{N}_]+/gu)?.slice(0, 30) ?? []
     const ftsExpression = terms.map((term) => '"' + term.replace(/"/g, '""') + '"*').join(' AND ')
-    const useFts = terms.length > 0 && Boolean(this.db.prepare('SELECT rowid FROM notes_fts WHERE notes_fts MATCH ? LIMIT 1').get(ftsExpression))
+    const useFts =
+      terms.length > 0 &&
+      Boolean(
+        this.db.prepare('SELECT rowid FROM notes_fts WHERE notes_fts MATCH ? LIMIT 1').get(ftsExpression),
+      )
     let rank =
       filters.sort === 'created_desc'
         ? 'n.created_at DESC, n.id DESC'
@@ -1117,6 +1128,25 @@ export class StrataDatabase {
   }
 
   /** Record a routing decision log entry. Best-effort — failures are silent. */
+  private sanitizeRouteLogs(): void {
+    if (this.db.prepare("SELECT 1 FROM settings WHERE key='routeLogPrivacyVersion'").get()) return
+    this.transaction(() => {
+      this.db.prepare("UPDATE ai_route_logs SET user_message='',reason=NULL,fallback_reason=NULL").run()
+      this.db.prepare("INSERT INTO settings(key,value) VALUES('routeLogPrivacyVersion','1')").run()
+    })
+  }
+
+  clearRouteLogs(): number {
+    return this.db.prepare('DELETE FROM ai_route_logs').run().changes
+  }
+
+  pruneRouteLogs(now = Date.now()): number {
+    const days = this.getSettings().aiRouteLogRetentionDays
+    if (days === 0) return 0
+    const cutoff = new Date(now - (days === 7 ? 7 : 30) * 86400000).toISOString()
+    return this.db.prepare('DELETE FROM ai_route_logs WHERE created_at < ?').run(cutoff).changes
+  }
+
   recordRouteLog(log: {
     threadId?: string | null
     userMessage: string
@@ -1133,6 +1163,8 @@ export class StrataDatabase {
     inputTokens?: number | null
     outputTokens?: number | null
   }): string {
+    if (!this.getSettings().aiEnableRouteLogs) return ''
+    this.pruneRouteLogs()
     const id = uuidv4()
     const now = new Date().toISOString()
     this.db
@@ -1143,7 +1175,7 @@ export class StrataDatabase {
       .run(
         id,
         log.threadId ?? null,
-        log.userMessage,
+        '',
         log.intent,
         log.route,
         log.providerId,
@@ -1151,9 +1183,9 @@ export class StrataDatabase {
         log.confidence ?? null,
         log.risk ?? null,
         log.requiresConfirmation ? 1 : 0,
-        log.reason ?? null,
+        null,
         log.fallbackUsed ? 1 : 0,
-        log.fallbackReason ?? null,
+        null,
         log.inputTokens ?? null,
         log.outputTokens ?? null,
         now,
@@ -1224,6 +1256,7 @@ export class StrataDatabase {
 
   /** List recent route logs. */
   listAiRouteLogs(limit = 100): AiRouteLog[] {
+    this.pruneRouteLogs()
     const rows = this.db
       .prepare('SELECT * FROM ai_route_logs ORDER BY created_at DESC LIMIT ?')
       .all(limit) as Array<{
@@ -1266,6 +1299,7 @@ export class StrataDatabase {
 
   /** List recent route logs for a specific thread. */
   listAiRouteLogsForThread(thread_id: string, limit = 500): AiRouteLog[] {
+    this.pruneRouteLogs()
     const rows = this.db
       .prepare('SELECT * FROM ai_route_logs WHERE thread_id = ? ORDER BY created_at DESC LIMIT ?')
       .all(thread_id, Math.max(1, Math.min(5000, limit))) as Array<{
@@ -1504,6 +1538,7 @@ export class StrataDatabase {
       if ((SECRET_KEYS as readonly string[]).includes(key)) continue
       upsert.run(key, JSON.stringify(value))
     }
+    if (patch.aiRouteLogRetentionDays !== undefined) this.pruneRouteLogs()
     return this.getSettings()
   }
 }

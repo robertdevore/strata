@@ -22,6 +22,68 @@ const open = () => {
   return { db, dir, service: new KnowledgeService(db) }
 }
 describe('transactional knowledge contracts', () => {
+  it('removes legacy routing excerpts when a library is opened', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-route-legacy-'))
+    let db = new StrataDatabase(dir)
+    try {
+      db.setSettings({ aiEnableRouteLogs: true })
+      db.recordRouteLog({
+        userMessage: '',
+        intent: 'general',
+        route: 'cheap',
+        providerId: 'custom',
+        model: 'test',
+      })
+      db.close()
+      const raw = new Database(path.join(dir, 'data', 'strata.sqlite'))
+      try {
+        raw.prepare("DELETE FROM settings WHERE key='routeLogPrivacyVersion'").run()
+        raw
+          .prepare(
+            "UPDATE ai_route_logs SET user_message='private legacy message', reason='private legacy reason', fallback_reason='private provider error'",
+          )
+          .run()
+      } finally {
+        raw.close()
+      }
+      db = new StrataDatabase(dir)
+      expect(JSON.stringify(db.listAiRouteLogs())).not.toContain('private')
+      expect(db.listAiRouteLogs()).toHaveLength(1)
+    } finally {
+      db.close()
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+  it('keeps routing logs opt-in, metadata-only, expiring and deletable', () => {
+    const { db } = open()
+    const log = {
+      userMessage: 'private note and sk-secret',
+      intent: 'general',
+      route: 'cheap',
+      providerId: 'custom',
+      model: 'model',
+      reason: 'private reasoning',
+      fallbackReason: 'secret provider response',
+    }
+    expect(db.recordRouteLog(log)).toBe('')
+    expect(db.listAiRouteLogs()).toEqual([])
+    db.setSettings({ aiEnableRouteLogs: true })
+    expect(db.recordRouteLog(log)).not.toBe('')
+    const saved = db.listAiRouteLogs()[0]
+    expect(saved.userMessage).toBe('')
+    expect(saved.reason).toBeNull()
+    expect(saved.fallbackReason).toBeNull()
+    expect(db.pruneRouteLogs(Date.now() + 31 * 86400000)).toBe(1)
+    db.setSettings({ aiRouteLogRetentionDays: 0 })
+    db.recordRouteLog(log)
+    expect(db.pruneRouteLogs(Date.now() + 366 * 86400000)).toBe(0)
+    expect(db.clearRouteLogs()).toBe(1)
+    expect(db.listAiRouteLogs()).toEqual([])
+    db.setSettings({ aiRouteLogRetentionDays: 7 })
+    db.recordRouteLog(log)
+    expect(db.pruneRouteLogs(Date.now() + 8 * 86400000)).toBe(1)
+  })
+
   it('imports bounded content atomically and rejects privileged path inputs', () => {
     const { db } = open()
     let notifications = 0

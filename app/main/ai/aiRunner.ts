@@ -120,7 +120,8 @@ const resolve_ai_settings = (db: StrataDatabase): AiSettings => {
     aiCustomBaseUrl: 'string' === typeof raw.aiCustomBaseUrl ? (raw.aiCustomBaseUrl as string) : '',
     aiShowRoutingDecisions:
       'boolean' === typeof raw.aiShowRoutingDecisions ? (raw.aiShowRoutingDecisions as boolean) : true,
-    aiEnableRouteLogs: 'boolean' === typeof raw.aiEnableRouteLogs ? (raw.aiEnableRouteLogs as boolean) : true,
+    aiEnableRouteLogs:
+      'boolean' === typeof raw.aiEnableRouteLogs ? (raw.aiEnableRouteLogs as boolean) : false,
     aiCheapConfidenceThreshold:
       'number' === typeof raw.aiCheapConfidenceThreshold ? (raw.aiCheapConfidenceThreshold as number) : 0.85,
     aiPremiumFallbackThreshold:

@@ -15,200 +15,201 @@ export type AiEditMode = 'read_only' | 'confirm' | 'auto_apply'
 export type AiRoutingMode = 'premium_only' | 'cheap_only' | 'auto' | 'ask_each_time'
 
 export interface Project {
-	id: string
-	name: string
-	createdAt: string
-	updatedAt: string
-	sortOrder: number
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  sortOrder: number
 }
 
 export interface Note {
-	revision: number
-	title?: string
-	id: string
-	content: string
-	createdAt: string
-	updatedAt: string
-	starred: boolean
-	archived: boolean
-	tags: string[]
-	projectId: string | null
-	deletedAt: string | null
-	contentLoaded?: boolean
+  revision: number
+  title?: string
+  id: string
+  content: string
+  createdAt: string
+  updatedAt: string
+  starred: boolean
+  archived: boolean
+  tags: string[]
+  projectId: string | null
+  deletedAt: string | null
+  contentLoaded?: boolean
 }
 
 export interface NotesFilter {
-	untagged?: boolean
-	sort?: SortMode
-	limit?: number
-	cursor?: string
-	query?: string
-	starred?: boolean
-	archived?: boolean
-	tag?: string
-	projectId?: string
-	includeDeleted?: boolean
+  untagged?: boolean
+  sort?: SortMode
+  limit?: number
+  cursor?: string
+  query?: string
+  starred?: boolean
+  archived?: boolean
+  tag?: string
+  projectId?: string
+  includeDeleted?: boolean
 }
 
 export interface Settings {
-	theme: ThemeMode
-	defaultView: ViewMode
-	confirmDelete: boolean
-	sortMode: SortMode
-	openAiApiKey: string
-	openAiModel: string
-	autoBackupFrequency: AutoBackupFrequency
-	lastAutoBackupAt: string | null
-	aiEditMode: AiEditMode
-	// AI provider settings
-	aiRoutingMode: AiRoutingMode
-	aiCheapProvider: string
-	aiCheapModel: string
-	aiPremiumProvider: string
-	aiPremiumModel: string
-	aiDeepseekApiKey: string
-	aiKimiApiKey: string
-	aiOpenrouterApiKey: string
-	aiCustomApiKey: string
-	aiCustomBaseUrl: string
-	aiShowRoutingDecisions: boolean
-	aiEnableRouteLogs: boolean
-	aiCheapConfidenceThreshold: number
-	aiPremiumFallbackThreshold: number
-	pinnedTags: string[]
-	pinnedNotes: string[]
-	hotkeys: HotkeysSettings
-	aiModelCatalog: string  // JSON object: {"openai":"gpt-5.5, gpt-4o", "deepseek-flash":"deepseek-v4-flash"}
-	homeTiles: HomeTileConfig[]
-	sidebarLayout: SidebarLayoutSettings
+  theme: ThemeMode
+  defaultView: ViewMode
+  confirmDelete: boolean
+  sortMode: SortMode
+  openAiApiKey: string
+  openAiModel: string
+  autoBackupFrequency: AutoBackupFrequency
+  lastAutoBackupAt: string | null
+  aiEditMode: AiEditMode
+  // AI provider settings
+  aiRoutingMode: AiRoutingMode
+  aiCheapProvider: string
+  aiCheapModel: string
+  aiPremiumProvider: string
+  aiPremiumModel: string
+  aiDeepseekApiKey: string
+  aiKimiApiKey: string
+  aiOpenrouterApiKey: string
+  aiCustomApiKey: string
+  aiCustomBaseUrl: string
+  aiShowRoutingDecisions: boolean
+  aiEnableRouteLogs: boolean
+  aiRouteLogRetentionDays: 7 | 30 | 0
+  aiCheapConfidenceThreshold: number
+  aiPremiumFallbackThreshold: number
+  pinnedTags: string[]
+  pinnedNotes: string[]
+  hotkeys: HotkeysSettings
+  aiModelCatalog: string // JSON object: {"openai":"gpt-5.5, gpt-4o", "deepseek-flash":"deepseek-v4-flash"}
+  homeTiles: HomeTileConfig[]
+  sidebarLayout: SidebarLayoutSettings
 }
 
 export interface NoteUpdatePatch {
-	expectedRevision?: number
-	content?: string
-	starred?: boolean
-	archived?: boolean
-	tags?: string[]
-	projectId?: string | null
+  expectedRevision?: number
+  content?: string
+  starred?: boolean
+  archived?: boolean
+  tags?: string[]
+  projectId?: string | null
 }
 
 export interface ListResult {
-	notes: Note[]
+  notes: Note[]
 }
 
 export interface AiThread {
-	id: string
-	title: string
-	model: string | null
-	createdAt: string
-	updatedAt: string
+  id: string
+  title: string
+  model: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AiMessage {
-	id: string
-	threadId: string
-	role: 'user' | 'assistant' | 'system'
-	content: string
-	createdAt: string
+  id: string
+  threadId: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  createdAt: string
 }
 
 export interface AiThreadSummary {
-	thread: AiThread
-	lastMessage: AiMessage | null
+  thread: AiThread
+  lastMessage: AiMessage | null
 }
 
 export interface AiChatResponse {
-	thread: AiThread
-	message: AiMessage
+  thread: AiThread
+  message: AiMessage
 }
 
 export interface AiOpenNoteContext {
-	id: string
-	title: string
-	content: string
+  id: string
+  title: string
+  content: string
 }
 
 export interface AiSearchResult {
-	message: AiMessage
-	thread: AiThread
+  message: AiMessage
+  thread: AiThread
 }
 
 export interface NoteLink {
-	id: string
-	sourceNoteId: string
-	targetNoteId: string | null
-	rawTarget: string
-	label: string | null
-	heading: string | null
-	linkType: 'wiki'
-	createdAt: string
+  id: string
+  sourceNoteId: string
+  targetNoteId: string | null
+  rawTarget: string
+  label: string | null
+  heading: string | null
+  linkType: 'wiki'
+  createdAt: string
 }
 
 export interface AiNoteEdit {
-	id: string
-	noteId: string
-	threadId: string | null
-	messageId: string | null
-	action: 'create' | 'update'
-	beforeContent: string | null
-	afterContent: string | null
-	beforeTags: string[] | null
-	afterTags: string[] | null
-	beforeProjectId: string | null
-	afterProjectId: string | null
-	model: string | null
-	promptExcerpt: string | null
-	createdAt: string
-	revertedAt: string | null
+  id: string
+  noteId: string
+  threadId: string | null
+  messageId: string | null
+  action: 'create' | 'update'
+  beforeContent: string | null
+  afterContent: string | null
+  beforeTags: string[] | null
+  afterTags: string[] | null
+  beforeProjectId: string | null
+  afterProjectId: string | null
+  model: string | null
+  promptExcerpt: string | null
+  createdAt: string
+  revertedAt: string | null
 }
 
 export interface AiTranscriptionResult {
-	text: string
+  text: string
 }
 
 export interface AiRouteLog {
-	id: string
-	threadId: string | null
-	userMessage: string
-	intent: string
-	route: string
-	providerId: string
-	model: string
-	confidence: number | null
-	risk: string | null
-	requiresConfirmation: boolean
-	reason: string | null
-	fallbackUsed: boolean
-	fallbackReason: string | null
-	inputTokens: number | null
-	outputTokens: number | null
-	createdAt: string
+  id: string
+  threadId: string | null
+  userMessage: string
+  intent: string
+  route: string
+  providerId: string
+  model: string
+  confidence: number | null
+  risk: string | null
+  requiresConfirmation: boolean
+  reason: string | null
+  fallbackUsed: boolean
+  fallbackReason: string | null
+  inputTokens: number | null
+  outputTokens: number | null
+  createdAt: string
 }
 
 export interface BackupResult {
-	createdAt: string
-	directory: string
-	files: string[]
+  createdAt: string
+  directory: string
+  files: string[]
 }
 
 export interface NoteSummary {
- id: string
- title: string
- snippet: string
- revision: number
- createdAt: string
- updatedAt: string
- starred: boolean
- archived: boolean
- tags: string[]
- projectId: string | null
- deletedAt: string | null
+  id: string
+  title: string
+  snippet: string
+  revision: number
+  createdAt: string
+  updatedAt: string
+  starred: boolean
+  archived: boolean
+  tags: string[]
+  projectId: string | null
+  deletedAt: string | null
 }
 export interface NoteRevision {
- noteId: string
- revision: number
- source: string
- operation: string
- createdAt: string
- snapshot: NoteUpdatePatch & {deletedAt?: string | null}
+  noteId: string
+  revision: number
+  source: string
+  operation: string
+  createdAt: string
+  snapshot: NoteUpdatePatch & { deletedAt?: string | null }
 }

@@ -96,6 +96,8 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>('general')
   const [backup_status, set_backup_status] = useState('')
+  const [routeLogStatus, setRouteLogStatus] = useState('')
+  const [clearingRouteLogs, setClearingRouteLogs] = useState(false)
   const [is_creating_backup, set_is_creating_backup] = useState(false)
   const [is_opening_backup_folder, set_is_opening_backup_folder] = useState(false)
   const [is_restoring_backup, set_is_restoring_backup] = useState(false)
@@ -825,11 +827,43 @@ export function SettingsModal({
                   <label className="inline-toggle">
                     <input
                       type="checkbox"
-                      checked={settings.aiEnableRouteLogs !== false}
+                      checked={settings.aiEnableRouteLogs === true}
                       onChange={(event) => onUpdate({ aiEnableRouteLogs: event.target.checked })}
                     />
-                    Enable route logs
+                    Keep routing metadata (no message excerpts)
                   </label>
+
+                  <label>
+                    Routing metadata retention
+                    <select
+                      value={settings.aiRouteLogRetentionDays ?? 30}
+                      onChange={(event) =>
+                        onUpdate({ aiRouteLogRetentionDays: Number(event.target.value) as 7 | 30 | 0 })
+                      }
+                    >
+                      <option value={7}>7 days</option>
+                      <option value={30}>30 days</option>
+                      <option value={0}>Forever</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={clearingRouteLogs}
+                    onClick={async () => {
+                      setClearingRouteLogs(true)
+                      try {
+                        await window.strata.ai.clearRouteLogs()
+                        setRouteLogStatus('Routing metadata cleared')
+                      } catch {
+                        setRouteLogStatus('Could not clear metadata. Retry')
+                      } finally {
+                        setClearingRouteLogs(false)
+                      }
+                    }}
+                  >
+                    Clear routing metadata
+                  </button>
+                  {routeLogStatus && <p role="status">{routeLogStatus}</p>}
 
                   <label>
                     Cheap Confidence Threshold ({settings.aiCheapConfidenceThreshold ?? 0.85})
@@ -882,8 +916,8 @@ export function SettingsModal({
               </label>
               <p className="tags-label">Last auto backup: {format_backup_time(settings.lastAutoBackupAt)}</p>
               <p className="tags-label" style={{ lineHeight: 1.4 }}>
-                Restore a complete SQLite backup. Strata saves the current database first, validates the selected
-                backup, and restarts with the restored data.
+                Restore a complete SQLite backup. Strata saves the current database first, validates the
+                selected backup, and restarts with the restored data.
               </p>
               <div className="modal-actions backup-actions">
                 <button
@@ -926,7 +960,9 @@ export function SettingsModal({
                     set_backup_status('Choose a Strata backup to restore…')
                     void onRestoreSelectedBackup()
                       .then((result) => {
-                        set_backup_status(result.canceled ? 'Restore canceled.' : 'Restoring backup and restarting Strata…')
+                        set_backup_status(
+                          result.canceled ? 'Restore canceled.' : 'Restoring backup and restarting Strata…',
+                        )
                       })
                       .catch((error) =>
                         set_backup_status(error instanceof Error ? error.message : 'Restore failed'),
@@ -946,14 +982,20 @@ export function SettingsModal({
                       <div>
                         <span className="backup-list-item-name">{item.name}</span>
                         <span className="backup-list-item-meta">
-                          {new Date(item.createdAt).toLocaleDateString()} · {format_backup_size(item.sizeBytes)}
+                          {new Date(item.createdAt).toLocaleDateString()} ·{' '}
+                          {format_backup_size(item.sizeBytes)}
                         </span>
                       </div>
                       <button
                         className="ghost-button"
                         disabled={is_restoring_backup}
                         onClick={() => {
-                          if (!window.confirm(`Restore backup “${item.name}”? Strata will restart after saving the current database.`)) return
+                          if (
+                            !window.confirm(
+                              `Restore backup “${item.name}”? Strata will restart after saving the current database.`,
+                            )
+                          )
+                            return
                           set_is_restoring_backup(true)
                           set_backup_status(`Validating ${item.name}…`)
                           void onRestoreBackup(item.name)

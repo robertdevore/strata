@@ -68,3 +68,5 @@ If Electron cannot load `better-sqlite3`, rebuild it for the Electron version de
 ```bash
 npx electron-rebuild -f -w better-sqlite3
 ```
+
+Routing diagnostics are off by default for new libraries. When enabled, Strata stores routing metadata without message excerpts or provider error text. Settings provide 7-day, 30-day (default), or unlimited retention and a clear action. Upgrading removes historical excerpts from the active library; older backup files are not rewritten.
