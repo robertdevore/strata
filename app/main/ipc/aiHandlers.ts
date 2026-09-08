@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto'
+import { ActiveAiRequests } from '../ai/activeRequests'
+import { assertNotCancelled } from '../ai/cancellation'
+import { DomainError } from '../../shared/errors'
 import { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { requestProviderJson } from '../ai/providerRequest'
@@ -23,11 +27,17 @@ const open_note_context_schema = z.object({
   title: z.string().trim().min(1).max(160),
   content: z.string().max(12000),
 })
-const send_schema = z.object({
-  threadId: z.string().uuid().optional(),
-  message: z.string().trim().min(1).max(12000),
-  openNotes: z.array(open_note_context_schema).max(12).optional(),
-})
+const send_schema = z
+  .object({
+    requestId: z
+      .string()
+      .uuid()
+      .default(() => randomUUID()),
+    threadId: z.string().uuid().optional(),
+    message: z.string().trim().min(1).max(12000),
+    openNotes: z.array(open_note_context_schema).max(12).optional(),
+  })
+  .strict()
 const route_logs_schema = z
   .object({ threadId: z.string().uuid().optional(), limit: z.number().int().min(1).max(5000).optional() })
   .optional()
@@ -95,6 +105,26 @@ const build_open_notes_context = (
 }
 
 export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed: ChangedDomains) => void) => {
+  const requests = new ActiveAiRequests()
+  const ownedRequest = async <T>(
+    event: Electron.IpcMainInvokeEvent,
+    requestId: string,
+    action: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> => {
+    if (event.sender.isDestroyed()) throw new DomainError('CANCELLED', 'AI request cancelled')
+    const request = requests.start(requestId, event.sender.id)
+    event.sender.once('destroyed', request.cancel)
+    try {
+      return await action(request.signal)
+    } finally {
+      event.sender.removeListener('destroyed', request.cancel)
+      request.finish()
+    }
+  }
+  handleTrustedIpc(IPC_CHANNELS.aiCancelRequest, (event, payload) => {
+    const { requestId } = z.object({ requestId: z.string().uuid() }).strict().parse(payload)
+    return requests.cancel(requestId, event.sender.id)
+  })
   handleTrustedIpc('ai:proposals:list', () => db.listProposals())
   handleTrustedIpc('ai:proposals:resolve', (_event, payload) => {
     const parsed = z.object({ id: z.string().uuid(), approved: z.boolean() }).strict().parse(payload)
@@ -129,67 +159,86 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
     return db.searchAiMessages(query, limit)
   })
 
-  handleTrustedIpc(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
-    const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
-    const { threadId, message, openNotes } = send_schema.parse(payload)
-    const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
-    if (!thread) {
-      throw new Error('Chat thread was not found.')
-    }
-    // An empty thread model leaves provider selection to the configured router.
-    const effective_model = thread.model?.trim() || undefined
-
-    db.createAiMessage(thread.id, 'user', message)
-    const ai_turn = await run_ai_turn(db, thread, {
-      openNotesContext: build_open_notes_context(openNotes),
-      forcedModel: effective_model,
-      onDataChanged,
+  handleTrustedIpc(IPC_CHANNELS.aiSendMessage, async (event, payload): Promise<AiChatResponse> => {
+    const { requestId, threadId, message, openNotes } = send_schema.parse(payload)
+    return ownedRequest(event, requestId, async (signal) => {
+      const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
+      assertNotCancelled(signal)
+      const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
+      if (!thread) throw new Error('Chat thread was not found.')
+      db.createAiMessage(thread.id, 'user', message)
+      let content: string
+      let cancelled = false
+      try {
+        const turn = await run_ai_turn(db, thread, {
+          signal,
+          openNotesContext: build_open_notes_context(openNotes),
+          forcedModel: thread.model?.trim() || undefined,
+          onDataChanged,
+        })
+        assertNotCancelled(signal)
+        content = turn.content
+      } catch (error) {
+        if (!signal.aborted && !(error instanceof DomainError && error.code === 'CANCELLED')) throw error
+        cancelled = true
+        content =
+          'Request cancelled. Any changes already applied remain saved. Pending proposals can still be reviewed.'
+      }
+      if (event.sender.isDestroyed()) throw new DomainError('CANCELLED', 'AI request cancelled')
+      const assistant_message = db.createAiMessage(thread.id, 'assistant', content)
+      const refreshed_thread = db.getAiThread(thread.id)
+      if (!refreshed_thread) throw new Error('Chat thread was not found after response generation.')
+      return {
+        thread: refreshed_thread,
+        message: assistant_message,
+        ...(cancelled ? { cancelled: true } : {}),
+      }
     })
-    const assistant_message = db.createAiMessage(thread.id, 'assistant', ai_turn.content)
-    const refreshed_thread = db.getAiThread(thread.id)
-    if (!refreshed_thread) throw new Error('Chat thread was not found after response generation.')
-
-    return {
-      thread: refreshed_thread,
-      message: assistant_message,
-    }
   })
 
-  handleTrustedIpc(IPC_CHANNELS.aiTranscribeAudio, async (_event, payload) => {
-    const { resolve_ai_settings } = await import('../ai/aiRunner')
-    const { base64Audio, mimeType, prompt, language } = transcriptionSchema.parse(payload)
-    const ai_settings = resolve_ai_settings(db)
-    const api_key = ai_settings.openAiApiKey || process.env.STRATA_OPENAI_API_KEY?.trim()
-    if (!api_key) {
-      throw new Error('AI is not configured. Set STRATA_OPENAI_API_KEY or add an OpenAI API Key in Settings.')
-    }
-    const audio_buffer = Buffer.from(base64Audio, 'base64')
-    if (!audio_buffer.length) {
-      throw new Error('Audio payload is empty.')
-    }
+  handleTrustedIpc(IPC_CHANNELS.aiTranscribeAudio, async (event, payload) => {
+    const parsed = transcriptionSchema.parse(payload)
+    return ownedRequest(event, parsed.requestId ?? randomUUID(), async (signal) => {
+      const { resolve_ai_settings } = await import('../ai/aiRunner')
+      assertNotCancelled(signal)
+      const { base64Audio, mimeType, prompt, language } = parsed
+      const ai_settings = resolve_ai_settings(db)
+      const api_key = ai_settings.openAiApiKey || process.env.STRATA_OPENAI_API_KEY?.trim()
+      if (!api_key) {
+        throw new Error(
+          'AI is not configured. Set STRATA_OPENAI_API_KEY or add an OpenAI API Key in Settings.',
+        )
+      }
+      const audio_buffer = Buffer.from(base64Audio, 'base64')
+      if (!audio_buffer.length) {
+        throw new Error('Audio payload is empty.')
+      }
 
-    const form_data = new FormData()
-    form_data.append(
-      'file',
-      new Blob([audio_buffer], { type: mimeType }),
-      `audio.${mimeType.split('/')[1] || 'wav'}`,
-    )
-    form_data.append('model', 'whisper-1')
-    if (prompt) form_data.append('prompt', prompt)
-    if (language) form_data.append('language', language)
+      const form_data = new FormData()
+      form_data.append(
+        'file',
+        new Blob([audio_buffer], { type: mimeType }),
+        `audio.${mimeType.split('/')[1] || 'wav'}`,
+      )
+      form_data.append('model', 'whisper-1')
+      if (prompt) form_data.append('prompt', prompt)
+      if (language) form_data.append('language', language)
 
-    const raw = await requestProviderJson('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${api_key}` },
-      body: form_data,
+      const raw = await requestProviderJson('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        signal,
+        headers: { Authorization: `Bearer ${api_key}` },
+        body: form_data,
+      })
+
+      const text = sanitize_transcription_text(extract_transcription_text(raw))
+      if (!text) {
+        throw new Error('Transcription could not be extracted from the response.')
+      }
+
+      assertNotCancelled(signal)
+      return { text }
     })
-
-    const text = sanitize_transcription_text(extract_transcription_text(raw))
-    if (!text) {
-      throw new Error('Transcription could not be extracted from the response.')
-    }
-
-    return { text }
   })
 
   handleTrustedIpc('ai:route-logs:clear', () => db.clearRouteLogs())

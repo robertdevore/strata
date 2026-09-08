@@ -439,6 +439,7 @@ export function EditorPane(props: EditorPaneProps) {
   const [chatLoadingThreads, setChatLoadingThreads] = useState(false)
   const [chatLoadingMessages, setChatLoadingMessages] = useState(false)
   const [chatSending, setChatSending] = useState(false)
+  const [chatCancelling, setChatCancelling] = useState(false)
   const [chatAssistantTyping, setChatAssistantTyping] = useState(false)
   const [chatDeleting, setChatDeleting] = useState(false)
   const saveState = useAppStore((state) => (note ? (state.saveStates[note.id] ?? 'saved') : 'idle'))
@@ -507,6 +508,10 @@ export function EditorPane(props: EditorPaneProps) {
   const noteIdRef = useRef<string | null>(null)
   const editorViewRef = useRef<EditorView | null>(null)
   const chatTypingIntervalRef = useRef<number | null>(null)
+  const chatTypingFinishRef = useRef<(() => void) | null>(null)
+  const chatRequestIdRef = useRef<string | null>(null)
+  const chatMessagesReadRef = useRef(0)
+  const chatCancellationRequestedRef = useRef(false)
   const findInputRef = useRef<HTMLInputElement>(null)
   const editorBodyRef = useRef<HTMLDivElement>(null)
   const pending_wrap_marker_ref = useRef<{
@@ -663,7 +668,12 @@ export function EditorPane(props: EditorPaneProps) {
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current)
       if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
+      const requestId = chatRequestIdRef.current
+      chatRequestIdRef.current = null
+      if (requestId) void aiService.cancelRequest(requestId).catch(() => {})
       if (chatTypingIntervalRef.current) window.clearInterval(chatTypingIntervalRef.current)
+      chatTypingFinishRef.current?.()
+      chatTypingFinishRef.current = null
     }
   }, [])
 
@@ -756,20 +766,22 @@ export function EditorPane(props: EditorPaneProps) {
       return
     }
 
+    if (chatRequestIdRef.current) return
+    const generation = ++chatMessagesReadRef.current
     let disposed = false
     setChatLoadingMessages(true)
     void aiService
       .listMessages(chatThreadId)
       .then((messages) => {
-        if (disposed) return
+        if (disposed || generation !== chatMessagesReadRef.current) return
         setChatMessages(messages)
       })
       .catch((error) => {
-        if (disposed) return
+        if (disposed || generation !== chatMessagesReadRef.current) return
         setChatErrorMessage(error instanceof Error ? error.message : 'Failed to load messages')
       })
       .finally(() => {
-        if (disposed) return
+        if (disposed || generation !== chatMessagesReadRef.current) return
         setChatLoadingMessages(false)
       })
 
@@ -1008,7 +1020,41 @@ export function EditorPane(props: EditorPaneProps) {
       window.clearInterval(chatTypingIntervalRef.current)
       chatTypingIntervalRef.current = null
     }
+    const finish = chatTypingFinishRef.current
+    chatTypingFinishRef.current = null
+    finish?.()
     setChatAssistantTyping(false)
+  }
+
+  const abandonChatRequest = () => {
+    const requestId = chatRequestIdRef.current
+    chatRequestIdRef.current = null
+    if (requestId) void aiService.cancelRequest(requestId).catch(() => {})
+    stopAssistantTypingAnimation()
+    setChatSending(false)
+    setChatCancelling(false)
+  }
+
+  const stopChatRequest = () => {
+    if (chatTypingFinishRef.current) {
+      stopAssistantTypingAnimation()
+      return
+    }
+    const requestId = chatRequestIdRef.current
+    if (!requestId) return
+    chatCancellationRequestedRef.current = true
+    setChatCancelling(true)
+    void aiService
+      .cancelRequest(requestId)
+      .then((accepted) => {
+        if (!accepted && chatRequestIdRef.current === requestId) setChatCancelling(false)
+      })
+      .catch(() => {
+        if (chatRequestIdRef.current === requestId) {
+          setChatCancelling(false)
+          setChatErrorMessage('Could not stop the request. Try again.')
+        }
+      })
   }
 
   const findNextMatch = () => {
@@ -1476,25 +1522,6 @@ export function EditorPane(props: EditorPaneProps) {
     setChatThreads(threads)
   }
 
-  const refreshChatUsage = async (thread_id: string | null, preferred_model = openAiModel) => {
-    if (!thread_id) {
-      setChatUsageSummary(null)
-      setChatUsageLoading(false)
-      return
-    }
-    setChatUsageSummary(null)
-    setChatUsageLoading(true)
-    try {
-      const logs = await aiService.listRouteLogs(thread_id)
-      const filtered_logs = select_usage_logs_for_model(logs, thread_id, preferred_model)
-      setChatUsageSummary(build_chat_usage_summary(filtered_logs))
-    } catch {
-      setChatUsageSummary(null)
-    } finally {
-      setChatUsageLoading(false)
-    }
-  }
-
   const maybeOpenMutatedNoteFromAssistant = async (assistant_content: string) => {
     const lower = assistant_content.toLowerCase()
     const looks_like_mutation =
@@ -1516,7 +1543,13 @@ export function EditorPane(props: EditorPaneProps) {
   }
 
   const sendChatMessage = async (message: string) => {
-    if (chatSending || chatAssistantTyping) return
+    if (chatRequestIdRef.current || chatSending || chatAssistantTyping) return
+    const requestId = crypto.randomUUID()
+    chatRequestIdRef.current = requestId
+    chatMessagesReadRef.current++
+    setChatLoadingMessages(false)
+    chatCancellationRequestedRef.current = false
+    setChatCancelling(false)
     setChatErrorMessage('')
     setChatSending(true)
     const optimistic_message: AiMessage = {
@@ -1530,44 +1563,65 @@ export function EditorPane(props: EditorPaneProps) {
 
     try {
       const response = await aiService.sendMessage({
+        requestId,
         threadId: chatThreadId ?? undefined,
         message,
         openNotes: open_note_context,
       })
+      if (chatRequestIdRef.current !== requestId) return
       setChatThreadId(response.thread.id)
       await refreshChatThreads()
-      await refreshChatUsage(response.thread.id, response.thread.model || openAiModel)
+      if (chatRequestIdRef.current !== requestId) return
 
+      if (chatRequestIdRef.current !== requestId) return
       const persisted_messages = await aiService.listMessages(response.thread.id)
+      if (chatRequestIdRef.current !== requestId) return
+      if (response.cancelled || chatCancellationRequestedRef.current) {
+        setChatMessages(persisted_messages)
+        return
+      }
       const base_messages = persisted_messages.filter((item) => item.id !== response.message.id)
       const animated_message: AiMessage = { ...response.message, content: '' }
       setChatMessages([...base_messages, animated_message])
-      setChatAssistantTyping(true)
-
       const full_content = response.message.content
       let cursor = 0
       const step = Math.max(1, Math.ceil(full_content.length / 140))
 
       await new Promise<void>((resolve) => {
         stopAssistantTypingAnimation()
+        setChatAssistantTyping(true)
+        chatTypingFinishRef.current = () => {
+          if (chatRequestIdRef.current === requestId) setChatMessages(persisted_messages)
+          resolve()
+        }
         chatTypingIntervalRef.current = window.setInterval(() => {
           cursor = Math.min(full_content.length, cursor + step)
           setChatMessages([...base_messages, { ...animated_message, content: full_content.slice(0, cursor) }])
           if (cursor >= full_content.length) {
             stopAssistantTypingAnimation()
-            setChatMessages(persisted_messages)
-            resolve()
           }
         }, 16)
       })
 
-      await maybeOpenMutatedNoteFromAssistant(response.message.content)
+      if (chatRequestIdRef.current === requestId)
+        await maybeOpenMutatedNoteFromAssistant(response.message.content)
     } catch (error) {
+      if (chatRequestIdRef.current !== requestId) return
       stopAssistantTypingAnimation()
       setChatMessages((current) => current.filter((item) => item.id !== optimistic_message.id))
-      setChatErrorMessage(error instanceof Error ? error.message : 'Failed to send chat message')
+      setChatErrorMessage(
+        chatCancellationRequestedRef.current
+          ? 'Request cancelled.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to send chat message',
+      )
     } finally {
-      setChatSending(false)
+      if (chatRequestIdRef.current === requestId) {
+        chatRequestIdRef.current = null
+        setChatSending(false)
+        setChatCancelling(false)
+      }
     }
   }
 
@@ -1612,7 +1666,7 @@ export function EditorPane(props: EditorPaneProps) {
 
   const deleteSelectedChatThread = async () => {
     if (!chatThreadId) return
-    stopAssistantTypingAnimation()
+    abandonChatRequest()
     setChatErrorMessage('')
     setChatDeleting(true)
 
@@ -1919,13 +1973,15 @@ export function EditorPane(props: EditorPaneProps) {
                   loadingThreads={chatLoadingThreads}
                   loadingMessages={chatLoadingMessages}
                   sending={chatSending}
+                  cancelling={chatCancelling}
+                  onStop={stopChatRequest}
                   assistantTyping={chatAssistantTyping}
                   deleting={chatDeleting}
                   errorMessage={chatErrorMessage}
                   chatUsageSummary={chatUsageSummary}
                   chatUsageLoading={chatUsageLoading}
                   onSelectThread={(thread_id) => {
-                    stopAssistantTypingAnimation()
+                    abandonChatRequest()
                     if (!thread_id) {
                       setChatThreadId(null)
                       setChatMessages([])
@@ -1937,7 +1993,7 @@ export function EditorPane(props: EditorPaneProps) {
                     setChatSearchResults([])
                   }}
                   onCreateThread={() => {
-                    stopAssistantTypingAnimation()
+                    abandonChatRequest()
                     setChatThreadId(null)
                     setChatMessages([])
                     setChatUsageSummary(null)

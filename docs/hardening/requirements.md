@@ -27,7 +27,7 @@ This is a working gap ledger, not a completion verdict. “Scoped tests passed�
 | 20 | Make AI Retrieval More Token-Efficient | Partial | Default tool lists 15/snippets 200. Complete representative tool-byte/token comparison outstanding. |
 | 21 | Budget AI Conversation Context | Partial | History/open-note/tool-context budgets implemented; complete category/accounting/cancellation UI evaluation outstanding. |
 | 22 | Fix Cheap → Premium Fallback Tool Loop | Implemented; scoped tests passed | Shared tool loop/state across fallback; providerFallback tests cover proposals, writes, budgets and double failure. |
-| 23 | Add Provider Timeouts and Cancellation | Partial | providerRequest deadlines/AbortSignal support and timeout tests; end-user cancellation across adapters/IPC remains incomplete. |
+| 23 | Add Provider Timeouts and Cancellation | Implemented; scoped tests passed | Request deadlines and sanitized errors, signal propagation through adapters/tool loops/fallback, owner-scoped bounded IPC requests, chat Stop and transcription Cancel controls. Cancellation/late-response/teardown tests passed; real Electron Stop aborted a synthetic provider request. No real speech/provider testing claimed. |
 | 24 | Harden Custom AI Endpoints | Partial | HTTPS/localhost HTTP policy, redirect and URL rejection tests. Complete custom-endpoint/DNS policy review outstanding. |
 | 25 | Bound Transcription Inputs | Implemented; scoped tests passed | transcriptionInput.ts validates encoded/decoded limits and MIME before allocation; providerSecurity tests. |
 | 26 | Improve AI Tool Validation | Implemented; final audit pending | Runtime tool Zod schemas and structured errors; malformed and permission cases tested. Full catalog contract audit outstanding. |

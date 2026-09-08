@@ -95,13 +95,16 @@ export interface StrataApi {
     renameThread: (thread_id: string, title: string) => Promise<boolean>
     setThreadModel: (thread_id: string, model: string) => Promise<boolean>
     listMessages: (thread_id: string) => Promise<AiMessage[]>
+    cancelRequest: (requestId: string) => Promise<boolean>
     sendMessage: (payload: {
+      requestId?: string
       threadId?: string
       message: string
       openNotes?: AiOpenNoteContext[]
     }) => Promise<AiChatResponse>
     searchChats: (query: string) => Promise<AiSearchResult[]>
     transcribeAudio: (payload: {
+      requestId?: string
       base64Audio: string
       mimeType: string
       prompt?: string

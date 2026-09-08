@@ -2,6 +2,7 @@ import { z } from 'zod'
 export const MAX_AUDIO_BYTES = 20 * 1024 * 1024
 export const transcriptionSchema = z
   .object({
+    requestId: z.string().uuid().optional(),
     base64Audio: z
       .string()
       .min(4)

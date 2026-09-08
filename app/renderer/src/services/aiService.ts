@@ -21,7 +21,11 @@ export const aiService = {
   listMessages(thread_id: string): Promise<AiMessage[]> {
     return window.strata.ai.listMessages(thread_id)
   },
+  cancelRequest(requestId: string): Promise<boolean> {
+    return window.strata.ai.cancelRequest(requestId)
+  },
   sendMessage(payload: {
+    requestId?: string
     threadId?: string
     message: string
     openNotes?: AiOpenNoteContext[]
@@ -32,6 +36,7 @@ export const aiService = {
     return window.strata.ai.searchChats(query)
   },
   transcribeAudio(payload: {
+    requestId?: string
     base64Audio: string
     mimeType: string
     prompt?: string

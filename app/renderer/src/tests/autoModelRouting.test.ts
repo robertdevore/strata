@@ -23,7 +23,13 @@ it('leaves Auto unforced and preserves an explicit provider-qualified selection'
   } as unknown as StrataDatabase
   mocks.run.mockResolvedValue({ content: 'reply', changed: { ...NO_CHANGED } })
   const frame = { url: 'file:///test/index.html' }
-  const sender = { mainFrame: frame } as Electron.WebContents
+  const sender = {
+    mainFrame: frame,
+    id: 1,
+    isDestroyed: () => false,
+    once: vi.fn(),
+    removeListener: vi.fn(),
+  } as unknown as Electron.WebContents
   configureTrustedIpc(() => sender, frame.url)
   const event = { sender, senderFrame: frame }
   registerAiHandlers(db)

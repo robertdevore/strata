@@ -131,6 +131,7 @@ export interface AiThreadSummary {
 }
 
 export interface AiChatResponse {
+  cancelled?: boolean
   thread: AiThread
   message: AiMessage
 }

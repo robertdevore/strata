@@ -77,6 +77,7 @@ const api: StrataApi = {
     setThreadModel: (thread_id, model) =>
       ipcRenderer.invoke(IPC_CHANNELS.aiThreadSetModel, { threadId: thread_id, model }),
     listMessages: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiMessagesList, { threadId: thread_id }),
+    cancelRequest: (requestId) => ipcRenderer.invoke(IPC_CHANNELS.aiCancelRequest, { requestId }),
     sendMessage: (payload) => ipcRenderer.invoke(IPC_CHANNELS.aiSendMessage, payload),
     searchChats: (query) => ipcRenderer.invoke(IPC_CHANNELS.aiSearchChats, { query }),
     transcribeAudio: (payload) => ipcRenderer.invoke(IPC_CHANNELS.aiTranscribeAudio, payload),

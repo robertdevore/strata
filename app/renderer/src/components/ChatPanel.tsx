@@ -152,6 +152,8 @@ interface ChatPanelProps {
   loadingThreads: boolean
   loadingMessages: boolean
   sending: boolean
+  cancelling: boolean
+  onStop: () => void
   assistantTyping: boolean
   deleting: boolean
   errorMessage: string
@@ -261,6 +263,8 @@ export function ChatPanel(props: ChatPanelProps) {
     loadingThreads,
     loadingMessages,
     sending,
+    cancelling,
+    onStop,
     assistantTyping,
     deleting,
     errorMessage,
@@ -302,6 +306,7 @@ export function ChatPanel(props: ChatPanelProps) {
   const [optimisticModel, setOptimisticModel] = useState<string | null>(null)
   const modelMenuRef = useRef<HTMLDivElement | null>(null)
   const modelSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const transcriptionRequestIdRef = useRef<string | null>(null)
   const liveDictationTextRef = useRef('')
   const chatMessagesRef = useRef<HTMLDivElement | null>(null)
   const chatSearchInputRef = useRef<HTMLInputElement | null>(null)
@@ -464,6 +469,9 @@ export function ChatPanel(props: ChatPanelProps) {
         await navigator.clipboard.writeText(message_content)
         setCopiedMessageId(message_id)
         show_copy_toast('Message copied')
+        const requestId = transcriptionRequestIdRef.current
+        transcriptionRequestIdRef.current = null
+        if (requestId) void aiService.cancelRequest(requestId).catch(() => {})
         if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
         copiedTimerRef.current = window.setTimeout(() => {
           setCopiedMessageId((current) => (current === message_id ? null : current))
@@ -605,6 +613,9 @@ export function ChatPanel(props: ChatPanelProps) {
 
   useEffect(() => {
     return () => {
+      const requestId = transcriptionRequestIdRef.current
+      transcriptionRequestIdRef.current = null
+      if (requestId) void aiService.cancelRequest(requestId).catch(() => {})
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
       if (copiedCodeTimerRef.current) window.clearTimeout(copiedCodeTimerRef.current)
       if (copyToastTimerRef.current) window.clearTimeout(copyToastTimerRef.current)
@@ -637,6 +648,14 @@ export function ChatPanel(props: ChatPanelProps) {
       return
     }
     setDraft(base ? `${base} ${normalized}` : normalized)
+  }
+
+  const cancelTranscription = () => {
+    const requestId = transcriptionRequestIdRef.current
+    transcriptionRequestIdRef.current = null
+    if (requestId) void aiService.cancelRequest(requestId).catch(() => {})
+    setIsTranscribing(false)
+    setDictationError('Transcription cancelled.')
   }
 
   const toggleDictation = async () => {
@@ -682,15 +701,20 @@ export function ChatPanel(props: ChatPanelProps) {
       pcmSamplesCountRef.current = 0
 
       const wav_blob = encode_wav(merged, pcmSampleRateRef.current)
+      const requestId = crypto.randomUUID()
+      transcriptionRequestIdRef.current = requestId
       setIsTranscribing(true)
       void blob_to_base64(wav_blob)
         .then(async (buffer) => {
+          if (transcriptionRequestIdRef.current !== requestId) return
           const result = await aiService.transcribeAudio({
+            requestId,
             base64Audio: buffer,
             mimeType: 'audio/wav',
             language: 'en',
             prompt: 'Final microphone transcription. Return complete spoken text only.',
           })
+          if (transcriptionRequestIdRef.current !== requestId) return
           const transcript = result.text.trim()
           const fallback_live = liveDictationTextRef.current.trim()
           const final_text = transcript || fallback_live
@@ -703,10 +727,14 @@ export function ChatPanel(props: ChatPanelProps) {
           setLiveDictationText(final_text)
         })
         .catch((error) => {
-          setDictationError(error instanceof Error ? error.message : 'Transcription failed')
+          if (transcriptionRequestIdRef.current === requestId)
+            setDictationError(error instanceof Error ? error.message : 'Transcription failed')
         })
         .finally(() => {
-          setIsTranscribing(false)
+          if (transcriptionRequestIdRef.current === requestId) {
+            transcriptionRequestIdRef.current = null
+            setIsTranscribing(false)
+          }
         })
       return
     }
@@ -978,6 +1006,11 @@ export function ChatPanel(props: ChatPanelProps) {
                 </div>
               </div>
             ))}
+            {isTranscribing && (
+              <button type="button" className="ghost-button" onClick={cancelTranscription}>
+                Cancel transcription
+              </button>
+            )}
             {sending && (
               <div className="chat-bubble chat-assistant chat-thinking" aria-live="polite">
                 <div className="chat-bubble-meta">
@@ -1215,15 +1248,38 @@ export function ChatPanel(props: ChatPanelProps) {
         >
           <MicrophoneIcon />
         </button>
-        <button
-          className="icon-button chat-send-button"
-          type="submit"
-          disabled={sending || assistantTyping || isDictating || isTranscribing || !draft.trim()}
-          title={sending ? 'Sending…' : 'Send message'}
-          aria-label={sending ? 'Sending' : 'Send message'}
-        >
-          <SendIcon />
-        </button>
+        {sending ? (
+          <button
+            type="button"
+            className="icon-button chat-send-button"
+            onClick={onStop}
+            disabled={cancelling}
+            aria-label="Stop AI response"
+            title={cancelling ? 'Stopping…' : 'Stop AI response'}
+          >
+            <span aria-hidden="true">{cancelling ? '…' : '■'}</span>
+          </button>
+        ) : isTranscribing ? (
+          <button
+            type="button"
+            className="icon-button chat-send-button"
+            onClick={cancelTranscription}
+            aria-label="Cancel transcription"
+            title="Cancel transcription"
+          >
+            <span aria-hidden="true">■</span>
+          </button>
+        ) : (
+          <button
+            className="icon-button chat-send-button"
+            type="submit"
+            disabled={assistantTyping || isDictating || !draft.trim()}
+            title="Send message"
+            aria-label="Send message"
+          >
+            <SendIcon />
+          </button>
+        )}
       </form>
       {copyToastText && (
         <span className="copy-toast" role="status" aria-live="polite">

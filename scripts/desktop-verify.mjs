@@ -310,6 +310,44 @@ try {
       ),
     )
     .toBe(true)
+  // Synthetic provider transport only: no requests reach a real AI service.
+  await application.evaluate(() => {
+    globalThis.__strataAiFixtureStarted = false
+    globalThis.__strataAiFixtureAborted = false
+    globalThis.fetch = async (url, init) => {
+      if (String(url) !== 'https://api.openai.com/v1/responses')
+        throw new Error('Unexpected fixture provider URL')
+      globalThis.__strataAiFixtureStarted = true
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener(
+          'abort',
+          () => {
+            globalThis.__strataAiFixtureAborted = true
+            reject(new Error('Synthetic request aborted'))
+          },
+          { once: true },
+        )
+      })
+    }
+  })
+  await page.evaluate(() =>
+    window.strata.settings.set({
+      aiRoutingMode: 'premium_only',
+      aiPremiumProvider: 'openai',
+      aiPremiumModel: 'fixture-model',
+    }),
+  )
+  await activePane.getByTitle('Open AI Chat', { exact: true }).click()
+  await activePane.getByPlaceholder('Message Strata AI…').fill('Explain this note')
+  await activePane.getByRole('button', { name: 'Send message', exact: true }).click()
+  await expect.poll(() => application.evaluate(() => globalThis.__strataAiFixtureStarted)).toBe(true)
+  await activePane.getByRole('button', { name: 'Stop AI response', exact: true }).click()
+  await expect.poll(() => application.evaluate(() => globalThis.__strataAiFixtureAborted)).toBe(true)
+  await expect(
+    activePane.getByText(/Request cancelled. Any changes already applied remain saved/),
+  ).toBeVisible()
+  await expect(activePane.getByRole('button', { name: 'Stop AI response', exact: true })).toHaveCount(0)
+  await activePane.getByTitle('Open AI Chat', { exact: true }).click()
   // Close immediately after input, before the debounce can save it.
   await activePane.locator('.cm-content[contenteditable="true"]').fill('Saved while quitting')
   await application.close()
@@ -374,7 +412,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {

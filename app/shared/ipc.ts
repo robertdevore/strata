@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
   aiThreadSetModel: 'ai:thread:set-model',
   aiMessagesList: 'ai:messages:list',
   aiSendMessage: 'ai:send',
+  aiCancelRequest: 'ai:cancel',
   aiSearchChats: 'ai:search',
   aiTranscribeAudio: 'ai:transcribe',
   linksBacklinks: 'links:backlinks',
