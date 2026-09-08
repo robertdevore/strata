@@ -1,3 +1,4 @@
+import { MoreNotes, NoteHistory } from './KnowledgeStatus'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type React from 'react'
@@ -771,6 +772,8 @@ export function Sidebar(props: SidebarProps) {
                           </div>
                         </div>
                       ))}
+                      <MoreNotes />
+                      <NoteHistory />
                       {hasMore && (
                         <div className="sidebar-load-more">
                           {visibleCount} of {props.notes.length} notes · scroll for more

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Note, Settings } from '@shared/types'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
 import { DEFAULT_HOME_TILES } from '@shared/homeTiles'
-import { applyFiltersAndSort, type ActiveFilter } from '@renderer/src/domain/filtering'
+import { type ActiveFilter } from '@renderer/src/domain/filtering'
 import { normalizeTag } from '@renderer/src/domain/noteUtils'
 import { notesService } from '@renderer/src/services/notesService'
 import { projectsService } from '@renderer/src/services/projectsService'
@@ -10,6 +10,8 @@ import { settingsService } from '@renderer/src/services/settingsService'
 import type { Project } from '@shared/types'
 import { DEFAULT_SIDEBAR_LAYOUT } from '@shared/sidebarLayout'
 
+let searchGeneration = 0
+let searchTimer: ReturnType<typeof setTimeout> | undefined
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed' | 'conflict' | 'unsaved'
 
 interface FlushDraftOptions {
@@ -37,6 +39,11 @@ const upsert_note = (notes: Note[], note: Note): Note[] => {
 }
 
 interface AppState {
+	nextCursor: string | null
+	retrievalError: string | null
+	listingIds: string[]
+	refreshListing: (more?:boolean) => Promise<void>
+	resolveConflict: (id:string,saveCopy:boolean) => Promise<void>
 	notes: Note[]
 	projects: Project[]
 	selectedNoteId: string | null
@@ -132,6 +139,9 @@ const defaultSettings: Settings = {
 
 export const useAppStore = create<AppState>((set, get) => ({
 	notes: [],
+	nextCursor: null,
+	listingIds: [],
+	retrievalError: null,
 	projects: [],
 	selectedNoteId: null,
 	drafts: {},
@@ -194,79 +204,51 @@ export const useAppStore = create<AppState>((set, get) => ({
 		set({ splitGridColumns: Math.max(2, Math.min(6, cols)) })
 	},
 
-	async load() {
-		const [notes, projects, tags, settings] = await Promise.all([
-			notesService.listSummaries(),
-			projectsService.list(),
-			notesService.listTags(),
-			settingsService.get(),
-		])
-		const activeFilter = 'starred' === settings.defaultView ? 'starred' : 'all'
-		set((state) => {
-			const existing_notes_by_id = new Map(state.notes.map((note) => [note.id, note]))
-			const note_ids = new Set(notes.map((note) => note.id))
-			const project_ids = new Set(projects.map((project) => project.id))
-			const open_tabs = state.openTabs.filter((note_id) => note_ids.has(note_id))
-			const selected_note_id = state.selectedNoteId && note_ids.has(state.selectedNoteId)
-				? state.selectedNoteId
-				: (open_tabs[0] ?? null)
-
-			const drafts: Record<string, string> = { ...state.drafts }
-			for (const [note_id, draft] of Object.entries(state.drafts)) {
-				if (note_ids.has(note_id)) drafts[note_id] = draft
-			}
-
-			const note_summary_cache: Record<string, string> = {}
-			for (const note of notes) {
-				note_summary_cache[note.id] = summarize_note_content(note.content)
-			}
-			for (const note_id of Object.keys(state.noteSummaryCache)) {
-				if (note_ids.has(note_id) && !(note_id in note_summary_cache)) {
-					note_summary_cache[note_id] = state.noteSummaryCache[note_id]
-				}
-			}
-
-			const note_last_accessed_at: Record<string, number> = {}
-			for (const [note_id, last_accessed_at] of Object.entries(state.noteLastAccessedAt)) {
-				if (note_ids.has(note_id)) note_last_accessed_at[note_id] = last_accessed_at
-			}
-
-			const untouched_new_note_ids: Record<string, true> = {}
-			for (const note_id of Object.keys(state.untouchedNewNoteIds)) {
-				if (note_ids.has(note_id)) untouched_new_note_ids[note_id] = true
-			}
-
-			const split_note_ids = state.splitNoteIds.filter((nid) => note_ids.has(nid))
-			const split_ratios = split_note_ids.length === state.splitNoteIds.length
-				? state.splitRatios
-				: (split_note_ids.length > 0 ? Array(split_note_ids.length + 1).fill(1 / (split_note_ids.length + 1)) : [])
-
-			const filtered_projects = projects.filter((project) => project_ids.has(project.id))
-			const merged_notes = notes.map((note) => {
-				const existing_note = existing_notes_by_id.get(note.id)
-				return existing_note?.contentLoaded && (existing_note.revision === note.revision || state.drafts[note.id] !== undefined) ? existing_note : note
+	async refreshListing(more = false) {
+		const generation=++searchGeneration
+		const state=get()
+		try {
+			const page=await notesService.page({query:state.searchQuery||undefined,tag:state.selectedTag??undefined,starred:state.activeFilter==='starred'?true:undefined,archived:state.activeFilter==='archived'?true:state.activeFilter==='starred'?undefined:false,untagged:state.activeFilter==='untagged'?true:undefined,sort:state.settings.sortMode,limit:100,cursor:more?state.nextCursor??undefined:undefined})
+			if(generation!==searchGeneration) return
+			set(current=>{
+				const existing=new Map(current.notes.map(note=>[note.id,note]))
+				const conflicts=page.notes.some(note=>existing.get(note.id)?.revision!==note.revision && current.drafts[note.id]!==undefined)
+				const merged=page.notes.map(note=>{
+					const old=existing.get(note.id)
+					return old?.contentLoaded && (old.revision===note.revision||current.drafts[note.id]!==undefined)?old:note
+				})
+				const keep=new Set([...current.openTabs,...current.splitNoteIds,...Object.keys(current.drafts),...(current.selectedNoteId?[current.selectedNoteId]:[])])
+				const received=new Set(merged.map(note=>note.id))
+				const retained=current.notes.filter(note=>!received.has(note.id)&&(more||keep.has(note.id)))
+				return {notes:[...retained,...merged],listingIds:more?[...new Set([...current.listingIds,...page.notes.map(note=>note.id)])]:page.notes.map(note=>note.id),nextCursor:page.nextCursor,retrievalError:null,...(conflicts?{saveState:'conflict' as const}:{})}
 			})
+		} catch {if(generation===searchGeneration)set({retrievalError:'Could not load notes. Retry when the local service is available.'})}
+	},
 
-			return {
-				notes: merged_notes,
-				projects: filtered_projects,
-				tags,
-				settings,
-				activeFilter,
-				selectedNoteId: selected_note_id,
-				openTabs: open_tabs,
-				drafts,
-				noteSummaryCache: note_summary_cache,
-				noteLastAccessedAt: note_last_accessed_at,
-				untouchedNewNoteIds: untouched_new_note_ids,
-				splitNoteIds: split_note_ids,
-				splitRatios: split_ratios,
-			}
-		})
-		const state = get()
-		if (state.selectedNoteId) {
-			void state.hydrateNote(state.selectedNoteId)
-		}
+	async load() {
+		const [projects,tags,settings]=await Promise.all([projectsService.list(),notesService.listTags(),settingsService.get()])
+		set({projects,tags,settings})
+		await get().refreshListing()
+		const state=get()
+		// Refresh open clean notes even when they are outside the current result page.
+		await Promise.all(state.openTabs.map(async id=>{
+			const full=await notesService.get(id)
+			set(current=>{
+				const existing=current.notes.find(note=>note.id===id)
+				if(current.drafts[id]!==undefined) return full?.revision!==existing?.revision?{saveState:'conflict' as const}:{}
+				if(!full) return {notes:current.notes.filter(note=>note.id!==id),openTabs:current.openTabs.filter(tab=>tab!==id),selectedNoteId:current.selectedNoteId===id?null:current.selectedNoteId}
+				return {notes:upsert_note(current.notes,full)}
+			})
+		}))
+		if(get().selectedNoteId) await get().hydrateNote(get().selectedNoteId!)
+	},
+
+	async resolveConflict(id,saveCopy) {
+		const draft=get().drafts[id]
+		if(saveCopy && draft!==undefined) await notesService.createWithPayload({content:draft,tags:['recovered-draft']})
+		const latest=await notesService.get(id)
+		set(current=>({drafts:Object.fromEntries(Object.entries(current.drafts).filter(([key])=>key!==id)),notes:latest?upsert_note(current.notes,latest):current.notes.filter(note=>note.id!==id),saveState:'saved'}))
+		await get().load()
 	},
 
 	async hydrateNote(id) {
@@ -329,14 +311,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	setSearchQuery(searchQuery) {
 		set({ searchQuery })
+		clearTimeout(searchTimer)
+		searchTimer=setTimeout(()=>{void get().refreshListing()},180)
 	},
 
 	setActiveFilter(activeFilter) {
 		set({ activeFilter, selectedTag: null })
+		void get().refreshListing()
 	},
 
 	setSelectedTag(selectedTag) {
 		set({ selectedTag, activeFilter: 'all' })
+		void get().refreshListing()
 	},
 
 	selectNote(selectedNoteId) {
@@ -436,6 +422,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		const note = await notesService.create()
 		set((state) => ({
 			notes: upsert_note(state.notes, note),
+			listingIds: [note.id,...state.listingIds],
 			selectedNoteId: note.id, openTabs: [...state.openTabs, note.id],
 			drafts: { ...state.drafts, [note.id]: note.content },
 			noteSummaryCache: { ...state.noteSummaryCache, [note.id]: summarize_note_content(note.content) },
@@ -530,7 +517,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 						[id]: Date.now(),
 					},
 					untouchedNewNoteIds: untouched_new_note_ids,
-					saveState: 'saved',
+					saveState: current.drafts[id] === draft ? 'saved' : 'unsaved',
 					drafts: current.drafts[id] === draft ? Object.fromEntries(Object.entries(current.drafts).filter(([key])=>key!==id)) : current.drafts,
 					lastSavedAt: updated.updatedAt,
 				}
@@ -594,6 +581,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 		if (!restored) return false
 		set((state) => ({
 			notes: upsert_note(state.notes.filter((note) => note.id !== restored.id), restored),
+			listingIds:[...new Set([restored.id,...state.listingIds])],
 			selectedNoteId: restored.id,
 			drafts: { ...state.drafts, [restored.id]: restored.content },
 			noteSummaryCache: {
@@ -647,17 +635,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	async updateSettings(patch) {
 		set({ settings: await settingsService.set(patch) })
+		if (patch.sortMode) await get().refreshListing()
 	},
 
 	filteredNotes() {
-		const state = get()
-		const project_names_by_id = Object.fromEntries(state.projects.map((project) => [project.id, project.name]))
-		return applyFiltersAndSort(state.notes, {
-			activeFilter: state.activeFilter,
-			selectedTag: state.selectedTag,
-			searchQuery: state.searchQuery,
-			sortMode: state.settings.sortMode,
-		}, project_names_by_id)
+		const state=get()
+		const byId=new Map(state.notes.map(note=>[note.id,note]))
+		return state.listingIds.flatMap(id=>{const note=byId.get(id);return note&&!note.deletedAt?[note]:[]})
 	},
 
 	selectedNote() {

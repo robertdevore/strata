@@ -1,6 +1,7 @@
 import type { Note, NoteUpdatePatch, NotesFilter } from '@shared/types'
 
 export const notesService = {
+	page(filters?:NotesFilter):Promise<{notes:Note[];nextCursor:string|null}> {return window.strata.notes.page(filters)},
 	list(filters?: NotesFilter): Promise<Note[]> {
 		return window.strata.notes.list(filters)
 	},
