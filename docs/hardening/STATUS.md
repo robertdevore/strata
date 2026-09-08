@@ -379,3 +379,17 @@ Read-only repository sweep: `rg` found no unresolved TODO/FIXME/HACK markers in 
 Full `npm run verify` completed successfully (227 tests/56 files, format, lint, TypeScript, production build). The first updated desktop run stopped at a fixture locator: adding the complete-state disclosure created a second `summary` element. The fixture now targets the proposal heading explicitly; this was a selector ambiguity, not an application failure. The final desktop retry uses the same verified build.
 
 Final desktop verification passed with the readable text diff and complete-state disclosure: rejection/approval, one saved revision, cancellation, persistence/conflicts, navigation, invalidation and security fixtures all passed. Log: `/tmp/strata-proposal-diff-desktop-final.log`.
+
+### Explicit per-message model choice
+
+Implemented the previously unwired Ask each time setting. A provider-qualified picker above the composer requires a new valid choice for every message and clears after send or conversation change. Keyboard and button submission obey the same guard. This mode hides the persistent thread picker and uses a neutral assistant label instead of falsely attributing a per-message reply to the stored thread model. Catalog refresh now follows all provider/model configuration inputs, not only the serialized custom catalog.
+
+The IPC contract accepts an optional requestModel and rejects a missing per-message choice in ask_each_time before recording messages or starting providers, regardless of the thread's stored model. The runner separately fails closed without an explicit forced model. A selected request model overrides only that request, never the thread setting; forced-model behavior prevents automatic premium escalation.
+
+Focused routing/cancellation/UI tests passed 15 cases. Tests cover Enter, repeated sends, chat changes, removed catalog choices, unchanged ordinary Auto behavior, no persisted message/provider work before selection, and unchanged thread model. An initial TypeScript check found an incorrect local settings variable in EditorPane; it was replaced with a scoped store subscription before desktop verification. The final desktop fixture now chooses a model separately for rejection and approval and checks the actual synthetic provider request model.
+
+Per-message selection verification: final scoped TypeScript, ESLint and production build passed; the final picker UI tests passed after hiding the thread picker and guarding removed catalog choices. Current inventory is 230 tests, with the last complete suite checkpoint at 227. The first desktop attempt stopped at a duplicate Settings-button locator in split-pane layout; the fixture now explicitly selects the first global Settings control and retries against the same build.
+
+The next desktop attempt reached Settings but its exact label locator did not match the nested AI Mode label. The fixture now scopes to the AI Mode label's select element. Both desktop interruptions so far occurred before exercising model selection and are not reported as successful end-to-end coverage.
+
+Final desktop model-choice verification passed. Each request required a separate selection; the synthetic provider received the exact chosen model, and rejection/approval plus all prior desktop scenarios passed. Log: `/tmp/strata-ask-model-desktop-choice.log`.

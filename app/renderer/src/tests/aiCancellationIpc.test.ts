@@ -27,7 +27,11 @@ beforeEach(() => {
 const fixture = () => {
   const thread = { id: '00000000-0000-4000-8000-000000000001', title: 'Chat', model: '' }
   const createAiMessage = vi.fn((_id, role, content) => ({ role, content }))
-  const db = { getAiThread: () => thread, createAiMessage } as unknown as StrataDatabase
+  const db = {
+    getSettings: () => ({ aiRoutingMode: 'auto' }),
+    getAiThread: () => thread,
+    createAiMessage,
+  } as unknown as StrataDatabase
   const frame = { url: 'file:///test/index.html' }
   let destroyed = false
   const sender = Object.assign(new EventEmitter(), { id: 1, mainFrame: frame, isDestroyed: () => destroyed })

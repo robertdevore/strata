@@ -1,3 +1,4 @@
+import { DomainError } from '../../shared/errors'
 import { assertNotCancelled } from './cancellation'
 import { NO_CHANGED, mergeChanged, hasChanges, type ChangedDomains } from '../../shared/changedDomains'
 // Strata AI Runner — orchestrates provider selection, routing, tool loop, and linkification
@@ -266,6 +267,8 @@ export const run_ai_turn = async (
 ): Promise<AiRunnerResult> => {
   assertNotCancelled(options?.signal)
   const ai_settings = resolve_ai_settings(db)
+  if (ai_settings.aiRoutingMode === 'ask_each_time' && !options?.forcedModel?.trim())
+    throw new DomainError('MODEL_SELECTION_REQUIRED', 'Choose a model for this message.')
   const history = db.listAiMessages(thread.id).slice(-40)
   const last_user = history.filter((m) => 'user' === m.role).pop()
   const user_message = last_user?.content || ''

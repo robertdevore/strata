@@ -34,6 +34,7 @@ const send_schema = z
       .uuid()
       .default(() => randomUUID()),
     threadId: z.string().uuid().optional(),
+    requestModel: z.string().trim().min(1).max(240).optional(),
     message: z.string().trim().min(1).max(12000),
     openNotes: z.array(open_note_context_schema).max(12).optional(),
   })
@@ -173,10 +174,12 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
   })
 
   handleTrustedIpc(IPC_CHANNELS.aiSendMessage, async (event, payload): Promise<AiChatResponse> => {
-    const { requestId, threadId, message, openNotes } = send_schema.parse(payload)
+    const { requestId, threadId, requestModel, message, openNotes } = send_schema.parse(payload)
     return ownedRequest(event, requestId, async (signal) => {
       const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
       assertNotCancelled(signal)
+      if (db.getSettings().aiRoutingMode === 'ask_each_time' && !requestModel)
+        throw new DomainError('MODEL_SELECTION_REQUIRED', 'Choose a model for this message.')
       const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
       if (!thread) throw new Error('Chat thread was not found.')
       db.createAiMessage(thread.id, 'user', message)
@@ -186,7 +189,7 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
         const turn = await run_ai_turn(db, thread, {
           signal,
           openNotesContext: build_open_notes_context(openNotes),
-          forcedModel: thread.model?.trim() || undefined,
+          forcedModel: requestModel ?? (thread.model?.trim() || undefined),
           onDataChanged,
         })
         assertNotCancelled(signal)

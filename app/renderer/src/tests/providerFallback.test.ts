@@ -48,6 +48,13 @@ const open = () => {
   return { db, thread }
 }
 describe('runner provider fallback', () => {
+  it('refuses ask-each-time execution without an explicit model before contacting providers', async () => {
+    const { db, thread } = open()
+    db.setSettings({ aiRoutingMode: 'ask_each_time' })
+    await expect(run_ai_turn(db, thread)).rejects.toMatchObject({ code: 'MODEL_SELECTION_REQUIRED' })
+    expect(providers.cheap.sendTurn).not.toHaveBeenCalled()
+    expect(providers.premium.sendTurn).not.toHaveBeenCalled()
+  })
   it('passes only read tools through both providers in read-only mode', async () => {
     const { db, thread } = open()
     db.setSettings({ aiEditMode: 'read_only' })

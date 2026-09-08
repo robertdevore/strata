@@ -145,6 +145,7 @@ interface ChatPanelProps {
   modelName: string
   threadModel: string
   modelCatalog: ModelCatalogEntry[]
+  askEachTime?: boolean
   noteTitlesById: Record<string, string>
   noteLinkOptions: NoteLinkOption[]
   searchQuery: string
@@ -166,7 +167,7 @@ interface ChatPanelProps {
   onSearchQueryChange: (value: string) => void
   onRunSearch: (query?: string) => void
   onClearSearch: () => void
-  onSendMessage: (message: string) => Promise<void>
+  onSendMessage: (message: string, requestModel?: string) => Promise<void>
   onOpenNote: (note_id: string, new_tab?: boolean) => void
   onSetThreadModel: (model: string) => void
 }
@@ -256,6 +257,7 @@ export function ChatPanel(props: ChatPanelProps) {
     modelName,
     threadModel,
     modelCatalog,
+    askEachTime = false,
     noteTitlesById,
     noteLinkOptions,
     searchQuery,
@@ -281,8 +283,14 @@ export function ChatPanel(props: ChatPanelProps) {
     onOpenNote,
     onSetThreadModel,
   } = props
-  const assistant_label = `Strata AI - ${modelName || 'gpt-4o'}`
+  const assistant_label = askEachTime ? 'Strata AI' : `Strata AI - ${modelName || 'gpt-4o'}`
   const [draft, setDraft] = useState('')
+  const [requestModel, setRequestModel] = useState('')
+  useEffect(() => setRequestModel(''), [activeThreadId, askEachTime])
+  const validRequestModel = modelCatalog.some(
+    (entry) => `${entry.providerId}::${entry.model}` === requestModel,
+  )
+
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [showUsageModal, setShowUsageModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -1038,13 +1046,43 @@ export function ChatPanel(props: ChatPanelProps) {
       )}
       {isDictating && liveDictationText && <p className="chat-placeholder">{liveDictationText}</p>}
 
+      {askEachTime && (
+        <label>
+          Model for this message
+          <select
+            aria-label="Model for this message"
+            value={requestModel}
+            disabled={sending || assistantTyping}
+            onChange={(event) => setRequestModel(event.target.value)}
+          >
+            <option value="">Choose a model…</option>
+            {modelCatalog.map((entry) => (
+              <option
+                key={`${entry.providerId}::${entry.model}`}
+                value={`${entry.providerId}::${entry.model}`}
+              >
+                {entry.providerLabel} · {entry.model}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <form
         className="chat-compose"
         onSubmit={(event) => {
           event.preventDefault()
           const next = draft.trim()
-          if (!next || sending || isDictating || isTranscribing) return
-          void onSendMessage(next)
+          if (
+            !next ||
+            sending ||
+            assistantTyping ||
+            isDictating ||
+            isTranscribing ||
+            (askEachTime && !validRequestModel)
+          )
+            return
+          void onSendMessage(next, askEachTime ? requestModel : undefined)
+          setRequestModel('')
           setDraft('')
         }}
       >
@@ -1091,8 +1129,17 @@ export function ChatPanel(props: ChatPanelProps) {
             if ('Enter' !== event.key || event.shiftKey) return
             event.preventDefault()
             const next = draft.trim()
-            if (!next || sending || assistantTyping || isDictating || isTranscribing) return
-            void onSendMessage(next)
+            if (
+              !next ||
+              sending ||
+              assistantTyping ||
+              isDictating ||
+              isTranscribing ||
+              (askEachTime && !validRequestModel)
+            )
+              return
+            void onSendMessage(next, askEachTime ? requestModel : undefined)
+            setRequestModel('')
             setDraft('')
             setComposeCursor(0)
           }}
@@ -1117,127 +1164,129 @@ export function ChatPanel(props: ChatPanelProps) {
             ))}
           </div>
         )}
-        <div className="chat-model-picker" ref={modelMenuRef}>
-          <button
-            type="button"
-            className="chat-model-trigger"
-            onClick={() => setModelMenuOpen((v) => !v)}
-            disabled={sending || assistantTyping}
-            title="Select AI model"
-            aria-label="Select AI model"
-            aria-expanded={modelMenuOpen}
-          >
-            <span className="chat-model-trigger-label">{display_model_label}</span>
-            {modelMenuOpen ? (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="chat-model-caret"
-              >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M11.293 7.293a1 1 0 0 1 1.32 -.083l.094 .083l6 6l.083 .094l.054 .077l.054 .096l.017 .036l.027 .067l.032 .108l.01 .053l.01 .06l.004 .057l.002 .059l-.002 .059l-.005 .058l-.009 .06l-.01 .052l-.032 .108l-.027 .067l-.07 .132l-.065 .09l-.073 .081l-.094 .083l-.077 .054l-.096 .054l-.036 .017l-.067 .027l-.108 .032l-.053 .01l-.06 .01l-.057 .004l-.059 .002h-12c-.852 0 -1.297 -.986 -.783 -1.623l.076 -.084l6 -6z" />
-              </svg>
-            ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="chat-model-caret"
-              >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M18 9c.852 0 1.297 .986 .783 1.623l-.076 .084l-6 6a1 1 0 0 1 -1.32 .083l-.094 -.083l-6 -6l-.083 -.094l-.054 -.077l-.054 -.096l-.017 -.036l-.027 -.067l-.032 -.108l-.01 -.053l-.01 -.06l-.004 -.057v-.118l.005 -.058l.009 -.06l.01 -.052l.032 -.108l.027 -.067l.07 -.132l.065 -.09l.073 -.081l.094 -.083l.077 -.054l.096 -.054l.036 -.017l.067 -.027l.108 -.032l.053 -.01l.06 -.01l.057 -.004l12.059 -.002z" />
-              </svg>
-            )}
-          </button>
-          {modelMenuOpen && (
-            <div className="chat-model-dropdown">
-              <div className="chat-model-search-row">
-                <input
-                  ref={modelSearchInputRef}
-                  type="text"
-                  className="search-input"
-                  value={modelSearch}
-                  onChange={(event) => {
-                    setModelSearch(event.target.value)
-                    setModelMenuActiveIndex(0)
-                  }}
-                  onKeyDown={(event) => {
-                    if ('ArrowDown' === event.key) {
-                      event.preventDefault()
-                      setModelMenuActiveIndex((idx) => Math.min(idx + 1, filtered_models.length))
-                      return
-                    }
-                    if ('ArrowUp' === event.key) {
-                      event.preventDefault()
-                      setModelMenuActiveIndex((idx) => Math.max(idx - 1, 0))
-                      return
-                    }
-                    if ('Escape' === event.key) {
-                      event.preventDefault()
-                      setModelMenuOpen(false)
-                      return
-                    }
-                    if ('Enter' === event.key) {
-                      event.preventDefault()
-                      if (0 === filtered_models.length) return
-                      const option = filtered_models[modelMenuActiveIndex]
-                      if (option) {
-                        setOptimisticModel(`${option.providerId}::${option.model}`)
-                        onSetThreadModel(`${option.providerId}::${option.model}`)
-                        setModelMenuOpen(false)
-                      }
-                      return
-                    }
-                  }}
-                  placeholder="Search models…"
-                  spellCheck={false}
-                />
-              </div>
-              <div className="chat-model-list" role="listbox">
-                <button
-                  type="button"
-                  className={`chat-model-option ${null !== optimisticModel && '' === optimisticModel ? 'chat-model-option-active' : ''}`}
-                  onClick={() => {
-                    setOptimisticModel('')
-                    onSetThreadModel('')
-                    setModelMenuOpen(false)
-                  }}
-                  role="option"
-                  aria-selected={null !== optimisticModel && '' === optimisticModel}
+        {!askEachTime && (
+          <div className="chat-model-picker" ref={modelMenuRef}>
+            <button
+              type="button"
+              className="chat-model-trigger"
+              onClick={() => setModelMenuOpen((v) => !v)}
+              disabled={sending || assistantTyping}
+              title="Select AI model"
+              aria-label="Select AI model"
+              aria-expanded={modelMenuOpen}
+            >
+              <span className="chat-model-trigger-label">{display_model_label}</span>
+              {modelMenuOpen ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="chat-model-caret"
                 >
-                  Auto
-                </button>
-                {filtered_models.map((entry, index) => (
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M11.293 7.293a1 1 0 0 1 1.32 -.083l.094 .083l6 6l.083 .094l.054 .077l.054 .096l.017 .036l.027 .067l.032 .108l.01 .053l.01 .06l.004 .057l.002 .059l-.002 .059l-.005 .058l-.009 .06l-.01 .052l-.032 .108l-.027 .067l-.07 .132l-.065 .09l-.073 .081l-.094 .083l-.077 .054l-.096 .054l-.036 .017l-.067 .027l-.108 .032l-.053 .01l-.06 .01l-.057 .004l-.059 .002h-12c-.852 0 -1.297 -.986 -.783 -1.623l.076 -.084l6 -6z" />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="chat-model-caret"
+                >
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M18 9c.852 0 1.297 .986 .783 1.623l-.076 .084l-6 6a1 1 0 0 1 -1.32 .083l-.094 -.083l-6 -6l-.083 -.094l-.054 -.077l-.054 -.096l-.017 -.036l-.027 -.067l-.032 -.108l-.01 -.053l-.01 -.06l-.004 -.057v-.118l.005 -.058l.009 -.06l.01 -.052l.032 -.108l.027 -.067l.07 -.132l.065 -.09l.073 -.081l.094 -.083l.077 -.054l.096 -.054l.036 -.017l.067 -.027l.108 -.032l.053 -.01l.06 -.01l.057 -.004l12.059 -.002z" />
+                </svg>
+              )}
+            </button>
+            {modelMenuOpen && (
+              <div className="chat-model-dropdown">
+                <div className="chat-model-search-row">
+                  <input
+                    ref={modelSearchInputRef}
+                    type="text"
+                    className="search-input"
+                    value={modelSearch}
+                    onChange={(event) => {
+                      setModelSearch(event.target.value)
+                      setModelMenuActiveIndex(0)
+                    }}
+                    onKeyDown={(event) => {
+                      if ('ArrowDown' === event.key) {
+                        event.preventDefault()
+                        setModelMenuActiveIndex((idx) => Math.min(idx + 1, filtered_models.length))
+                        return
+                      }
+                      if ('ArrowUp' === event.key) {
+                        event.preventDefault()
+                        setModelMenuActiveIndex((idx) => Math.max(idx - 1, 0))
+                        return
+                      }
+                      if ('Escape' === event.key) {
+                        event.preventDefault()
+                        setModelMenuOpen(false)
+                        return
+                      }
+                      if ('Enter' === event.key) {
+                        event.preventDefault()
+                        if (0 === filtered_models.length) return
+                        const option = filtered_models[modelMenuActiveIndex]
+                        if (option) {
+                          setOptimisticModel(`${option.providerId}::${option.model}`)
+                          onSetThreadModel(`${option.providerId}::${option.model}`)
+                          setModelMenuOpen(false)
+                        }
+                        return
+                      }
+                    }}
+                    placeholder="Search models…"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="chat-model-list" role="listbox">
                   <button
-                    key={`${entry.providerId}:${entry.model}`}
                     type="button"
-                    className={`chat-model-option ${`${entry.providerId}::${entry.model}` === optimisticModel ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
+                    className={`chat-model-option ${null !== optimisticModel && '' === optimisticModel ? 'chat-model-option-active' : ''}`}
                     onClick={() => {
-                      setOptimisticModel(`${entry.providerId}::${entry.model}`)
-                      onSetThreadModel(`${entry.providerId}::${entry.model}`)
+                      setOptimisticModel('')
+                      onSetThreadModel('')
                       setModelMenuOpen(false)
                     }}
                     role="option"
-                    aria-selected={`${entry.providerId}::${entry.model}` === optimisticModel}
+                    aria-selected={null !== optimisticModel && '' === optimisticModel}
                   >
-                    <span className="chat-model-option-provider">{entry.providerLabel}</span>
-                    <span className="chat-model-option-model">{entry.model}</span>
+                    Auto
                   </button>
-                ))}
-                {0 === filtered_models.length && (
-                  <p className="tags-label" style={{ padding: '8px', textAlign: 'center', margin: 0 }}>
-                    No models match
-                  </p>
-                )}
+                  {filtered_models.map((entry, index) => (
+                    <button
+                      key={`${entry.providerId}:${entry.model}`}
+                      type="button"
+                      className={`chat-model-option ${`${entry.providerId}::${entry.model}` === optimisticModel ? 'chat-model-option-active' : ''} ${index === modelMenuActiveIndex ? 'chat-model-option-focus' : ''}`}
+                      onClick={() => {
+                        setOptimisticModel(`${entry.providerId}::${entry.model}`)
+                        onSetThreadModel(`${entry.providerId}::${entry.model}`)
+                        setModelMenuOpen(false)
+                      }}
+                      role="option"
+                      aria-selected={`${entry.providerId}::${entry.model}` === optimisticModel}
+                    >
+                      <span className="chat-model-option-provider">{entry.providerLabel}</span>
+                      <span className="chat-model-option-model">{entry.model}</span>
+                    </button>
+                  ))}
+                  {0 === filtered_models.length && (
+                    <p className="tags-label" style={{ padding: '8px', textAlign: 'center', margin: 0 }}>
+                      No models match
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
         <button
           className={`icon-button chat-mic-button ${isDictating ? 'chip-active chat-mic-recording' : ''}`}
           type="button"
@@ -1273,7 +1322,7 @@ export function ChatPanel(props: ChatPanelProps) {
           <button
             className="icon-button chat-send-button"
             type="submit"
-            disabled={assistantTyping || isDictating || !draft.trim()}
+            disabled={assistantTyping || isDictating || !draft.trim() || (askEachTime && !validRequestModel)}
             title="Send message"
             aria-label="Send message"
           >

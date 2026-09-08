@@ -27,6 +27,7 @@ export const aiService = {
   sendMessage(payload: {
     requestId?: string
     threadId?: string
+    requestModel?: string
     message: string
     openNotes?: AiOpenNoteContext[]
   }): Promise<AiChatResponse> {

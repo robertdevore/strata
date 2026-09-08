@@ -359,6 +359,8 @@ try {
         init.headers.Authorization !== 'Bearer synthetic-desktop-fixture-key'
       )
         throw new Error('Unexpected fixture provider request')
+      if (JSON.parse(init.body).model !== 'fixture-model')
+        throw new Error('Per-message model selection was not honored')
       const initial = globalThis.__strataProposalTurn++ % 2 === 0
       return new Response(
         JSON.stringify(
@@ -379,10 +381,22 @@ try {
       )
     }
   })
+  await page.getByTitle('Settings', { exact: true }).first().click()
+  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page
+    .locator('.settings-tab-content label')
+    .filter({ hasText: 'AI Mode' })
+    .locator('select')
+    .selectOption('ask_each_time')
+  await page.getByRole('button', { name: 'Close settings', exact: true }).click()
   const proposalNotes = () =>
     page.evaluate(() => window.strata.notes.page({ query: 'Desktop approved proposal' }))
   for (const action of ['Reject', 'Approve edit']) {
     await activePane.getByPlaceholder('Message Strata AI…').fill('Create the proposed fixture note')
+    await expect(activePane.getByRole('button', { name: 'Send message', exact: true })).toBeDisabled()
+    await activePane
+      .getByLabel('Model for this message', { exact: true })
+      .selectOption('openai::fixture-model')
     await activePane.getByRole('button', { name: 'Send message', exact: true }).click()
     const review = activePane.getByRole('region', { name: 'AI edit proposals' })
     await review.locator('summary').filter({ hasText: 'AI edit awaiting approval:' }).click()
@@ -459,7 +473,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation and proposal rejection/approval, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation, per-message model choice and proposal rejection/approval, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {

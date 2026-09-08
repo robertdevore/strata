@@ -824,7 +824,17 @@ export function EditorPane(props: EditorPaneProps) {
   }, [chatThreadId, showChatPanel, chatThreads, openAiModel])
 
   // Load model catalog
-  const aiModelCatalog = useAppStore((state) => state.settings.aiModelCatalog)
+  const aiRoutingMode = useAppStore((state) => state.settings.aiRoutingMode)
+  const aiModelCatalogKey = useAppStore(({ settings }) =>
+    JSON.stringify([
+      settings.aiModelCatalog,
+      settings.aiCheapProvider,
+      settings.aiCheapModel,
+      settings.aiPremiumProvider,
+      settings.aiPremiumModel,
+      settings.openAiModel,
+    ]),
+  )
   useEffect(() => {
     if (!showChatPanel) return
     let disposed = false
@@ -841,7 +851,7 @@ export function EditorPane(props: EditorPaneProps) {
     return () => {
       disposed = true
     }
-  }, [showChatPanel, aiModelCatalog])
+  }, [showChatPanel, aiModelCatalogKey])
 
   useEffect(() => {
     const openFindReplace = () => {
@@ -1542,7 +1552,7 @@ export function EditorPane(props: EditorPaneProps) {
     await onOpenNoteFromChat(existing_note.id)
   }
 
-  const sendChatMessage = async (message: string) => {
+  const sendChatMessage = async (message: string, requestModel?: string) => {
     if (chatRequestIdRef.current || chatSending || chatAssistantTyping) return
     const requestId = crypto.randomUUID()
     chatRequestIdRef.current = requestId
@@ -1564,6 +1574,7 @@ export function EditorPane(props: EditorPaneProps) {
     try {
       const response = await aiService.sendMessage({
         requestId,
+        requestModel,
         threadId: chatThreadId ?? undefined,
         message,
         openNotes: open_note_context,
@@ -1966,6 +1977,7 @@ export function EditorPane(props: EditorPaneProps) {
                   modelName={active_chat_model}
                   threadModel={chatThreadModel}
                   modelCatalog={chatModelCatalog}
+                  askEachTime={aiRoutingMode === 'ask_each_time'}
                   noteTitlesById={note_titles_by_id}
                   noteLinkOptions={note_link_options}
                   searchQuery={chatSearchQuery}

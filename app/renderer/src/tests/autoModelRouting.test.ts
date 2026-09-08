@@ -17,7 +17,9 @@ import { configureTrustedIpc } from '@main/security/trustedIpc'
 
 it('leaves Auto unforced and preserves an explicit provider-qualified selection', async () => {
   const thread = { id: '00000000-0000-4000-8000-000000000001', title: 'Chat', model: '' }
+  const settings = { aiRoutingMode: 'auto' }
   const db = {
+    getSettings: () => settings,
     getAiThread: () => thread,
     createAiMessage: vi.fn().mockReturnValue({ content: 'reply' }),
   } as unknown as StrataDatabase
@@ -39,4 +41,14 @@ it('leaves Auto unforced and preserves an explicit provider-qualified selection'
   thread.model = 'custom::company-model'
   await send(event, { threadId: thread.id, message: 'hello again' })
   expect(mocks.run.mock.calls[1][2].forcedModel).toBe('custom::company-model')
+  settings.aiRoutingMode = 'ask_each_time'
+  const writes = vi.mocked(db.createAiMessage).mock.calls.length
+  await expect(send(event, { threadId: thread.id, message: 'must choose first' })).rejects.toMatchObject({
+    code: 'MODEL_SELECTION_REQUIRED',
+  })
+  expect(db.createAiMessage).toHaveBeenCalledTimes(writes)
+  expect(mocks.run).toHaveBeenCalledTimes(2)
+  await send(event, { threadId: thread.id, message: 'chosen', requestModel: 'openai::selected-once' })
+  expect(mocks.run.mock.calls[2][2].forcedModel).toBe('openai::selected-once')
+  expect(thread.model).toBe('custom::company-model')
 })

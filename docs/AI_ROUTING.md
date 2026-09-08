@@ -9,11 +9,11 @@ Strata includes an intent-based routing system that automatically chooses betwee
 | `premium_only` | Always use the premium provider (e.g., GPT-4o) |
 | `cheap_only` | Always use the cheap provider (e.g., DeepSeek Flash) |
 | `auto` | Automatically route based on intent and risk |
-| `ask_each_time` | Legacy setting; the current implementation does not present a per-message chooser. This remains under audit. |
+| `ask_each_time` | Require an explicit provider-qualified model choice before each message. The choice resets after sending and does not change the thread model. |
 
 ## How Routing Works
 
-1. **Safety check**: Destructive requests (delete, destroy, wipe) are immediately blocked
+1. **Classification**: Heuristic routing can flag destructive language. Fixed route modes bypass that classification; runtime tool permissions remain authoritative.
 2. **Intent classification**: Keyphrase-based matching against the user's message
 3. **Risk assessment**: Low/medium/high based on intent type
 4. **Provider selection**: Cheap for low-risk simple tasks, premium for complex/risky tasks
@@ -73,3 +73,7 @@ Or on fallback:
 ## Eval Set
 
 `app/main/ai/evals/routing-examples.json` contains 50 routing examples for testing and validation. Each example includes expected intent, route, risk, and confirmation requirement.
+
+## Per-message choice
+
+In **Ask each time**, choose **Model for this message** before sending. Send and keyboard submission remain disabled until the choice is valid. The main-process boundary rejects a missing choice with `MODEL_SELECTION_REQUIRED` before recording a message or contacting a provider, even when the thread has a stored model. An explicit choice uses that provider/model without automatic premium fallback. Switching conversations clears the choice; changing configured catalog inputs refreshes the available models. Ordinary Auto and fixed thread models retain their existing behavior.
