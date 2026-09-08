@@ -6,7 +6,7 @@ import { NO_CHANGED, mergeChanged, hasChanges, type ChangedDomains } from '../..
 import type { StrataDatabase } from '../db/index'
 import type { AiThread } from '../../shared/types'
 import type { AiProvider, AiRouteLog, AiRoutingMode, AiSettings } from './types'
-import { AI_TOOLS, execute_tool_call } from './tools'
+import { toolsForMode, execute_tool_call } from './tools'
 import { route_ai_request } from './routing'
 import type { RouterConfig } from './routing'
 import { create_provider, resolve_model_selection, get_preset_by_id } from './providers/providerRegistry'
@@ -344,7 +344,7 @@ export const run_ai_turn = async (
       state: toolState,
       systemPrompt: system_prompt,
       messages: input_messages,
-      tools: AI_TOOLS,
+      tools: toolsForMode(db.getSettings().aiEditMode),
       execute,
       onUsage: (usage) => {
         if (usage) {

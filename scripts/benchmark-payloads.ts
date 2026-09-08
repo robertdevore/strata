@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import ts from 'typescript'
-import { AI_TOOLS, execute_tool_call } from '../app/main/ai/tools'
+import { AI_TOOLS, execute_tool_call, toolsForMode } from '../app/main/ai/tools'
 import { budgetHistory } from '../app/main/ai/toolLoop'
 import type { StrataDatabase } from '../app/main/db'
 import type { Note } from '../app/shared/types'
@@ -142,16 +142,7 @@ const newHistoryJson = JSON.stringify(budgetHistory(history))
 const openNotes = notes.slice(0, 12)
 const oldContext = beforeOpenContext(openNotes)
 const newContext = afterOpenContext(openNotes)
-const mutationNames = new Set([
-  'create_note',
-  'update_note',
-  'update_note_by_title',
-  'create_project',
-  'update_project',
-  'delete_project',
-  'reorder_projects',
-])
-const readOnlyCatalog = AI_TOOLS.filter((tool) => !mutationNames.has(tool.name))
+const readOnlyCatalog = toolsForMode('read_only')
 console.log(
   JSON.stringify(
     {
@@ -178,8 +169,8 @@ console.log(
         ...comparison(JSON.stringify(oldTools.AI_TOOLS), JSON.stringify(AI_TOOLS)),
         beforeTools: oldTools.AI_TOOLS.length,
         afterTools: AI_TOOLS.length,
-        readOnlyCandidateTools: readOnlyCatalog.length,
-        readOnlyCandidateBytes: bytes(JSON.stringify(readOnlyCatalog)),
+        readOnlyTools: readOnlyCatalog.length,
+        readOnlyBytes: bytes(JSON.stringify(readOnlyCatalog)),
       },
       openNoteContext: comparison(oldContext, newContext),
       historyContext: comparison(oldHistoryJson, newHistoryJson),
@@ -187,12 +178,15 @@ console.log(
         beforePrompt + oldContext + oldHistoryJson + JSON.stringify(oldTools.AI_TOOLS),
         afterPrompt + newContext + newHistoryJson + JSON.stringify(AI_TOOLS),
       ),
+      readOnlyCombinedBytes: bytes(
+        afterPrompt + newContext + newHistoryJson + JSON.stringify(readOnlyCatalog),
+      ),
       limitations: [
         'UTF-8 bytes, not model-specific token counts or latency; transport envelopes are excluded.',
         'Read-only deterministic fixture adapters supply identical ordered knowledge. This does not measure SQLite ranking or query performance.',
         'Default result counts and get_project semantics changed. Smaller outputs do not imply equivalent recall; callers can request more summaries or full notes explicitly.',
         'Current revisions/title/contentLoaded metadata increase the explicit full-note payload.',
-        'The read-only catalog is a measured candidate, not an enabled runtime policy in this snapshot.',
+        'Read-only and unknown modes advertise only read tools; confirm and auto_apply retain the full catalog.',
       ],
     },
     null,

@@ -347,3 +347,11 @@ Added benchmark:payloads, which loads the original e2ca89b tool executor and sel
 Default list output fell from 45,182 to 6,872 bytes (60 to 15 summaries). The sampled combined system/open-note/history/catalog content fell from 187,019 to 33,990 bytes. The explicit full-note response grew from 7,309 to 7,372 bytes because of additional metadata. The full catalog grew from 4,925 to 5,302 bytes; a candidate read-only catalog retains all 10 read tools in 2,732 bytes. Benchmark execution, source formatting, targeted lint and diff checks passed. No live database/provider was used.
 
 Follow-up: enable the measured permission-mode subset without intent guessing, and replace slicing of serialized open-note context with complete bounded entries plus an omission count. Preserve this baseline artifact unchanged.
+
+### Permission-based AI catalog and valid bounded context
+
+Read-only and unknown stored permission modes now advertise only the complete read-tool catalog; confirm/auto-apply retain all mutation tools. Runtime mutation checks independently fail closed for unknown values. Runner tests exercise the same catalog through cheap and premium fallback, including rejection of an unsolicited mutation call. Open-note summaries are appended as complete JSON entries within the 4,000-character budget, include an omitted count, and preserve Unicode code points. Escaped content cannot leave a truncated JSON object.
+
+The immutable follow-up payload artifact records 2,732 read-only catalog bytes versus 5,302 full catalog bytes (48.47% reduction). Complete context framing adds 22 bytes to the ordinary fixture (3,570 total); combined read-only content/catalog is 31,442 bytes versus original 187,019. Tool outputs are unchanged. See payloads.md for semantic changes, source hashes and measurement limits; byte savings are not token/quality claims.
+
+Verification: `npm run verify` passed formatting, lint, 219 tests in 54 files, TypeScript and production build. Focused context/mutation/fallback tests passed before the full suite. This checkpoint does not complete the broader hardening goal; proposal review, remaining benchmarks, restore lifecycle and release audit continue below the requirement ledger.

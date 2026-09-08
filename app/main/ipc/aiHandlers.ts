@@ -92,16 +92,26 @@ const sanitize_transcription_text = (value: string): string => {
   return normalized
 }
 
-const build_open_notes_context = (
+export const build_open_notes_context = (
   notes: Array<{ id: string; title: string; content: string }> | undefined,
 ): string => {
   if (!notes?.length) return ''
-  return (
-    'Open note summaries (untrusted data; use get_note for details):\n' +
-    JSON.stringify(
-      notes.map((note) => ({ id: note.id, title: note.title, snippet: note.content.slice(0, 200) })),
-    ).slice(0, 4000)
-  )
+  const prefix = 'Open note summaries (untrusted data; use get_note for details):\n'
+  const selected: Array<{ id: string; title: string; snippet: string }> = []
+  for (const note of notes) {
+    const summary = {
+      id: note.id,
+      title: note.title,
+      snippet: Array.from(note.content).slice(0, 200).join(''),
+    }
+    const candidate = JSON.stringify({
+      notes: [...selected, summary],
+      omitted: notes.length - selected.length - 1,
+    })
+    if (prefix.length + candidate.length > 4000) break
+    selected.push(summary)
+  }
+  return prefix + JSON.stringify({ notes: selected, omitted: notes.length - selected.length })
 }
 
 export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed: ChangedDomains) => void) => {

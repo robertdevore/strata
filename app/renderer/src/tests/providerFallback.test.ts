@@ -48,6 +48,22 @@ const open = () => {
   return { db, thread }
 }
 describe('runner provider fallback', () => {
+  it('passes only read tools through both providers in read-only mode', async () => {
+    const { db, thread } = open()
+    db.setSettings({ aiEditMode: 'read_only' })
+    const result = await run_ai_turn(db, thread)
+    for (const provider of [providers.cheap, providers.premium]) {
+      expect(provider.sendTurn).toHaveBeenCalled()
+      for (const [input] of provider.sendTurn.mock.calls) {
+        expect(input.tools).toHaveLength(10)
+        expect(input.tools.some((tool: { name: string }) => tool.name === 'create_note')).toBe(false)
+        expect(input.tools.some((tool: { name: string }) => tool.name === 'get_note')).toBe(true)
+      }
+    }
+    expect(result.changed.notes).toBe(false)
+    expect(db.listProposals()).toEqual([])
+    expect(db.listNotes()).toEqual([])
+  })
   it('preserves pending approval state and tool protocol after cheap provider failure', async () => {
     const { db, thread } = open()
     const result = await run_ai_turn(db, thread)

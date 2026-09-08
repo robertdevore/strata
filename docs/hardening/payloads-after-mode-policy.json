@@ -1,0 +1,134 @@
+{
+  "kind": "deterministic-payload-contracts",
+  "generatedAt": "2026-09-08T21:40:34.758Z",
+  "baselineCommit": "e2ca89b9b38efc71cb4c1652649b5297f5f67310",
+  "currentCommit": "f248b4188798e3438c8dd36a6309e2c0c7343ef1",
+  "fixture": {
+    "notes": 100,
+    "noteContentBytes": 6966,
+    "openNotes": 12,
+    "historyMessages": 40,
+    "hash": "998a777cfb02c8c61bea7db8d8a74ce51aa1c9ff2c103381e881b64ce71e9404"
+  },
+  "sourceHashes": {
+    "app/main/ai/tools.ts": {
+      "before": "8eedebc7f79f3de1d07cde7d9e28c405c1c359a3467e27d3dc4aad76bc5b3451",
+      "after": "099f41aece5a9733f87c5d817b0503c8ef05b8e018917afd99d7cdff69ad2ffb"
+    },
+    "app/main/ai/aiRunner.ts": {
+      "before": "b07aceb482f803f46d61f8db849deb74bffec8877d8ea49bdd785c6f2031fe47",
+      "after": "cd974179a66db095ae6437e896059059809515875a63b9349b5792db94e5491f"
+    },
+    "app/main/ipc/aiHandlers.ts": {
+      "before": "cfc6e58cebcdabe52ed290808c64a8bdbae8a7c2675139758061468cc3100de9",
+      "after": "b3ff924a4d736210c188182dff0b6014a13071329031f1359ec7efbb2a8c7444"
+    },
+    "app/main/ai/toolLoop.ts": {
+      "before": "6f9b38de5842866c6eb2d3623aa1283052bf9e18077aa17dca63e1a1d69ebdba",
+      "after": "2a99c26d74e2356fd97df9bb2cd279235cb4f1a93d67503a665a4efcf6b1909f"
+    }
+  },
+  "toolOutputs": [
+    {
+      "tool": "list_notes",
+      "args": {},
+      "beforeBytes": 45182,
+      "afterBytes": 6872,
+      "reductionPercent": 84.79,
+      "beforeNotes": 60,
+      "afterNotes": 15
+    },
+    {
+      "tool": "search_notes",
+      "args": {
+        "query": "provider"
+      },
+      "beforeBytes": 18827,
+      "afterBytes": 6872,
+      "reductionPercent": 63.5,
+      "beforeNotes": 25,
+      "afterNotes": 15
+    },
+    {
+      "tool": "search_notes_by_tag",
+      "args": {
+        "tag": "provider"
+      },
+      "beforeBytes": 37652,
+      "afterBytes": 6872,
+      "reductionPercent": 81.75,
+      "beforeNotes": 50,
+      "afterNotes": 15
+    },
+    {
+      "tool": "search_notes_by_project",
+      "args": {
+        "project_id": "10000000-0000-4000-8000-000000000001"
+      },
+      "beforeBytes": 37823,
+      "afterBytes": 7043,
+      "reductionPercent": 81.38,
+      "beforeNotes": 50,
+      "afterNotes": 15
+    },
+    {
+      "tool": "get_project",
+      "args": {
+        "project_id": "10000000-0000-4000-8000-000000000001"
+      },
+      "beforeBytes": 75474,
+      "afterBytes": 172,
+      "reductionPercent": 99.77,
+      "beforeNotes": 100,
+      "afterNotes": 0
+    },
+    {
+      "tool": "get_note",
+      "args": {
+        "note_id": "00000000-0000-4000-8000-000000000001"
+      },
+      "beforeBytes": 7309,
+      "afterBytes": 7372,
+      "reductionPercent": -0.86,
+      "beforeNotes": 1,
+      "afterNotes": 1
+    }
+  ],
+  "systemPrompt": {
+    "beforeBytes": 1659,
+    "afterBytes": 462,
+    "reductionPercent": 72.15
+  },
+  "toolCatalog": {
+    "beforeBytes": 4925,
+    "afterBytes": 5302,
+    "reductionPercent": -7.65,
+    "beforeTools": 17,
+    "afterTools": 17,
+    "readOnlyTools": 10,
+    "readOnlyBytes": 2732
+  },
+  "openNoteContext": {
+    "beforeBytes": 38343,
+    "afterBytes": 3570,
+    "reductionPercent": 90.69
+  },
+  "historyContext": {
+    "beforeBytes": 142092,
+    "afterBytes": 24678,
+    "reductionPercent": 82.63
+  },
+  "combinedContextAndCatalog": {
+    "beforeBytes": 187019,
+    "afterBytes": 34012,
+    "reductionPercent": 81.81
+  },
+  "readOnlyCombinedBytes": 31442,
+  "limitations": [
+    "UTF-8 bytes, not model-specific token counts or latency; transport envelopes are excluded.",
+    "Read-only deterministic fixture adapters supply identical ordered knowledge. This does not measure SQLite ranking or query performance.",
+    "Default result counts and get_project semantics changed. Smaller outputs do not imply equivalent recall; callers can request more summaries or full notes explicitly.",
+    "Current revisions/title/contentLoaded metadata increase the explicit full-note payload.",
+    "Read-only and unknown modes advertise only read tools; confirm and auto_apply retain the full catalog."
+  ]
+}

@@ -28,3 +28,9 @@ The combined figure excludes provider transport envelopes. The history fixture d
 The full catalog grows from 4,925 to 5,302 bytes as write contracts gain validation/revision fields. A measured read-only subset retains all 10 read tools and uses 2,732 bytes, 48.47% less than the current full catalog. This first snapshot measures that subset as a candidate; the runtime still advertises the full catalog. A simple permission-mode subset can achieve that saving without guessing intent.
 
 The first context snapshot also prompted a follow-up correctness check: the current open-note builder slices serialized JSON at a character limit. Long permitted titles can therefore leave a partial final entry. The follow-up should preserve complete entries and explicitly report omissions; the original result above must remain unchanged.
+
+## Permission policy and complete context entries
+
+The subsequent [payloads-after-mode-policy.json](payloads-after-mode-policy.json) records the implemented policy. Read-only and unknown permission values advertise all 10 read tools (2,732 bytes); confirm and auto-apply retain all 17 tools (5,302 bytes). Runtime validation independently rejects writes under unknown modes. Selection depends on explicit permissions, avoiding intent guesses that could remove necessary retrieval tools.
+
+Open-note context now adds whole summaries within its 4,000-character budget and reports omitted notes. Escaped strings cannot truncate serialized JSON, and excerpts preserve Unicode code points. The representative context grows from 3,548 to 3,570 bytes for the explicit wrapper/count. Combined content is 34,012 bytes with all tools, or 31,442 in read-only mode, versus the original 187,019 bytes. These are serialization measurements, not model token or quality estimates. The original snapshot remains unchanged.

@@ -269,6 +269,12 @@ const mutations = new Set([
   'delete_project',
   'reorder_projects',
 ])
+/** Permission-based selection keeps every read tool and never guesses the user's intent. */
+export const toolsForMode = (mode: unknown): AiToolDefinition[] =>
+  mode === 'confirm' || mode === 'auto_apply'
+    ? [...AI_TOOLS]
+    : AI_TOOLS.filter((tool) => !mutations.has(tool.name))
+
 for (const tool of AI_TOOLS) {
   if (tool.name === 'update_note' || tool.name === 'update_note_by_title') {
     tool.parameters.properties.expected_revision = {
@@ -347,7 +353,8 @@ export const execute_tool_call = (
     let result: unknown
     if (mutations.has(call.name)) {
       const mode = db.getSettings().aiEditMode
-      if (mode === 'read_only') throw new DomainError('READ_ONLY', 'AI mutations are disabled')
+      if (mode !== 'confirm' && mode !== 'auto_apply')
+        throw new DomainError('READ_ONLY', 'AI mutations are disabled')
       let changed = { ...NO_CHANGED }
       const service = new KnowledgeService(db, (domains) => {
         changed = domains
