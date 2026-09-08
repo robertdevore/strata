@@ -78,3 +78,7 @@ Thumbs.db
 
 # Local knowledge exports
 /work/
+
+# Python utility caches
+__pycache__/
+*.pyc
