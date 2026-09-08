@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { CliError } from '../lib/errors'
-import { print_success, format_table } from '../lib/output'
+import { print_success } from '../lib/output'
+import { notePageLimit, noteOutputFields, printNotePage } from '../lib/noteOutput'
 import {
   append_markdown,
   derive_title_from_markdown,
@@ -99,7 +100,8 @@ export const register_notes_commands = (
       fields?: string
     }) {
       const { options, client } = get_context(this)
-      const limit = Math.max(1, Math.min(100, Number.parseInt(command_options.limit, 10) || 50))
+      const limit = notePageLimit(command_options.limit)
+      noteOutputFields(command_options)
       const projects = command_options.project ? await client.listProjects() : []
       const project_id = command_options.projectId
         ? command_options.projectId
@@ -129,66 +131,28 @@ export const register_notes_commands = (
       })
 
       const page = await client.listNotesPage(filters)
-      const result = command_options.full
-        ? await Promise.all(page.notes.map((note) => client.getNote(note.id)))
-        : page.notes
-      const fields = command_options.fields
-        ?.split(',')
-        .map((field) => field.trim())
-        .filter(Boolean)
-      const data = {
-        ok: true,
-        count: result.length,
-        nextCursor: page.nextCursor ?? null,
-        ...(command_options.count
-          ? {}
-          : {
-              notes: command_options.idsOnly
-                ? result.map((note) => note.id)
-                : result.map((note) =>
-                    Object.fromEntries(
-                      Object.entries(note).filter(
-                        ([key]) =>
-                          (command_options.full || key !== 'content') && (!fields || fields.includes(key)),
-                      ),
-                    ),
-                  ),
-            }),
-      }
-
-      if (
-        'pretty' === options.outputMode &&
-        !options.quiet &&
-        !command_options.idsOnly &&
-        !command_options.count &&
-        !command_options.fields
-      ) {
-        const project_names = new Map(
-          (await client.listProjects()).map((project) => [project.id, project.name]),
-        )
-        const rows = result.map((note) => [
-          note.id.slice(0, 8),
-          note.updatedAt,
-          note.projectId ? (project_names.get(note.projectId) ?? note.projectId.slice(0, 8)) : '',
-          note.tags.join(','),
-          note.title ?? derive_title_from_markdown(note.content || note.snippet || ''),
-        ])
-        print_success(options, data, {
-          prettyText: format_table(['ID', 'Updated', 'Project', 'Tags', 'Title'], rows),
-        })
-        return
-      }
-      print_success(options, data)
+      await printNotePage(client, options, page, command_options, { ok: true })
     })
 
   notes
     .command('get <noteId>')
     .description('Get one note by ID.')
     .option('--content-only', 'Print only note content.')
-    .action(async function (note_id: string, command_options: { contentOnly?: boolean }) {
+    .option('--revision', 'Print only the current note revision.')
+    .action(async function (note_id: string, command_options: { contentOnly?: boolean; revision?: boolean }) {
       const { options, client } = get_context(this)
       note_id_schema.parse(note_id)
+      if (command_options.contentOnly && command_options.revision)
+        throw new CliError({
+          code: 'INVALID_OPTIONS',
+          exitCode: ExitCode.ValidationError,
+          message: 'Choose --content-only or --revision.',
+        })
       const note = await client.getNote(note_id)
+      if (command_options.revision) {
+        if (!options.quiet) process.stdout.write(String(note.revision) + '\n')
+        return
+      }
 
       if (command_options.contentOnly) {
         if (!options.quiet) process.stdout.write(note.content + '\n')

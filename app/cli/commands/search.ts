@@ -1,6 +1,5 @@
 import { Command } from 'commander'
-import { print_success, format_table } from '../lib/output'
-import { derive_title_from_markdown } from '../lib/markdown'
+import { notePageLimit, noteOutputFields, printNotePage, type NoteOutputFlags } from '../lib/noteOutput'
 import { CliError } from '../lib/errors'
 import type { CliRuntimeOptions } from '../types'
 import type { StrataApiClient } from '../lib/apiClient'
@@ -22,12 +21,23 @@ export const register_search_command = (
     .option('--project-id <id>', 'Optional project ID filter.')
     .option('--limit <count>', 'Max notes to return.', '25')
     .option('--cursor <cursor>', 'Continue this search')
+    .option('--fields <fields>', 'Comma-separated summary fields')
+    .option('--ids-only', 'Return only note IDs')
+    .option('--count', 'Return only the page count')
+    .option('--full', 'Explicitly fetch full records for this page')
     .action(async function (
       query: string,
-      command_options: { tag?: string; project?: string; projectId?: string; limit: string; cursor?: string },
+      command_options: NoteOutputFlags & {
+        tag?: string
+        project?: string
+        projectId?: string
+        limit: string
+        cursor?: string
+      },
     ) {
       const { options, client } = get_context(this)
-      const limit = Math.max(1, Math.min(100, Number.parseInt(command_options.limit, 10) || 25))
+      const limit = notePageLimit(command_options.limit)
+      noteOutputFields(command_options)
       const project_id =
         command_options.projectId ??
         (command_options.project
@@ -48,33 +58,6 @@ export const register_search_command = (
         projectId: project_id,
         cursor: command_options.cursor,
       })
-      const notes = page.notes
-
-      const data = {
-        query,
-        count: notes.length,
-        nextCursor: page.nextCursor ?? null,
-        notes: notes.map((note) =>
-          Object.fromEntries(Object.entries(note).filter(([key]) => key !== 'content')),
-        ),
-      }
-
-      if ('pretty' === options.outputMode && !options.quiet) {
-        const project_names = new Map(
-          (await client.listProjects()).map((project) => [project.id, project.name]),
-        )
-        const rows = notes.map((note) => [
-          note.id.slice(0, 8),
-          note.updatedAt,
-          note.projectId ? (project_names.get(note.projectId) ?? note.projectId.slice(0, 8)) : '',
-          note.tags.join(','),
-          note.title ?? derive_title_from_markdown(note.content || note.snippet || ''),
-        ])
-        const table = format_table(['ID', 'Updated', 'Project', 'Tags', 'Title'], rows)
-        print_success(options, data, { prettyText: table })
-        return
-      }
-
-      print_success(options, data)
+      await printNotePage(client, options, page, command_options, { query })
     })
 }

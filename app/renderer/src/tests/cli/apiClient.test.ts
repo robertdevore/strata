@@ -40,6 +40,7 @@ describe('cli API client', () => {
           note: {
             id: '00000000-0000-0000-0000-000000000000',
             content: '# Title\\n\\nBody',
+            revision: 1,
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
             starred: false,
@@ -187,3 +188,38 @@ it('preserves timeout classification when the server stalls after sending header
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 })
+
+it.each(['revision', 'content'])(
+  'rejects a full note missing %s instead of inventing write prerequisites',
+  async (missing) => {
+    const note = {
+      id: '00000000-0000-4000-8000-000000000001',
+      content: '# Original',
+      revision: 2,
+      createdAt: '2026-09-08T00:00:00Z',
+      updatedAt: '2026-09-08T00:00:00Z',
+      starred: false,
+      archived: false,
+      tags: [],
+      projectId: null,
+      deletedAt: null,
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              note: Object.fromEntries(Object.entries(note).filter(([key]) => key !== missing)),
+            }),
+          ),
+      ),
+    )
+    try {
+      const client = new StrataApiClient({ baseUrl: 'http://127.0.0.1:3939', token: null, timeoutMs: 1000 })
+      await expect(client.getNote(note.id)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  },
+)

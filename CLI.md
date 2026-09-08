@@ -211,7 +211,7 @@ Use $strata-memory in AUTO mode. Recall only what this task needs, hold durable 
 
 ## Bounded retrieval and safe updates
 
-`notes list` returns at most 100 summaries per page (50 by default), with `nextCursor`. Continue with `--cursor` and the same filters. Use `--fields id,title,revision`, `--ids-only` or `--count` to reduce output. `--full` explicitly fetches full records for the selected page. `search` defaults to 25 summaries; `notes get <id>` retrieves one full note. Treat cursors as continuation hints, not a snapshot across concurrent changes.
+`notes list` returns at most 100 summaries per page (50 by default), with `nextCursor`. Continue with `--cursor` and the same filters. Use `--fields id,title,revision`, `--ids-only` or `--count` to reduce output. `--full` explicitly fetches full records for the selected page. `search` defaults to 25 summaries and supports the same `--fields`, `--ids-only`, `--count`, `--full` and `--cursor` options. Invalid fields or limits are rejected rather than silently ignored. `notes get <id>` retrieves one full note; `--revision` prints its current revision number and `--content-only` prints its Markdown. Those two raw-output flags are mutually exclusive and bypass the usual response envelope. Treat cursors as continuation hints, not a snapshot across concurrent changes.
 
 Read the note revision before editing and pass it with `--if-revision`. A conflict preserves the newer stored note. For example:
 

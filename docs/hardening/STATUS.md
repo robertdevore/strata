@@ -485,3 +485,11 @@ Verification: the full CLI directory passed 33 tests before the final compact-ou
 The CLI now bounds response bodies to 4 MiB while streaming, including responses without Content-Length. Body read failures propagate instead of being converted into empty JSON; stalled bodies retain REQUEST_TIMEOUT classification. Malformed successful JSON/schema responses produce INVALID_RESPONSE without network retries. Request timers are cleared on every path, including transient HTTP retries that previously left timers alive. HTTP 409 now uses the documented conflict/unsafe exit code 6, while 400/422 use validation code 2. Raw transport exception text is no longer attached to diagnostic details.
 
 Ten API-client tests passed, including size bounds with/without headers, malformed JSON/schema rejection without retries, timer cleanup after a 503-to-success retry, real loopback stalled-body timeout, and conflict status/revision preservation. TypeScript and scoped ESLint passed. The full inventory is now 271 tests; final whole-suite verification remains pending after subsequent CLI work.
+
+### Complete CLI retrieval projections and require real write prerequisites
+
+List/search now share bounded projection and human-table formatting. Search gains --fields, --ids-only, --count and --full; explicit full output is no longer hidden by the normal human summary table. Unknown fields, content without --full and malformed/out-of-range limits are rejected. Notes get gains mutually exclusive --revision/raw current revision and --content-only output. Count means the current page count and preserves nextCursor.
+
+Full-note client responses now require content and revision. The previous defaults could invent an empty body or revision 1 if a server omitted write prerequisites; malformed full responses now fail with INVALID_RESPONSE. Summary reads still allow omitted bodies. Real CLI/API integration verifies projections, raw revision output, full content, count/ID results and invalid options. API-client regressions cover omitted content/revision.
+
+`npm run verify` passed all **273 tests across 61 files**, formatting, lint, TypeScript and the production build. Log: `/tmp/strata-cli-contract-verify.log`. This is the latest full source checkpoint. Controlled performance work and the remaining release/UX audit still prevent a completion claim.

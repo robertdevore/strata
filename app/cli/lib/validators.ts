@@ -16,7 +16,7 @@ export const note_schema = z.object({
   content: z.string().default(''),
   title: z.string().optional(),
   snippet: z.string().optional(),
-  revision: z.number().int().positive().default(1),
+  revision: z.number().int().positive(),
   createdAt: z.string(),
   updatedAt: z.string(),
   starred: z.boolean(),
@@ -32,7 +32,7 @@ export const note_list_response_schema = z.object({
 })
 
 export const note_response_schema = z.object({
-  note: note_schema,
+  note: note_schema.extend({ content: z.string() }),
 })
 
 export const delete_response_schema = z.object({

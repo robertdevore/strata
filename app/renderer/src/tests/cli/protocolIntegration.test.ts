@@ -46,6 +46,25 @@ describe('CLI protocol integration', () => {
         run(['--confirm', 'notes', 'update', note.id, '--content', '# Stale', '--if-revision', '1']),
       ).rejects.toThrow()
       expect(db.getNote(note.id)?.content).toBe('# Updated')
+      expect((await run(['notes', 'list', '--fields', 'id,revision'])).data.notes).toEqual([
+        { id: note.id, revision: 2 },
+      ])
+      expect((await run(['search', 'Updated', '--fields', 'title,revision'])).data.notes).toEqual([
+        { title: 'Updated', revision: 2 },
+      ])
+      expect((await run(['search', 'Updated', '--ids-only'])).data.notes).toEqual([note.id])
+      const pageCount = await run(['search', 'Updated', '--count'])
+      expect(pageCount.data).toMatchObject({ count: 1, nextCursor: null })
+      expect(pageCount.data.notes).toBeUndefined()
+      expect((await run(['search', 'Updated', '--full'])).data.notes[0].content).toBe('# Updated')
+      expect(await run(['notes', 'get', note.id, '--revision'])).toBe(2)
+      for (const args of [
+        ['notes', 'list', '--limit', '3oops'],
+        ['search', 'Updated', '--fields', 'typo'],
+      ]) {
+        await expect(run(args)).rejects.toMatchObject({ code: 2 })
+      }
+
       const search = await run(['agent', 'context', 'search', 'Updated'])
       expect(search.data.notes[0]).toMatchObject({ title: 'Updated', revision: 2 })
       const full = await run(['agent', 'context', 'search', 'Updated', '--full'])
