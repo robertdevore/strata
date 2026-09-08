@@ -27,6 +27,21 @@ const open = () => {
   return { db, call, service: new KnowledgeService(db) }
 }
 describe('AI mutation permissions', () => {
+  it('records the project identity and order that a human must review', () => {
+    const { db, service } = open()
+    const first = db.createProject('Original project')
+    const second = db.createProject('Second project')
+    const rename = service.propose({ op: 'rename_project', id: first.id, name: 'Proposed name' })
+    expect(rename.before).toEqual(first)
+    expect(rename.after).toMatchObject({ id: first.id, name: 'Proposed name' })
+    const removal = service.propose({ op: 'delete_project', id: first.id })
+    expect(removal.before).toEqual(first)
+    expect(db.getProject(first.id)).toEqual(first)
+    const order = db.listProjects()
+    const reorder = service.propose({ op: 'reorder_projects', projectIds: [second.id, first.id] })
+    expect(reorder.before).toEqual(order)
+    expect(db.listProjects()).toEqual(order)
+  })
   it('filters pending proposals by conversation before applying the result limit', () => {
     const { db } = open()
     for (let index = 0; index < 55; index++)

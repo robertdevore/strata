@@ -385,11 +385,11 @@ try {
     await activePane.getByPlaceholder('Message Strata AI…').fill('Create the proposed fixture note')
     await activePane.getByRole('button', { name: 'Send message', exact: true }).click()
     const review = activePane.getByRole('region', { name: 'AI edit proposals' })
-    await review.locator('summary').click()
-    await expect(review.getByText(/Desktop approved proposal/)).toBeVisible()
+    await review.locator('summary').filter({ hasText: 'AI edit awaiting approval:' }).click()
+    await expect(review.getByText('+ # Desktop approved proposal', { exact: true })).toBeVisible()
     expect((await proposalNotes()).notes).toHaveLength(0)
     await review.getByRole('button', { name: action, exact: true }).click()
-    await expect(review.locator('summary')).toHaveCount(0)
+    await expect(review.locator('summary').filter({ hasText: 'AI edit awaiting approval:' })).toHaveCount(0)
   }
   const approvedNotes = (await proposalNotes()).notes
   expect(approvedNotes).toHaveLength(1)

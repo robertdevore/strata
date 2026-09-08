@@ -279,7 +279,14 @@ export class KnowledgeService {
   ): { id: string; operation: Operation; before: unknown; after: unknown } {
     const operation = operationSchema.parse(input)
     return this.db.transaction(() => {
-      const before = operation.op === 'update_note' ? this.db.getNote(operation.id) : null
+      const before =
+        operation.op === 'update_note' || operation.op === 'delete_note' || operation.op === 'restore_note'
+          ? this.db.aiGetNoteById(operation.id, true)
+          : operation.op === 'rename_project' || operation.op === 'delete_project'
+            ? this.db.getProject(operation.id)
+            : operation.op === 'reorder_projects'
+              ? this.db.listProjects()
+              : null
       const after = this.mutate(operation, { source: 'ai', dryRun: true })
       const proposal = { operation, before, after, actor }
       const id = this.db.createProposal(proposal)

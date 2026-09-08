@@ -1,3 +1,4 @@
+import { ProposalDiff } from './ProposalDiff'
 import { useEffect, useRef, useState } from 'react'
 interface Proposal {
   id: string
@@ -63,15 +64,8 @@ export const AiProposals = ({ sending, threadId }: { sending: boolean; threadId:
         return (
           <details key={proposal.id}>
             <summary>AI edit awaiting approval: {payload.operation.op.replaceAll('_', ' ')}</summary>
-            <p>Review the complete before and proposed after state. Applying checks the original revision.</p>
-            <h4>Before</h4>
-            <pre style={{ maxHeight: 220, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-              {JSON.stringify(payload.before, null, 2)}
-            </pre>
-            <h4>After</h4>
-            <pre style={{ maxHeight: 220, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-              {JSON.stringify(payload.after, null, 2)}
-            </pre>
+            <p>Review the proposed changes. Note updates check the original revision before applying.</p>
+            <ProposalDiff before={payload.before} after={payload.after} />
             <button disabled={busy !== null} onClick={() => void resolve(proposal.id, true)}>
               Approve edit
             </button>

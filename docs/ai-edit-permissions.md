@@ -1,106 +1,33 @@
-# AI Edit Permissions
+# AI edit permissions
 
-Strata includes a safety and transparency layer for AI-powered note editing. Every AI-created or AI-updated note is tracked in an edit history, and users can control whether the AI may edit notes at all.
-
-## Settings
-
-### AI Edit Mode
-
-Configured in **Settings → AI Edit Mode**:
+AI is optional. It accesses knowledge through validated tools and the same transactional service used by other write interfaces.
 
 | Mode | Behavior |
-|------|----------|
-| **Read Only** | AI cannot create or update notes. Tool calls return an error. |
-| **Confirm** *(default)* | AI edits are saved but recorded in history. Users can revert any edit. |
-| **Auto Apply** | Same as Confirm — AI edits are saved and recorded. The mode name indicates intent; the safety layer (history + revert) is always active. |
+| --- | --- |
+| Read Only | All read tools remain available. Every mutation, including project changes, is rejected with `READ_ONLY`. Mutation schemas are omitted from provider requests. |
+| Confirm (default) | A valid write creates a pending proposal. Nothing is applied until a human approves it. |
+| Auto Apply | Valid writes apply immediately and note changes record a revision. |
 
-## How It Works
+Unknown stored permission values fail closed. A provider cannot approve its own proposals or bypass the runtime permission check.
 
-### 1. Edit Recording
+## Review and approval
 
-Whenever the AI uses the `create_note` or `update_note` tool, Strata records an entry in the `ai_note_edits` table containing:
+Pending proposals appear in the conversation that created them. Expand **AI edit awaiting approval** to review text additions/removals, changed metadata, and the complete before/after states. Project proposals include their original identity or ordering. Preparing a proposal runs validation in a rolled-back transaction.
 
-- `action`: `"create"` or `"update"`
-- `before_content` / `after_content`: Content snapshots
-- `before_tags` / `after_tags`: Tag snapshots
-- `thread_id`, `message_id`: Links to the AI chat context
-- `model`: The AI model used
-- `prompt_excerpt`: First 200 characters of the prompt
-- `created_at`: Timestamp
-- `reverted_at`: Initially `null`, set when reverted
+Choose **Approve edit** or **Reject**. Approval rechecks the original note revision and applies the change transactionally. If another writer changed the note, approval fails; reject the stale proposal and request a fresh one. Rejection changes no notes or projects. Changing chats cannot make a late response replace the current review state.
 
-### 2. Read-Only Enforcement
+The text view shows a contiguous replacement region with shared leading/trailing lines omitted explicitly. The complete snapshots remain available for detailed review. Project operations do not yet have the same revision precondition as note updates; the ongoing hardening audit tracks that limitation.
 
-When `aiEditMode` is `read_only`, the AI's `create_note` and `update_note` tool calls return an error:
+## History and recovery
 
-```json
-{ "error": "AI note editing is disabled (aiEditMode: read_only)" }
-```
+Universal note history covers human, API, CLI and AI changes. Open **Note revision history** to inspect and intentionally restore a saved revision. Restoration checks the revision read during review, records a new revision, and refuses stale writes.
 
-### 3. Viewing Edit History
+Legacy AI edit records remain available. Their revert operation checks whether later changes have occurred and refuses to overwrite them. Revert is not an unconditional rollback of newer work.
 
-Open a note, then click the **chatbot icon** (🤖) in the editor footer row (next to the trash icon). A modal opens showing all AI edits for that note, including:
+## Cancellation
 
-- Action type and timestamp
-- Whether content was changed
-- Prompt excerpt
-- **Revert** button for non-reverted edits
+**Stop AI response** cancels an in-flight provider request. Already-applied writes remain saved, and pending proposals can still be reviewed. Switching conversations or unmounting the editor cancels that view's pending request; cancellation is not a transaction spanning the entire conversation.
 
-### 4. Reverting AI Edits
+## Automation
 
-Clicking **Revert** on an edit entry:
-
-- For `update` edits: Restores the note's content and tags to their previous state
-- For `create` edits: Soft-deletes the created note
-- Marks the edit as `reverted_at = now`
-
-The note's content is immediately restored. The reverted edit remains in history for audit purposes.
-
-## Database Schema
-
-Migration v5 created the `ai_note_edits` table:
-
-```sql
-CREATE TABLE ai_note_edits (
-  id TEXT PRIMARY KEY,
-  note_id TEXT NOT NULL,
-  thread_id TEXT,
-  message_id TEXT,
-  action TEXT NOT NULL,        -- 'create' | 'update'
-  before_content TEXT,
-  after_content TEXT,
-  before_tags TEXT,
-  after_tags TEXT,
-  model TEXT,
-  prompt_excerpt TEXT,
-  created_at TEXT NOT NULL,
-  reverted_at TEXT,            -- NULL until reverted
-  FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
-);
-```
-
-## API Endpoints
-
-### GET /notes/:id/ai-edits
-
-Returns the edit history for a note.
-
-```bash
-curl http://127.0.0.1:3939/notes/abc123/ai-edits
-```
-
-### POST /ai-edits/:id/revert
-
-Reverts a specific AI edit.
-
-```bash
-curl -X POST http://127.0.0.1:3939/ai-edits/edit-abc123/revert
-```
-
-## Design Decisions
-
-- **No silent edits**: AI edits are NEVER applied without a history record, regardless of `aiEditMode`.
-- **Revert is always available**: Even in `auto_apply` mode, users can undo AI changes.
-- **Human edits are unaffected**: The edit history only tracks AI-initiated changes. Manual edits are not recorded.
-- **Confirm mode is default**: New installations default to `confirm` for maximum transparency.
-- **Deferred**: Inline diff preview (side-by-side before/after) and confirm-mode approval flow are scaffolded for future implementation.
+The loopback API requires authentication. Use the installed CLI or the current [CLI contract](../CLI.md) for note revisions, safe updates and restoration. Do not use the unauthenticated examples in historical design documents. Proposal approval is a human desktop action, not a model tool.
