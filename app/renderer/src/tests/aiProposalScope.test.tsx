@@ -78,6 +78,30 @@ it('does not reinsert a resolved proposal from an older refresh', async () => {
   view.rerender(<AiProposals sending={false} threadId="first" />)
   await act(async () => fireEvent.click(screen.getByText('Reject')))
   expect(screen.queryByText('Reject')).toBeNull()
+  expect(screen.getByRole('status').textContent).toBe('Proposal rejected.')
   await act(async () => finish([item]))
   expect(screen.queryByText('Reject')).toBeNull()
+})
+
+it('shows successful application explicitly and clears it when changing chats', async () => {
+  Object.defineProperty(window, 'strata', {
+    configurable: true,
+    value: {
+      ai: {
+        listProposals: vi
+          .fn()
+          .mockResolvedValueOnce([proposal('approved')])
+          .mockResolvedValue([]),
+        resolveProposal: vi.fn().mockResolvedValue({}),
+      },
+    },
+  })
+  const view = render(<AiProposals sending={true} threadId="first" />)
+  fireEvent.click(await screen.findByText('Approve edit'))
+  expect((await screen.findByRole('status')).textContent).toBe('Edit applied.')
+  expect(screen.queryByText('Approve edit')).toBeNull()
+  view.rerender(<AiProposals sending={false} threadId="first" />)
+  expect(screen.getByRole('status').textContent).toBe('Edit applied.')
+  view.rerender(<AiProposals sending={false} threadId="second" />)
+  expect(screen.queryByRole('status')).toBeNull()
 })

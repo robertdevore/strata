@@ -12,11 +12,15 @@ export const AiProposals = ({ sending, threadId }: { sending: boolean; threadId:
   const [loadedThread, setLoadedThread] = useState<string | null>(null)
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   useEffect(() => {
     let active = true
     const version = ++listVersion.current
-    setError('')
+    if (sending) {
+      setError('')
+      setFeedback('')
+    }
     if (!threadId) return
     void window.strata.ai
       .listProposals(threadId)
@@ -37,15 +41,21 @@ export const AiProposals = ({ sending, threadId }: { sending: boolean; threadId:
       active = false
     }
   }, [sending, threadId])
-  useEffect(() => setBusy(null), [threadId])
+  useEffect(() => {
+    setBusy(null)
+    setError('')
+    setFeedback('')
+  }, [threadId])
   const resolve = async (id: string, approved: boolean) => {
     const requestThread = threadId
     setBusy(id)
     setError('')
+    setFeedback('')
     try {
       await window.strata.ai.resolveProposal(id, approved)
       if (currentThread.current !== requestThread) return
       listVersion.current++
+      setFeedback(approved ? 'Edit applied.' : 'Proposal rejected.')
       setProposals((items) => items.filter((item) => item.id !== id))
     } catch {
       if (currentThread.current !== requestThread) return
@@ -59,6 +69,7 @@ export const AiProposals = ({ sending, threadId }: { sending: boolean; threadId:
   return (
     <section aria-label="AI edit proposals">
       {error && loadedThread === threadId && <p role="alert">{error}</p>}
+      {feedback && loadedThread === threadId && <p role="status">{feedback}</p>}
       {(threadId && loadedThread === threadId ? proposals : []).map((proposal) => {
         const payload = proposal.payload as { operation: { op: string }; before: unknown; after: unknown }
         return (

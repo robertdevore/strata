@@ -1,3 +1,4 @@
+import { notifyCommittedChanges } from '../services/notifications'
 import { randomUUID } from 'node:crypto'
 import { ActiveAiRequests } from '../ai/activeRequests'
 import { assertNotCancelled } from '../ai/cancellation'
@@ -281,7 +282,7 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
   handleTrustedIpc(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
     const { editId } = z.object({ editId: z.string().uuid() }).parse(payload)
     const result = db.revertAiEdit(editId)
-    if (result) onDataChanged?.(ALL_CHANGED)
+    if (result) notifyCommittedChanges(onDataChanged, ALL_CHANGED)
     return result
   })
 

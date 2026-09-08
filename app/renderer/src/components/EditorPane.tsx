@@ -498,7 +498,6 @@ export function EditorPane(props: EditorPaneProps) {
     const readingTimeMin = Math.max(1, Math.ceil(words / 200))
     return { words, chars, charsNoSpaces, lines, paragraphs, readingTimeMin }
   }, [content])
-  const noteIdPatternRef = useRef(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi)
   const [inlineFindQuery, setInlineFindQuery] = useState('')
   const [showInlineFind, setShowInlineFind] = useState(false)
   const [inlineFindCount, setInlineFindCount] = useState(0)
@@ -1532,26 +1531,6 @@ export function EditorPane(props: EditorPaneProps) {
     setChatThreads(threads)
   }
 
-  const maybeOpenMutatedNoteFromAssistant = async (assistant_content: string) => {
-    const lower = assistant_content.toLowerCase()
-    const looks_like_mutation =
-      lower.includes('create_note') ||
-      lower.includes('update_note') ||
-      lower.includes('created note') ||
-      lower.includes('updated note')
-    if (!looks_like_mutation) return
-
-    const matched_note_ids = Array.from(
-      new Set((assistant_content.match(noteIdPatternRef.current) ?? []).map((value) => value.toLowerCase())),
-    )
-    if (0 === matched_note_ids.length) return
-
-    const existing_note = notes.find((candidate) => matched_note_ids.includes(candidate.id.toLowerCase()))
-    if (!existing_note) return
-
-    await onOpenNoteFromChat(existing_note.id)
-  }
-
   const sendChatMessage = async (message: string, requestModel?: string) => {
     if (chatRequestIdRef.current || chatSending || chatAssistantTyping) return
     const requestId = crypto.randomUUID()
@@ -1613,9 +1592,6 @@ export function EditorPane(props: EditorPaneProps) {
           }
         }, 16)
       })
-
-      if (chatRequestIdRef.current === requestId)
-        await maybeOpenMutatedNoteFromAssistant(response.message.content)
     } catch (error) {
       if (chatRequestIdRef.current !== requestId) return
       stopAssistantTypingAnimation()

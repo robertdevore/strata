@@ -1,3 +1,4 @@
+import { notifyCommittedChanges } from './services/notifications'
 import type { ChangedDomains } from '../shared/changedDomains'
 import { IPC_CHANNELS } from '../shared/ipc'
 import { DraftCloseGuard } from './lifecycle/draftCloseGuard'
@@ -45,7 +46,11 @@ let current_settings: Settings | null = null
 let db: StrataDatabase | null = null
 let database_recovery: DatabaseRecoveryResult | null = null
 
-const notifyDataChanged = (changed: ChangedDomains) => main_window?.webContents.send('data:changed', changed)
+const notifyDataChanged = (changed: ChangedDomains) => {
+  const contents = main_window?.webContents
+  if (!contents || contents.isDestroyed()) return
+  notifyCommittedChanges((domains) => contents.send('data:changed', domains), changed)
+}
 
 const draftCloseGuard = new DraftCloseGuard({
   requestSave: (requestId) => {

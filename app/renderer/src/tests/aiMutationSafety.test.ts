@@ -27,6 +27,23 @@ const open = () => {
   return { db, call, service: new KnowledgeService(db) }
 }
 describe('AI mutation permissions', () => {
+  it('records an unchanged update as a no-op rather than claiming a new revision', () => {
+    const { db, call } = open()
+    db.setSettings({ aiEditMode: 'auto_apply' })
+    const note = db.createNote({ content: '# Unchanged' })
+    const result = call('update_note', {
+      note_id: note.id,
+      content: note.content,
+      expected_revision: note.revision,
+    })
+    expect(result.mutation).toMatchObject({
+      operation: 'update_note',
+      status: 'unchanged',
+      entities: [{ id: note.id, revision: note.revision }],
+    })
+    expect(JSON.parse(result.output).status).toBe('unchanged')
+    expect(db.listRevisions(note.id)).toHaveLength(1)
+  })
   it('rejects stale project renames and reorders while keeping the proposal pending', () => {
     const { db, service } = open()
     const project = db.createProject('Original')

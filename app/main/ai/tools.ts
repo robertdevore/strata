@@ -1,3 +1,4 @@
+import type { MutationOutcome } from './execution'
 import { NO_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 // Strata AI — tool definitions and execution
 // Provides tool schemas for AI providers and executes tool calls against the database.
@@ -259,6 +260,7 @@ export interface ToolExecutionResult {
   output: string
   changed: ChangedDomains
   proposalId?: string
+  mutation?: MutationOutcome
 }
 const mutations = new Set([
   'create_note',
@@ -397,12 +399,35 @@ export const execute_tool_call = (
           }),
           changed: { ...NO_CHANGED },
           proposalId: proposal.id,
+          mutation: { operation: parsed.op, status: 'proposed', proposalId: proposal.id, entities: [] },
         }
       }
+      const deletedProject = parsed.op === 'delete_project' ? db.getProject(parsed.id) : null
       result = service.mutate(parsed, { source: 'ai' })
+      const values = (Array.isArray(result) ? result : [result]) as Array<Record<string, unknown>>
+      const kind = ['create_note', 'update_note'].includes(parsed.op) ? 'note' : 'project'
+      const targets = parsed.op === 'reorder_projects' ? new Set(parsed.projectIds) : undefined
+      const entities: MutationOutcome['entities'] = values
+        .filter((value) => value && typeof value.id === 'string' && (!targets || targets.has(value.id)))
+        .map((value) => ({
+          kind,
+          id: String(value.id),
+          title:
+            typeof value.title === 'string'
+              ? value.title
+              : typeof value.name === 'string'
+                ? value.name
+                : undefined,
+          ...(typeof value.revision === 'number' ? { revision: value.revision } : {}),
+        }))
+      if (parsed.op === 'delete_project')
+        entities.push({ kind: 'project', id: parsed.id, title: deletedProject?.name })
+      const unchanged =
+        parsed.op === 'update_note' && entities[0]?.revision === parsed.payload.expectedRevision
       return {
-        output: JSON.stringify({ status: 'applied', result }),
+        output: JSON.stringify({ status: unchanged ? 'unchanged' : 'applied', result }),
         changed,
+        mutation: { operation: parsed.op, status: unchanged ? 'unchanged' : 'applied', entities },
       }
     }
     switch (call.name) {
@@ -465,6 +490,9 @@ export const execute_tool_call = (
         error: { code, message, details: error instanceof DomainError ? error.details : {} },
       }),
       changed: { ...NO_CHANGED },
+      ...(mutations.has(call.name)
+        ? { mutation: { operation: call.name, status: 'failed' as const, errorCode: code, entities: [] } }
+        : {}),
     }
   }
 }

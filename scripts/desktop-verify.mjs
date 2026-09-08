@@ -404,6 +404,9 @@ try {
     expect((await proposalNotes()).notes).toHaveLength(0)
     await review.getByRole('button', { name: action, exact: true }).click()
     await expect(review.locator('summary').filter({ hasText: 'AI edit awaiting approval:' })).toHaveCount(0)
+    await expect(review.getByRole('status')).toHaveText(
+      action === 'Reject' ? 'Proposal rejected.' : 'Edit applied.',
+    )
   }
   const approvedNotes = (await proposalNotes()).notes
   expect(approvedNotes).toHaveLength(1)

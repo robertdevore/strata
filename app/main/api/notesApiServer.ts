@@ -1,3 +1,4 @@
+import { notifyCommittedChanges } from '../services/notifications'
 import { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -186,7 +187,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
           .parse(await body(request))
         const note = db.restoreRevision(id, parsed.revision, parsed.expectedRevision)
         if (!note) return fail('NOT_FOUND', 'Note not found', 404)
-        options.onDataChanged?.(ALL_CHANGED)
+        notifyCommittedChanges(options.onDataChanged, ALL_CHANGED)
         return ok({ note })
       }
       if (!db.getNote(id)) return fail('NOT_FOUND', 'Note not found', 404)
@@ -245,7 +246,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
     }
     if (method === 'POST' && parts[0] === 'ai-edits' && parts[2] === 'revert') {
       const reverted = db.revertAiEdit(idSchema.parse(parts[1]))
-      if (reverted) options.onDataChanged?.(ALL_CHANGED)
+      if (reverted) notifyCommittedChanges(options.onDataChanged, ALL_CHANGED)
       return reverted ? ok({ reverted }) : fail('NOT_FOUND', 'Edit not found or already reverted', 404)
     }
     return fail('NOT_FOUND', 'Not found', 404)

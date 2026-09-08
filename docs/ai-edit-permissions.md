@@ -18,6 +18,12 @@ Choose **Approve edit** or **Reject**. Approval rechecks the original note revis
 
 The text view shows a contiguous replacement region with shared leading/trailing lines omitted explicitly. The complete snapshots remain available for detailed review. Project rename/reorder approval checks a fingerprint of the original project state. Project deletion also checks every affected note ID/revision, including archived and deleted members, and shows the affected assignment count. Changes after review cause a conflict and leave the proposal pending. Older project proposals without this check must be rejected and recreated.
 
+## Reports of changes
+
+Strata generates mutation reports from executed operations: applied changes, unchanged notes, pending proposals, and failed attempts are distinct. Reports include saved note links/revisions and preserve partial results across provider fallback. A successful project operation cannot make a failed note update appear successful. These reports are saved in the conversation.
+
+The editor stays on the current note while a response arrives. Follow a reported note link to open a changed note. No-op updates are reported without claiming a new revision. Ordinary retrieval answers keep the provider's explanation; a language-based warning remains only as an additional check when no mutation ran.
+
 ## History and recovery
 
 Universal note history covers human, API, CLI and AI changes. Open **Note revision history** to inspect and intentionally restore a saved revision. Restoration checks the revision read during review, records a new revision, and refuses stale writes.

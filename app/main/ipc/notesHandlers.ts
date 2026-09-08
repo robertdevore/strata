@@ -1,3 +1,4 @@
+import { notifyCommittedChanges } from '../services/notifications'
 import { ALL_CHANGED, NO_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { handleTrustedIpc } from '../security/trustedIpc'
 import { KnowledgeService, listSchema, updateSchema, createSchema } from '../services/knowledgeService'
@@ -30,7 +31,7 @@ export const registerNotesHandlers = (
       .strict()
       .parse(payload)
     const result = db.pruneHistory(keep, fingerprint)
-    if (result) onDataChanged?.({ ...NO_CHANGED, history: true })
+    if (result) notifyCommittedChanges(onDataChanged, { ...NO_CHANGED, history: true })
     return result
   })
   handleTrustedIpc('notes:history', (_event, payload) =>
@@ -49,7 +50,7 @@ export const registerNotesHandlers = (
       })
       .parse(payload)
     const result = db.restoreRevision(p.id, p.revision, p.expectedRevision)
-    if (result) onDataChanged?.(ALL_CHANGED)
+    if (result) notifyCommittedChanges(onDataChanged, ALL_CHANGED)
     return result
   })
   handleTrustedIpc('notes:page', (_event, payload) => {

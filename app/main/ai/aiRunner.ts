@@ -1,3 +1,5 @@
+import { notifyCommittedChanges } from '../services/notifications'
+import { formatExecutionReport } from './execution'
 import { DomainError } from '../../shared/errors'
 import { assertNotCancelled } from './cancellation'
 import { NO_CHANGED, mergeChanged, hasChanges, type ChangedDomains } from '../../shared/changedDomains'
@@ -49,30 +51,6 @@ const derive_chat_title = (message: string): string => {
     .find((line) => line.length > 0)
   if (!first_line) return 'New chat'
   return first_line.length <= 64 ? first_line : `${first_line.slice(0, 61)}...`
-}
-
-const assistant_claims_note_edit_success = (content: string): boolean => {
-  const lower = content.toLowerCase()
-  const has_success_claim =
-    /\b(done|updated|edited|inserted|added|applied|patched|rewrote|reordered|renumbered|created)\b/i.test(
-      lower,
-    )
-  const has_note_scope = /\b(note|notes|markdown|todo|list|section|callout|content)\b/i.test(lower)
-  return has_success_claim && has_note_scope
-}
-
-const enforce_note_edit_truthfulness = (content: string, notes_changed: boolean): string => {
-  if (!content || notes_changed) return content
-
-  if (!assistant_claims_note_edit_success(content)) {
-    return content
-  }
-
-  return [
-    'I did not apply any note edits in this step.',
-    'No note content was changed.',
-    'Provide the exact note title or a note link like [Title](#strata-note:note_id), and I will apply the edit and confirm exactly what changed.',
-  ].join('\n\n')
 }
 
 /** Convert raw note IDs in AI response text to #strata-note: links */
@@ -336,7 +314,7 @@ export const run_ai_turn = async (
     if (!db.getAiThread(thread.id)) throw new DomainError('CANCELLED', 'Chat was deleted')
     const result = execute_tool_call(db, call, { threadId: thread.id, model })
     changed = mergeChanged(changed, result.changed)
-    if (hasChanges(result.changed)) options?.onDataChanged?.(result.changed)
+    if (hasChanges(result.changed)) notifyCommittedChanges(options?.onDataChanged, result.changed)
     return result
   }
   const toolState = createToolLoopState()
@@ -377,7 +355,15 @@ export const run_ai_turn = async (
   }
   if (ai_settings.aiEnableRouteLogs) log_route(db, route_log)
   return {
-    content: linkify_note_ids(db, enforce_note_edit_truthfulness(result.content, hasChanges(changed))),
+    content: linkify_note_ids(
+      db,
+      formatExecutionReport(
+        result.content,
+        toolState.mutations,
+        result.stop,
+        ['create_note', 'update_note', 'tag_note'].includes(decision.intent),
+      ),
+    ),
     changed,
     routeLog: route_log,
   }

@@ -48,6 +48,52 @@ const open = () => {
   return { db, thread }
 }
 describe('runner provider fallback', () => {
+  it('keeps committed write receipts when a refresh listener fails', async () => {
+    const { db, thread } = open()
+    db.setSettings({ aiEditMode: 'auto_apply' })
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const result = await run_ai_turn(db, thread, {
+        onDataChanged: () => {
+          throw new Error('private notification details')
+        },
+      })
+      expect(db.listNotes()).toHaveLength(1)
+      expect(result.content).toContain(`#strata-note:${db.listNotes()[0].id}`)
+      expect(warning).toHaveBeenCalledWith('[Strata] Data-change notification failed after commit.')
+    } finally {
+      warning.mockRestore()
+    }
+  })
+  it('reports a project success and note conflict separately instead of trusting broad change flags', async () => {
+    const { db, thread } = open()
+    db.setSettings({ aiEditMode: 'auto_apply' })
+    const note = db.createNote({ content: 'Original' })
+    db.updateNote(note.id, { content: 'Human edit', expectedRevision: note.revision })
+    providers.cheap.sendTurn
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: '',
+        toolCalls: [
+          { id: 'project', name: 'create_project', argumentsJson: '{"name":"Saved project"}' },
+          {
+            id: 'note',
+            name: 'update_note',
+            argumentsJson: JSON.stringify({
+              note_id: note.id,
+              content: 'stale',
+              expected_revision: note.revision,
+            }),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: 'I updated every note successfully.', toolCalls: [] })
+    const result = await run_ai_turn(db, thread)
+    expect(result.content).toContain('Saved project')
+    expect(result.content).toContain('REVISION_CONFLICT')
+    expect(result.content).not.toContain('every note successfully')
+    expect(db.getNote(note.id)?.content).toBe('Human edit')
+  })
   it('rejects a late provider tool call after its conversation was removed', async () => {
     const { db, thread } = open()
     db.setSettings({ aiEditMode: 'auto_apply' })
@@ -104,6 +150,8 @@ describe('runner provider fallback', () => {
     expect(result.changed.notes).toBe(true)
     expect(db.listNotes()).toHaveLength(1)
     expect(db.listRevisions(db.listNotes()[0].id)).toHaveLength(1)
+    expect(result.content).toContain(`#strata-note:${db.listNotes()[0].id}`)
+    expect(result.content).toContain('revision 1')
   })
   it('keeps the total tool budget across providers and surfaces existing proposals at the limit', async () => {
     const { db, thread } = open()

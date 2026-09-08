@@ -1,3 +1,4 @@
+import { notifyCommittedChanges } from './notifications'
 import { ALL_CHANGED, NO_CHANGED, mergeChanged, type ChangedDomains } from '../../shared/changedDomains'
 export { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
 import { createHash } from 'node:crypto'
@@ -119,7 +120,7 @@ export class KnowledgeService {
   private notify?: (changed: ChangedDomains) => void
   constructor(db: StrataDatabase, notify?: (changed: ChangedDomains) => void) {
     this.db = db
-    this.notify = notify
+    this.notify = (changed) => notifyCommittedChanges(notify, changed)
   }
   resolveLinkedNote(input: unknown): import('../../shared/types').WikiLinkResolution {
     const title = z

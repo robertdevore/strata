@@ -1,3 +1,4 @@
+import type { MutationOutcome, ToolLoopStop } from './execution'
 import { assertNotCancelled } from './cancellation'
 import { NO_CHANGED, mergeChanged, type ChangedDomains } from '../../shared/changedDomains'
 // Pure helpers for building the message list sent to an AI provider.
@@ -87,6 +88,7 @@ export const createToolLoopState = () => ({
   toolCalls: 0,
   changed: { ...NO_CHANGED },
   proposalIds: [] as string[],
+  mutations: [] as MutationOutcome[],
 })
 
 export const runProviderToolLoop = async (options: {
@@ -100,10 +102,17 @@ export const runProviderToolLoop = async (options: {
     output: string
     changed: ChangedDomains
     proposalId?: string
+    mutation?: MutationOutcome
   }
   onUsage?: (usage: AiProviderTurnOutput['usage']) => void
   state?: ReturnType<typeof createToolLoopState>
-}): Promise<{ content: string; changed: ChangedDomains; proposalIds: string[]; toolCalls: number }> => {
+}): Promise<{
+  content: string
+  changed: ChangedDomains
+  proposalIds: string[]
+  toolCalls: number
+  stop: ToolLoopStop
+}> => {
   const state = options.state ?? createToolLoopState()
   let changed = state.changed
   let toolCalls = state.toolCalls
@@ -111,8 +120,14 @@ export const runProviderToolLoop = async (options: {
   while (state.steps < 6) {
     assertNotCancelled(options.signal)
     state.steps++
-    if (JSON.stringify(options.messages).length + options.systemPrompt.length > 100000)
+    if (
+      JSON.stringify(options.messages).length +
+        options.systemPrompt.length +
+        JSON.stringify(options.tools).length >
+      100000
+    )
       return {
+        stop: 'context_limit',
         content: proposalIds.length
           ? 'Context budget reached. Edits are awaiting your approval in the proposal panel.'
           : 'Context budget reached. Narrow the request to continue.',
@@ -131,6 +146,7 @@ export const runProviderToolLoop = async (options: {
     options.onUsage?.(output.usage)
     if (!output.toolCalls.length)
       return {
+        stop: 'complete',
         content: proposalIds.length
           ? 'Edits are awaiting your approval in the proposal panel.'
           : output.content,
@@ -140,6 +156,7 @@ export const runProviderToolLoop = async (options: {
       }
     if (output.toolCalls.length > 20 || toolCalls + output.toolCalls.length > 30)
       return {
+        stop: 'tool_limit',
         content: proposalIds.length
           ? 'Tool-call limit reached. Edits are awaiting your approval in the proposal panel.'
           : 'Tool-call limit reached. Narrow the request to continue.',
@@ -156,11 +173,13 @@ export const runProviderToolLoop = async (options: {
       changed = mergeChanged(changed, execution.changed)
       state.changed = changed
       if (execution.proposalId) proposalIds.push(execution.proposalId)
+      if (execution.mutation) state.mutations.push(execution.mutation)
       results.push({ id: call.id, output: execution.output })
     }
     record_assistant_turn(options.messages, output.content, output.toolCalls, results)
   }
   return {
+    stop: 'tool_limit',
     content: proposalIds.length
       ? 'Edits are awaiting your approval in the proposal panel.'
       : 'Tool-call limit reached. Narrow the request to continue.',
