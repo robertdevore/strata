@@ -16,7 +16,7 @@ export const register_search_command = (
 ): void => {
   program
     .command('search <query>')
-    .description('Search notes with synchronous lexical substring matching.')
+    .description('Search notes with ranked local FTS and substring fallback.')
     .option('--tag <tag>', 'Optional exact tag filter.')
     .option('--project <name>', 'Optional project name filter.')
     .option('--project-id <id>', 'Optional project ID filter.')

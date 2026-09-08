@@ -78,6 +78,11 @@ try {
       (await exec(process.execPath, [...args, ...more], { cwd: temporary, env, timeout: 10000 })).stdout,
     ).data
   assert.equal((await run(['health'])).ok, true)
+  const doctor = await run(['--fail-on-warning', 'config', 'doctor'])
+  assert.equal(doctor.ok, true)
+  assert.deepEqual(doctor.warnings, [])
+  for (const document of ['CLI.md', 'API.md', 'SECURITY.md', 'docs/CLI.md'])
+    assert((await fs.stat(path.join(install, 'node_modules', 'strata', document))).size > 0)
   const first = await run(['agent', 'capture', '# Installed package\nNative SQLite is working'])
   const second = await run(['agent', 'capture', '# Installed package\nNative SQLite is working'])
   assert.equal(first.noteId, second.noteId)
@@ -94,7 +99,7 @@ try {
   ])
   assert.equal(server.exitCode, 0)
   console.log(
-    'Installed CLI package verified: native database, authenticated server, capture deduplication, retrieval and shutdown.',
+    'Installed CLI package verified: native database, authenticated server, installed documentation/doctor, capture deduplication, retrieval and shutdown.',
   )
 } finally {
   if (server && server.exitCode === null) server.kill('SIGTERM')

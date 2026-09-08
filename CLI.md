@@ -8,14 +8,32 @@ Strata CLI is the automation-first interface for Strata.
 
 It talks to the local HTTP API, never writes directly to SQLite, and is designed for both human and agent workflows.
 
+## Install and connect
+
+From a source checkout, run `npm pack` and install the resulting archive with `npm install -g ./strata-0.8.0.tgz`. The installed `strata` command works outside the repository. Open the desktop app, or run `strata server --user-data-dir /path/to/library` to start the separate knowledge server. Use the same library directory as the desktop when sharing a library.
+
+The API requires authentication. The CLI discovers the owner-only local credential automatically; `STRATA_API_TOKEN` or `--token` explicitly overrides it. `STRATA_API_CREDENTIAL_FILE` selects a different credential file. Prefer the environment or credential file over putting secrets in shell history. `strata config doctor` checks connectivity and authentication without requiring a source checkout.
+
 ## Quick Start
+
+Installed usage:
+
+```bash
+strata health
+strata capabilities --json
+strata notes list --limit 20 --json
+strata --dry-run projects import ./notes-folder
+strata --confirm projects import ./notes-folder
+```
+
+From a source checkout:
 
 ```bash
 npm run strata -- health
 npm run strata -- notes list --json
 npm run strata -- notes create --content "# Test\n\nHello"
 npm run strata -- ai route "Create a note about provider routing"
-npm run strata -- projects import ./notes-folder
+npm run strata -- --confirm projects import ./notes-folder
 ```
 
 Command format:
@@ -27,7 +45,7 @@ npm run strata -- <command> [options]
 Legacy helpers are still available:
 
 ```bash
-npm run notes:api -- health
+npm run strata -- health
 npm run strata:ai:legacy -- health
 ```
 
@@ -55,17 +73,12 @@ Available on all commands.
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `STRATA_API_BASE_URL` | `http://127.0.0.1:3939` | Local API endpoint |
-| `STRATA_API_TOKEN` | unset | Optional auth token |
+| `STRATA_API_TOKEN` | unset | Explicit credential override; otherwise discover the local credential |
+| `STRATA_API_CREDENTIAL_FILE` | platform default | Override the credential-file location |
+| `STRATA_USER_DATA_DIR` | platform default | Shared desktop/standalone library location |
 | `STRATA_CLI_OUTPUT` | `pretty` | `pretty` or `json` |
 | `STRATA_CLI_DRY_RUN` | `false` | `true` or `false` |
 | `STRATA_CLI_AGENT_MODE` | `false` | `true` or `false` |
-
-Forward-looking provider variables (optional today):
-
-- `STRATA_AI_CHEAP_PROVIDER`
-- `STRATA_AI_CHEAP_MODEL`
-- `STRATA_AI_PREMIUM_PROVIDER`
-- `STRATA_AI_PREMIUM_MODEL`
 
 ## Exit Codes
 
@@ -127,7 +140,7 @@ npm run strata -- projects create "Work"
 npm run strata -- projects rename <projectId> "New name"
 npm run strata -- projects delete <projectId>
 npm run strata -- projects reorder <projectId1> <projectId2> <projectId3>
-npm run strata -- projects import ./folder-of-markdown
+npm run strata -- --confirm projects import ./folder-of-markdown
 ```
 
 Projects are local categories. Importing a folder of markdown files creates a project named after the folder by default, then imports each markdown file as a note in that project.
@@ -142,7 +155,7 @@ npm run strata -- search "provider routing" --json
 npm run strata -- search "provider routing" --project "Work"
 ```
 
-Search is synchronous lexical substring matching over note content, tags, and project names. A successful create is searchable immediately and after restart. It is not semantic search: use distinctive terms that occur in the saved note, rather than a conceptual paraphrase.
+Search uses synchronous local FTS5 ranking, indexed titles, exact tag/project filters, and a substring fallback for unmatched terms. A successful create is searchable immediately and after restart. It is not semantic search: use distinctive terms that occur in the saved note, rather than a conceptual paraphrase.
 
 ### Tags
 
@@ -179,7 +192,7 @@ npm run strata -- agent summary --file ./summary.md --project "Agent Notes"
 npm run strata -- agent context search "routing" --limit 5
 ```
 
-Agent context search uses the same synchronous lexical search contract and returns compact records (`id`, title, snippet, timestamps, project, and tags) by default. Use `--full` only when complete note bodies are required. The default limit is 5 and the accepted range is 1–50.
+Agent context search uses the same ranked local search contract and returns compact records (`id`, title, snippet, timestamps, project, and tags) by default. Use `--full` only when complete note bodies are required. The default limit is 5 and the accepted range is 1–50.
 
 Agent-mode defaults:
 
@@ -195,6 +208,23 @@ Recommended full-session instruction:
 ```text
 Use $strata-memory in AUTO mode. Recall only what this task needs, hold durable candidates without interrupting work, and save only the smallest useful memory delta at the end. A no-write result is valid. Batch duplicate searches, avoid overlapping atomic/handoff prose, and verify only high-value memory with one exact and one conceptual lookup.
 ```
+
+## Bounded retrieval and safe updates
+
+`notes list` returns at most 100 summaries per page (50 by default), with `nextCursor`. Continue with `--cursor` and the same filters. Use `--fields id,title,revision`, `--ids-only` or `--count` to reduce output. `--full` explicitly fetches full records for the selected page. `search` defaults to 25 summaries; `notes get <id>` retrieves one full note. Treat cursors as continuation hints, not a snapshot across concurrent changes.
+
+Read the note revision before editing and pass it with `--if-revision`. A conflict preserves the newer stored note. For example:
+
+```bash
+strata --json notes get <noteId>
+strata --confirm notes update <noteId> --if-revision 14 --stdin
+strata history list <noteId>
+strata --confirm history restore <noteId> 13 --if-revision 15
+strata --dry-run batch --file operations.json
+strata --confirm batch --file operations.json --request-id retry-safe-001
+```
+
+Batch supports at most 50 validated operations in one transaction. Request IDs make matching retries idempotent; reusing an ID with a different request is rejected. See [API.md](API.md) for operation shapes and [memory/import details](docs/CLI.md).
 
 ## JSON Error Shape
 
@@ -216,7 +246,7 @@ In JSON mode, CLI failures return machine-safe payloads:
 - No token values are printed.
 - No direct DB access from CLI.
 - No shell execution from model output.
-- Localhost API defaults support local-first safety.
+- The API binds to loopback, requires a credential, and rejects browser-origin requests.
 
 ## Related Docs
 

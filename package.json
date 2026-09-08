@@ -141,6 +141,9 @@
     "app/standalone",
     "scripts/strata.mjs",
     "LICENSE",
-    "docs/CLI.md"
+    "docs/CLI.md",
+    "CLI.md",
+    "API.md",
+    "SECURITY.md"
   ]
 }

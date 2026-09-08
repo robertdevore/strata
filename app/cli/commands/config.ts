@@ -1,6 +1,4 @@
 import { Command } from 'commander'
-import path from 'node:path'
-import { promises as fs } from 'node:fs'
 import { print_success } from '../lib/output'
 import { is_local_base_url } from '../lib/config'
 import { CliError } from '../lib/errors'
@@ -10,28 +8,6 @@ import type { StrataApiClient } from '../lib/apiClient'
 interface RuntimeContext {
   options: CliRuntimeOptions
   client: StrataApiClient
-}
-
-const find_repo_root = async (start_dir: string): Promise<string | null> => {
-  let current_dir = start_dir
-  for (;;) {
-    const package_json_path = path.join(current_dir, 'package.json')
-    try {
-      await fs.access(package_json_path)
-      return current_dir
-    } catch {
-      // keep walking up
-    }
-    const parent = path.dirname(current_dir)
-    if (parent === current_dir) return null
-    current_dir = parent
-  }
-}
-
-const read_package_scripts = async (root_dir: string): Promise<Record<string, string>> => {
-  const raw = await fs.readFile(path.join(root_dir, 'package.json'), 'utf-8')
-  const parsed = JSON.parse(raw) as { scripts?: Record<string, string> }
-  return parsed.scripts || {}
 }
 
 export const register_config_commands = (
@@ -77,10 +53,11 @@ export const register_config_commands = (
       }
 
       if (!options.token) {
+        warnings.push('The API requires a credential; none was discovered.')
         checks.push({
           name: 'auth_token',
-          ok: true,
-          detail: 'No token configured (valid when API token auth is disabled).',
+          ok: false,
+          detail: 'No API credential was discovered. Start Strata or configure STRATA_API_TOKEN.',
         })
       } else {
         checks.push({ name: 'auth_token', ok: true, detail: 'Token configured (value hidden).' })
@@ -91,28 +68,6 @@ export const register_config_commands = (
         checks.push({ name: 'local_base_url', ok: false, detail: options.baseUrl })
       } else {
         checks.push({ name: 'local_base_url', ok: true, detail: options.baseUrl })
-      }
-
-      const repo_root = await find_repo_root(process.cwd())
-      if (!repo_root) {
-        checks.push({
-          name: 'repo_context',
-          ok: false,
-          detail: 'Could not locate package.json from current directory.',
-        })
-        warnings.push('Run CLI from the Strata repository for full script checks.')
-      } else {
-        checks.push({ name: 'repo_context', ok: true, detail: repo_root })
-        const scripts = await read_package_scripts(repo_root)
-        const has_notes_api = 'string' === typeof scripts['notes:api']
-        checks.push({
-          name: 'notes_api_script',
-          ok: has_notes_api,
-          detail: has_notes_api ? 'notes:api script is present.' : 'notes:api script not found.',
-        })
-        if (!has_notes_api) {
-          warnings.push('Legacy notes:api script missing. Existing automation may break.')
-        }
       }
 
       const data = {

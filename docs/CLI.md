@@ -2,7 +2,7 @@
 
 Canonical CLI documentation now lives in the repository root:
 
-- `CLI.md`
+- [CLI.md](../CLI.md)
 
 Quick start:
 
@@ -15,7 +15,7 @@ npm run strata -- ai route "Create a note about provider routing"
 Legacy scripts remain available for compatibility:
 
 ```bash
-npm run notes:api -- health
+npm run strata -- health
 npm run strata:ai:legacy -- health
 ```
 
