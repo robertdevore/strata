@@ -220,3 +220,8 @@ export interface NoteRevision {
   createdAt: string
   snapshot: NoteUpdatePatch & { deletedAt?: string | null }
 }
+
+export type WikiLinkResolution =
+  | { status: 'missing' }
+  | { status: 'resolved'; note: NoteSummary }
+  | { status: 'ambiguous'; matches: NoteSummary[] }

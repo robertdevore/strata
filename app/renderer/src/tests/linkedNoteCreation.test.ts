@@ -19,6 +19,13 @@ it('rechecks linked-note existence and records/notifies only an actual creation'
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ notes: true, links: true, history: true }))
     expect(() => service.createMissingLinkedNote('Invalid\ntitle')).toThrow()
     expect(notify).toHaveBeenCalledTimes(1)
+    db.createNote({ content: '# Indexed target\n\nDifferent note' })
+    const ambiguous = service.resolveLinkedNote('Indexed target')
+    expect(ambiguous.status).toBe('ambiguous')
+    if (ambiguous.status === 'ambiguous') expect(ambiguous.matches).toHaveLength(2)
+    expect(() => service.createMissingLinkedNote('Indexed target')).toThrow('Choose a note explicitly')
+    expect(db.findNotesByTitle('Indexed target')).toHaveLength(2)
+    expect(notify).toHaveBeenCalledTimes(1)
   } finally {
     db.close()
     fs.rmSync(directory, { recursive: true, force: true })

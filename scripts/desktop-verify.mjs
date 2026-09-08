@@ -114,8 +114,24 @@ try {
   await expect(page.locator('.cm-content').first()).toContainText('Retrieved beyond sidebar page.', {
     timeout: 20000,
   })
+  await page.evaluate(async () => {
+    await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice one' })
+    await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice two' })
+  })
+  await page.locator('.cm-content[contenteditable="true"]').first().fill('[[Ambiguous target]]')
+  await expect
+    .poll(async () => (await page.evaluate((id) => window.strata.notes.get(id), distantId)).content)
+    .toContain('[[Ambiguous target]]')
+  const previewButton = page.getByTitle('Preview', { exact: true })
+  if (!(await previewButton.getAttribute('class')).includes('chip-active')) await previewButton.click()
+  await page.getByRole('link', { name: 'Ambiguous target', exact: true }).click()
+  const choices = page.getByRole('region', { name: 'Choose wiki-link target' })
+  await expect(choices).toBeVisible()
+  await choices.getByRole('button', { name: /Choice two/ }).click()
+  await expect(page.locator('.cm-content').first()).toContainText('Choice two', { timeout: 20000 })
+  expect(unexpectedCreatePrompt).toBe(false)
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, and explicit ambiguous-link choice.',
   )
 } finally {
   try {

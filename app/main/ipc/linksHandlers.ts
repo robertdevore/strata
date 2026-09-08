@@ -10,7 +10,7 @@ export const registerLinksHandlers = (db: StrataDatabase, onChanged?: () => void
     db.getBacklinks(idSchema.parse(payload).id),
   )
   ipcMain.handle(IPC_CHANNELS.linksResolveTarget, (_event, payload) =>
-    db.resolveLinkTarget(z.object({ rawTarget: z.string().max(500) }).parse(payload).rawTarget),
+    service.resolveLinkedNote(z.object({ rawTarget: z.string() }).parse(payload).rawTarget),
   )
   ipcMain.handle(IPC_CHANNELS.linksCreateMissingNote, (_event, payload) => {
     const { title } = z.object({ title: z.string() }).parse(payload)

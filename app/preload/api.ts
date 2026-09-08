@@ -111,7 +111,7 @@ export interface StrataApi {
   }
   links: {
     backlinks: (note_id: string) => Promise<Array<{ link: NoteLink; source: Note }>>
-    resolveTarget: (raw_target: string) => Promise<Note | null>
+    resolveTarget: (raw_target: string) => Promise<import('../shared/types').WikiLinkResolution>
     createMissingNote: (title: string) => Promise<Note | null>
     relatedNotes: (note_id: string) => Promise<Array<{ note: Note; reason: string; score: number }>>
   }

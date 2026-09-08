@@ -109,6 +109,20 @@ export class KnowledgeService {
     this.db = db
     this.notify = notify
   }
+  resolveLinkedNote(input: unknown): import('../../shared/types').WikiLinkResolution {
+    const title = z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .regex(/^[^\r\n]+$/)
+      .parse(input)
+    const matches = this.db.findNoteSummariesByTitle(title)
+    if (matches.length === 0) return { status: 'missing' }
+    if (matches.length === 1) return { status: 'resolved', note: matches[0] }
+    return { status: 'ambiguous', matches }
+  }
+
   createMissingLinkedNote(input: unknown) {
     const title = z
       .string()
@@ -119,8 +133,10 @@ export class KnowledgeService {
       .parse(input)
     let created = false
     const note = this.db.transaction(() => {
-      const existing = this.db.resolveLinkTarget(title)
-      if (existing) return existing
+      const resolution = this.resolveLinkedNote(title)
+      if (resolution.status === 'ambiguous')
+        throw new DomainError('AMBIGUOUS_TITLE', 'Multiple notes have this title. Choose a note explicitly.')
+      if (resolution.status === 'resolved') return this.db.getNote(resolution.note.id)!
       created = true
       return this.db.createNote({ content: `# ${title}\n\n` })
     }, 'human')

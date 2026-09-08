@@ -17,7 +17,7 @@ import {
   formatRelativeTime,
 } from '@renderer/src/domain/noteUtils'
 import { markdown_from_clipboard } from '@renderer/src/domain/markdownPaste'
-import { openWikiLink } from '../services/wikiNavigation'
+import { AmbiguousWikiLinkError, openWikiLink } from '../services/wikiNavigation'
 import { aiService } from '@renderer/src/services/aiService'
 import { useAppStore } from '@renderer/src/state/useAppStore'
 import { TagsEditor } from './TagsEditor'
@@ -442,6 +442,11 @@ export function EditorPane(props: EditorPaneProps) {
   const [chatSending, setChatSending] = useState(false)
   const [chatAssistantTyping, setChatAssistantTyping] = useState(false)
   const [chatDeleting, setChatDeleting] = useState(false)
+  const [wikiChoices, setWikiChoices] = useState<{
+    noteId: string
+    newTab: boolean
+    matches: import('@shared/types').NoteSummary[]
+  } | null>(null)
   const [chatErrorMessage, setChatErrorMessage] = useState('')
   const [chatModelCatalog, setChatModelCatalog] = useState<
     Array<{ providerId: string; providerLabel: string; model: string }>
@@ -1642,7 +1647,11 @@ export function EditorPane(props: EditorPaneProps) {
   const handleWikiLinkClick = async (href: string, new_tab = false) => {
     try {
       return await openWikiLink(href, new_tab, onOpenNoteFromChat)
-    } catch {
+    } catch (error) {
+      if (error instanceof AmbiguousWikiLinkError && note) {
+        setWikiChoices({ noteId: note.id, newTab: new_tab, matches: error.matches })
+        return true
+      }
       useAppStore.setState({
         navigationError: 'Could not open this wiki link. Your current draft is preserved.',
       })
@@ -1655,6 +1664,28 @@ export function EditorPane(props: EditorPaneProps) {
 
   return (
     <section className="editor">
+      {wikiChoices?.noteId === note.id && (
+        <div
+          role="region"
+          aria-label="Choose wiki-link target"
+          style={{ maxHeight: 280, overflow: 'auto', padding: 12 }}
+        >
+          <p>Multiple notes have this title. Choose the intended note (up to 20 matches).</p>
+          {wikiChoices.matches.map((candidate) => (
+            <button
+              key={candidate.id}
+              style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 8 }}
+              onClick={() => {
+                void onOpenNoteFromChat(candidate.id, wikiChoices.newTab)
+                setWikiChoices(null)
+              }}
+            >
+              {candidate.title} · {candidate.updatedAt} · {candidate.snippet}
+            </button>
+          ))}
+          <button onClick={() => setWikiChoices(null)}>Cancel link navigation</button>
+        </div>
+      )}
       <header className="editor-header">
         {editingTitle ? (
           <input

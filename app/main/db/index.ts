@@ -1496,6 +1496,17 @@ export class StrataDatabase {
     return rows.map((row) => this.mapNote(row))
   }
 
+  findNoteSummariesByTitle(title: string): NoteSummary[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, title, revision, substr(content,1,280) AS content,
+      created_at, updated_at, starred, archived, tags, project_id, deleted_at
+      FROM notes WHERE normalized_title = ? AND deleted_at IS NULL ORDER BY id LIMIT 20`,
+      )
+      .all(this.normalizeTitle(title)) as DbNoteRow[]
+    return rows.map((row) => this.summarize(this.mapNoteSummary(row)))
+  }
+
   resolveLinkTarget(raw_target: string): Note | null {
     const matches = this.findNotesByTitle(raw_target)
     return matches.length === 1 ? matches[0] : null

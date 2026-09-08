@@ -1,3 +1,11 @@
+import type { NoteSummary } from '@shared/types'
+export class AmbiguousWikiLinkError extends Error {
+  readonly matches: NoteSummary[]
+  constructor(matches: NoteSummary[]) {
+    super('Multiple notes have this title. Choose a note.')
+    this.matches = matches
+  }
+}
 /** Resolve through indexed storage; never infer absence from the current sidebar page. */
 export async function openWikiLink(
   href: string,
@@ -12,11 +20,15 @@ export async function openWikiLink(
   if (raw === null) return false
   const title = decodeURIComponent(raw.split('#')[0]).trim()
   if (!title || title.length > 500 || /[\r\n]/.test(title)) throw new Error('Invalid link target')
-  let note = await window.strata.links.resolveTarget(title)
+  const resolution = await window.strata.links.resolveTarget(title)
+  if (resolution.status === 'ambiguous') throw new AmbiguousWikiLinkError(resolution.matches)
+  const note = resolution.status === 'resolved' ? resolution.note : null
   if (!note && window.confirm(`Note "${title}" does not exist. Create it?`)) {
     // The service rechecks existence in the creation transaction to avoid duplicates.
-    note = await window.strata.links.createMissingNote(title)
-    if (!note) throw new Error('Could not create note')
+    const created = await window.strata.links.createMissingNote(title)
+    if (!created) throw new Error('Could not create note')
+    await open(created.id, newTab)
+    return true
   }
   if (note) await open(note.id, newTab)
   return true
