@@ -135,3 +135,10 @@ Added `npm run package:verify`: packs the real distributable, installs productio
 
 The initial installed-runtime smoke passed. The additional bin-link assertion exposed macOS `/var` vs `/private/var` path aliasing in the verifier; it now compares realpaths on both sides. Final smoke rerun follows. Source verification is recorded below.
 Final installed package smoke passed, including canonical bin-link/executable checks. `npm run verify` passed formatting, lint, all 128 tests/27 files, TypeScript and production build. Remote CI and Electron package validation remain outstanding.
+
+### Electron native package checkpoint
+
+Built an unsigned macOS x64 application directory with Electron 41.10.3 using electron-builder. Executed its bundled binary in Electron's Node mode, loaded better-sqlite3 from app.asar, and verified SQLite 3.53.4 plus an FTS query. Added `package:electron:verify` to build a temporary directory package and check bundled main/preload/renderer assets, SQLite loading, FTS and quick_check without opening the user library. This is not a renderer interaction test or signed installer validation.
+
+The pre-existing configured PNG/ICNS/ICO release assets were ignored with the whole build directory; narrowed ignores so the three required icons can be tracked and clean checkouts can package them. macOS CI now includes the unsigned directory/native check. Signing/notarization, Windows NSIS and Linux AppImage remain unverified. Final reusable-script and source verification results follow.
+Reusable unsigned macOS x64 check passed: Electron 41.10.3, SQLite 3.53.4, bundled assets/FTS/integrity. Source `npm run verify` passed formatting, lint, 128 tests/27 files, typecheck and build. No signing was attempted; full hardening goal remains active.

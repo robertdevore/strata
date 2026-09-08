@@ -28,3 +28,6 @@ jobs:
       - run: npm audit --audit-level=high
       - name: Verify installed CLI and native database
         run: npm run package:verify
+      - name: Verify unsigned macOS Electron directory and native runtime
+        if: matrix.os == 'macos-latest'
+        run: npm run package:electron:verify
