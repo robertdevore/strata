@@ -832,7 +832,7 @@ export function ChatPanel(props: ChatPanelProps) {
 
   return (
     <aside className="preview-panel chat-panel">
-      <AiProposals sending={sending} />
+      <AiProposals sending={sending} threadId={activeThreadId} />
       <div className="chat-panel-top">
         <div className="chat-thread-row">
           {editingThreadTitle && active_thread ? (

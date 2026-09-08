@@ -88,7 +88,7 @@ export interface StrataApi {
     restoreNamed: (name: string) => Promise<{ canceled: boolean }>
   }
   ai: {
-    listProposals: () => Promise<Array<{ id: string; payload: unknown; createdAt: string }>>
+    listProposals: (threadId: string) => Promise<Array<{ id: string; payload: unknown; createdAt: string }>>
     resolveProposal: (id: string, approved: boolean) => Promise<unknown>
     listThreads: () => Promise<AiThreadSummary[]>
     deleteThread: (thread_id: string) => Promise<boolean>

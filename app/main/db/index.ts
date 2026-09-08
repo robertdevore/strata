@@ -227,11 +227,15 @@ export class StrataDatabase {
       .run(id, JSON.stringify(payload), new Date().toISOString())
     return id
   }
-  listProposals(): Array<{ id: string; payload: unknown; createdAt: string }> {
+  listProposals(threadId?: string): Array<{ id: string; payload: unknown; createdAt: string }> {
     return (
       this.db
-        .prepare("SELECT * FROM mutation_proposals WHERE status='pending' ORDER BY created_at LIMIT 50")
-        .all() as Array<{ id: string; payload: string; created_at: string }>
+        .prepare(
+          `SELECT * FROM mutation_proposals WHERE status='pending'
+           AND (? IS NULL OR json_extract(payload, '$.actor.threadId') = ?)
+           ORDER BY created_at, id LIMIT 50`,
+        )
+        .all(threadId ?? null, threadId ?? null) as Array<{ id: string; payload: string; created_at: string }>
     ).map((row) => ({ id: row.id, payload: JSON.parse(row.payload), createdAt: row.created_at }))
   }
   resolveProposal<T>(id: string, approved: boolean, apply: (payload: unknown) => T): T | null {

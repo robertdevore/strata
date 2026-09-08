@@ -350,6 +350,50 @@ try {
     activePane.getByText(/Request cancelled. Any changes already applied remain saved/),
   ).toBeVisible()
   await expect(activePane.getByRole('button', { name: 'Stop AI response', exact: true })).toHaveCount(0)
+  await page.evaluate(() => window.strata.settings.set({ aiEditMode: 'confirm' }))
+  await application.evaluate(() => {
+    globalThis.__strataProposalTurn = 0
+    globalThis.fetch = async (url, init) => {
+      if (
+        String(url) !== 'https://api.openai.com/v1/responses' ||
+        init.headers.Authorization !== 'Bearer synthetic-desktop-fixture-key'
+      )
+        throw new Error('Unexpected fixture provider request')
+      const initial = globalThis.__strataProposalTurn++ % 2 === 0
+      return new Response(
+        JSON.stringify(
+          initial
+            ? {
+                output: [
+                  {
+                    type: 'function_call',
+                    call_id: 'fixture-proposal',
+                    name: 'create_note',
+                    arguments: JSON.stringify({ content: '# Desktop approved proposal' }),
+                  },
+                ],
+              }
+            : { output_text: 'Done', output: [] },
+        ),
+        { headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+  })
+  const proposalNotes = () =>
+    page.evaluate(() => window.strata.notes.page({ query: 'Desktop approved proposal' }))
+  for (const action of ['Reject', 'Approve edit']) {
+    await activePane.getByPlaceholder('Message Strata AI…').fill('Create the proposed fixture note')
+    await activePane.getByRole('button', { name: 'Send message', exact: true }).click()
+    const review = activePane.getByRole('region', { name: 'AI edit proposals' })
+    await review.locator('summary').click()
+    await expect(review.getByText(/Desktop approved proposal/)).toBeVisible()
+    expect((await proposalNotes()).notes).toHaveLength(0)
+    await review.getByRole('button', { name: action, exact: true }).click()
+    await expect(review.locator('summary')).toHaveCount(0)
+  }
+  const approvedNotes = (await proposalNotes()).notes
+  expect(approvedNotes).toHaveLength(1)
+  expect(await page.evaluate((id) => window.strata.notes.history(id), approvedNotes[0].id)).toHaveLength(1)
   await activePane.getByTitle('Open AI Chat', { exact: true }).click()
   // Close immediately after input, before the debounce can save it.
   await activePane.locator('.cm-content[contenteditable="true"]').fill('Saved while quitting')
@@ -415,7 +459,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
+    'Desktop verified: editor autosave/history/reload, full-library and ambiguous-link navigation, split-pane conflicts and graceful quit persistence, domain and backlink refresh, AI Stop cancellation and proposal rejection/approval, sandbox/CSP/navigation/permission/IPC boundaries, offline PDF generation, and sanitized renderer failures.',
   )
 } finally {
   try {

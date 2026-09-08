@@ -27,6 +27,18 @@ const open = () => {
   return { db, call, service: new KnowledgeService(db) }
 }
 describe('AI mutation permissions', () => {
+  it('filters pending proposals by conversation before applying the result limit', () => {
+    const { db } = open()
+    for (let index = 0; index < 55; index++)
+      db.createProposal({ actor: { threadId: 'other' }, operation: { op: 'create_note' } })
+    const id = db.createProposal({ actor: { threadId: 'selected' }, operation: { op: 'create_note' } })
+    db.createProposal({ operation: { op: 'create_note' } })
+    expect(db.listProposals('selected').map((item) => item.id)).toEqual([id])
+    expect(db.listProposals('missing')).toEqual([])
+    expect(db.listProposals('other')).toHaveLength(50)
+    db.resolveProposal(id, false, () => null)
+    expect(db.listProposals('selected')).toEqual([])
+  })
   it('blocks every write domain in read-only mode', () => {
     const { db, call } = open()
     db.setSettings({ aiEditMode: 'read_only' })

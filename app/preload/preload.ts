@@ -68,7 +68,7 @@ const api: StrataApi = {
     restoreNamed: (name) => ipcRenderer.invoke(IPC_CHANNELS.backupRestoreNamed, { name }),
   },
   ai: {
-    listProposals: () => ipcRenderer.invoke('ai:proposals:list'),
+    listProposals: (threadId) => ipcRenderer.invoke('ai:proposals:list', { threadId }),
     resolveProposal: (id, approved) => ipcRenderer.invoke('ai:proposals:resolve', { id, approved }),
     listThreads: () => ipcRenderer.invoke(IPC_CHANNELS.aiThreadsList),
     deleteThread: (thread_id) => ipcRenderer.invoke(IPC_CHANNELS.aiThreadDelete, { threadId: thread_id }),

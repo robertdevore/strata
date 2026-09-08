@@ -135,7 +135,10 @@ export const registerAiHandlers = (db: StrataDatabase, onDataChanged?: (changed:
     const { requestId } = z.object({ requestId: z.string().uuid() }).strict().parse(payload)
     return requests.cancel(requestId, event.sender.id)
   })
-  handleTrustedIpc('ai:proposals:list', () => db.listProposals())
+  handleTrustedIpc('ai:proposals:list', (_event, payload) => {
+    const { threadId } = thread_id_schema.parse(payload)
+    return db.listProposals(threadId)
+  })
   handleTrustedIpc('ai:proposals:resolve', (_event, payload) => {
     const parsed = z.object({ id: z.string().uuid(), approved: z.boolean() }).strict().parse(payload)
     return new KnowledgeService(db, onDataChanged).approve(parsed.id, parsed.approved)
