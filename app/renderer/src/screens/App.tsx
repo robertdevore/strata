@@ -355,18 +355,7 @@ export function App() {
 
   const openNoteFromChat = useCallback(
     async (note_id: string, new_tab = false) => {
-      const target_note = store.notes.find((candidate) => candidate.id === note_id)
-      if (!target_note) return
-
-      if (store.selectedNoteId && store.selectedNoteId !== note_id) {
-        await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
-      }
-
-      if (new_tab) {
-        store.openNoteInTab(note_id)
-      } else {
-        store.selectNote(note_id)
-      }
+      await store.navigateToNote(note_id, new_tab)
     },
     [store],
   )
@@ -763,6 +752,7 @@ export function App() {
         }}
       >
         <DraftConflict />
+
         <Sidebar
           notes={notes}
           projects={store.projects}
@@ -829,6 +819,12 @@ export function App() {
         <div
           className={`editor-column${store.openTabs.length > 1 || splitNoteIds.length > 0 ? ' has-tabs' : ''}${splitNoteIds.length > 0 ? ' editor-column-split' : ''}`}
         >
+          {store.navigationError && (
+            <div role="alert">
+              {store.navigationError}
+              <button onClick={() => useAppStore.setState({ navigationError: null })}>Dismiss</button>
+            </div>
+          )}
           <TabBar
             tabs={store.openTabs}
             activeTabId={store.selectedNoteId}
@@ -1169,15 +1165,7 @@ export function App() {
           selectedNoteId={store.selectedNoteId}
           onClose={() => setPaletteMode(null)}
           onOpenNote={async (id) => {
-            await store.ensureNote(id)
-            if (store.selectedNoteId && store.selectedNoteId !== id) {
-              await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
-              const current = useAppStore.getState()
-              const draft = current.drafts[store.selectedNoteId]
-              const saved = current.notes.find((note) => note.id === store.selectedNoteId)
-              if (draft !== undefined && draft !== saved?.content) throw new Error('Draft not saved')
-            }
-            store.openNoteInTab(id)
+            if (!(await store.navigateToNote(id, true))) throw new Error('Note not opened')
           }}
           onRunCommand={(cmd) => void runCommand(cmd)}
           onTogglePreview={() => window.dispatchEvent(new CustomEvent('strata:toggle-preview'))}

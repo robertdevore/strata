@@ -69,9 +69,15 @@ try {
       shell: typeof window.strata.shell,
     })),
   ).toEqual({ require: 'undefined', process: 'undefined', shell: 'undefined' })
-  const distantId = await page.evaluate(async () => {
+  const distantId = await page.evaluate(async (savedId) => {
+    const original = await window.strata.notes.get(savedId)
+    await window.strata.notes.update(savedId, {
+      tags: ['navigation-fixture'],
+      expectedRevision: original.revision,
+    })
     const distant = await window.strata.notes.create({
       content: '# Distant lookup target\n\nRetrieved beyond sidebar page.',
+      tags: ['navigation-fixture'],
     })
     for (let index = 0; index < 105; index++) {
       await window.strata.notes.create({ content: `# Recent filler ${index}` })
@@ -80,7 +86,7 @@ try {
     if (firstPage.notes.some((note) => note.id === distant.id))
       throw new Error('Fixture did not exceed first page')
     return distant.id
-  })
+  }, saved.id)
   await page.reload()
   await page.getByRole('button', { name: /^Quick Open/ }).click()
   await page.getByRole('textbox', { name: 'Quick open notes' }).fill('Distant lookup target')
@@ -91,8 +97,14 @@ try {
   expect(await page.evaluate((id) => window.strata.notes.get(id).then((note) => note.id), distantId)).toBe(
     distantId,
   )
+  await page.getByRole('button', { name: 'Open note actions', exact: true }).click()
+  await page.getByTitle('Related Notes', { exact: true }).click()
+  await page.locator('.related-notes-modal').getByText('Desktop verification', { exact: true }).click()
+  await expect(page.locator('.cm-content').first()).toContainText('Persisted through the real editor', {
+    timeout: 20000,
+  })
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open beyond 100 notes.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/related navigation beyond 100 notes.',
   )
 } finally {
   try {

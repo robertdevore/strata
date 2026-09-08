@@ -10,6 +10,8 @@ import { settingsService } from '@renderer/src/services/settingsService'
 import type { Project } from '@shared/types'
 import { DEFAULT_SIDEBAR_LAYOUT } from '@shared/sidebarLayout'
 
+let navigationGeneration = 0
+let pendingNavigationId: string | null = null
 let searchGeneration = 0
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed' | 'conflict' | 'unsaved'
@@ -74,6 +76,8 @@ interface AppState {
   setSplitLayout: (layout: 'columns' | 'grid') => void
   setSplitGridColumns: (cols: number) => void
   load: () => Promise<void>
+  navigationError: string | null
+  navigateToNote: (id: string, newTab?: boolean) => Promise<boolean>
   ensureNote: (id: string) => Promise<void>
   hydrateNote: (id: string) => Promise<void>
   touchNote: (id: string) => void
@@ -149,6 +153,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   retrievalError: null,
   projects: [],
   selectedNoteId: null,
+  navigationError: null,
   drafts: {},
   untouchedNewNoteIds: {},
   noteSummaryCache: {},
@@ -239,6 +244,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             : note
         })
         const keep = new Set([
+          ...(pendingNavigationId ? [pendingNavigationId] : []),
           ...current.openTabs,
           ...current.splitNoteIds,
           ...Object.keys(current.drafts),
@@ -305,8 +311,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().load()
   },
 
+  async navigateToNote(id, newTab = false) {
+    const generation = ++navigationGeneration
+    pendingNavigationId = id
+    const selected = get().selectedNoteId
+    set({ navigationError: null })
+    try {
+      await get().ensureNote(id)
+      if (generation !== navigationGeneration || get().selectedNoteId !== selected) return false
+      if (selected && selected !== id) {
+        await get().flushDraft(selected, { allowDiscardUntouchedEmpty: true })
+        if (generation !== navigationGeneration || get().selectedNoteId !== selected) return false
+        const draft = get().drafts[selected]
+        if (draft !== undefined && draft !== get().notes.find((note) => note.id === selected)?.content) {
+          throw new Error('Draft not saved')
+        }
+      }
+      if (newTab) get().openNoteInTab(id)
+      else get().selectNote(id)
+      return true
+    } catch {
+      if (generation === navigationGeneration && get().selectedNoteId === selected) {
+        set({ navigationError: 'Could not open this note. Your current draft is preserved.' })
+      }
+      return false
+    } finally {
+      if (generation === navigationGeneration) pendingNavigationId = null
+    }
+  },
+
   async ensureNote(id) {
-    if (get().notes.some((note) => note.id === id)) return
+    const current = get().notes.find((note) => note.id === id)
+    if (current?.deletedAt) throw new Error('Note unavailable')
+    if (current) {
+      await get().hydrateNote(id)
+      if (!get().notes.find((note) => note.id === id)?.contentLoaded) throw new Error('Note unavailable')
+      return
+    }
     const note = await notesService.get(id)
     if (!note || note.deletedAt) throw new Error('Note unavailable')
     set((state) =>
