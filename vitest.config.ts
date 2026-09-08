@@ -17,7 +17,6 @@ export default defineConfig({
   test: {
     // Native SQLite and CLI subprocess suites should not fan out across every host CPU.
     maxWorkers: 2,
-    minWorkers: 1,
     environment: 'node',
     include: ['app/renderer/src/tests/**/*.test.{ts,tsx}'],
   },
