@@ -1,3 +1,4 @@
+import { runtimeErrorCode } from '../../shared/runtimeLogging'
 import fs from 'node:fs'
 import Database from 'better-sqlite3'
 import fsPromises from 'node:fs/promises'
@@ -310,7 +311,7 @@ export class BackupManager {
       const result = await this.createBackupNow('auto')
       this.on_auto_backup_created(result.createdAt)
     } catch (error) {
-      console.error('[strata-backup] Auto backup failed', error)
+      console.error('[strata-backup] Auto backup failed', runtimeErrorCode(error))
     } finally {
       this.running = false
     }

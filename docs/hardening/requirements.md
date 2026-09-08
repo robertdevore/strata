@@ -63,5 +63,5 @@ This is a working gap ledger, not a completion verdict. â€œScoped tests passedâ€
 | 56 | Add/Improve CI | Partial | Pinned read-only Linux/macOS Actions workflow includes audit and package smoke. Not pushed/executed remotely yet. |
 | 57 | Dependency and Supply-Chain Review | Partial | Compatible dependency patches and zero-vulnerability audit recorded. Final audit/override rationale and release dependency review outstanding. |
 | 58 | Packaging and Release UX | Partial | Tracked release icons; unsigned macOS directory/bundled native SQLite smoke passed. Installers/platform coverage/signing docs/update policy remain. |
-| 59 | Runtime Logging | Partial | Provider errors sanitized and routing excerpts removed. Full runtime log/privacy sweep and explicit debug-mode policy outstanding. |
+| 59 | Runtime Logging | Implemented; scoped tests passed | Provider errors sanitized and routing excerpts removed. First-party main/renderer/standalone log sites audited; exceptions/codes/paths and CLI verbose URLs sanitized. Opt-in STRATA_DEBUG emits fixed startup checkpoints; renderer failure privacy verified in Electron. |
 | 60 | Performance Budgets | Incomplete | Intermediate measurements recorded, but final controlled workloads and enforceable documented budgets still required. |

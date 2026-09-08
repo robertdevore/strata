@@ -1,3 +1,4 @@
+import { runtimeErrorCode } from '../shared/runtimeLogging'
 import os from 'node:os'
 import path from 'node:path'
 import { openStrataDatabaseWithRecovery } from '../main/db/recovery'
@@ -48,14 +49,14 @@ const run = async (): Promise<void> => {
 
   active_server = await startNotesApiServer(db)
   if (database_recovery.recovered && database_recovery.backupDir) {
-    console.warn(`[strata-server] Recovered damaged database files to ${database_recovery.backupDir}`)
+    console.warn(
+      '[strata-server] Damaged database recovered; damaged files preserved for recovery',
+    )
     if (database_recovery.restoredFromBackupPath) {
-      console.warn(
-        `[strata-server] Restored latest healthy backup from ${database_recovery.restoredFromBackupPath}`,
-      )
+      console.warn('[strata-server] Restored latest healthy backup')
     }
   }
-  console.info(`[strata-server] Using data from ${user_data_dir}`)
+  console.info('[strata-server] Local API ready')
 
   await new Promise<void>(() => {
     // Keep the process alive until interrupted.
@@ -63,6 +64,6 @@ const run = async (): Promise<void> => {
 }
 
 void run().catch((error) => {
-  console.error('[strata-server] Failed to start', error)
+  console.error('[strata-server] Failed to start', runtimeErrorCode(error))
   process.exit(1)
 })

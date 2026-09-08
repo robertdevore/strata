@@ -1,3 +1,4 @@
+import { runtimeErrorCode } from '@shared/runtimeLogging'
 import { Component, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as StrataApp } from './screens/App'
@@ -9,18 +10,17 @@ interface RootErrorBoundaryProps {
 
 interface RootErrorBoundaryState {
   error_message: string | null
-  error_stack: string | null
 }
 
 class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErrorBoundaryState> {
-  state: RootErrorBoundaryState = { error_message: null, error_stack: null }
+  state: RootErrorBoundaryState = { error_message: null }
 
   static getDerivedStateFromError(error: Error): RootErrorBoundaryState {
-    return { error_message: error.message || 'Unknown renderer error', error_stack: error.stack || null }
+    return { error_message: runtimeErrorCode(error) }
   }
 
   componentDidCatch(error: Error) {
-    console.error('Renderer boundary caught error:', error)
+    console.error('Renderer boundary caught error:', runtimeErrorCode(error))
   }
 
   render() {
@@ -37,10 +37,8 @@ class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErrorBound
           }}
         >
           <h2 style={{ marginTop: 0 }}>Strata failed to render</h2>
-          <p>{this.state.error_message}</p>
-          {this.state.error_stack && (
-            <pre style={{ marginTop: 16, fontSize: 12, overflowX: 'auto' }}>{this.state.error_stack}</pre>
-          )}
+          <p>Restart Strata to reopen the workspace.</p>
+          <p>Error code: {this.state.error_message}</p>
         </div>
       )
     }
@@ -56,14 +54,20 @@ if (!root_element) {
 }
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection in renderer:', event.reason)
+  event.preventDefault()
+  console.error('Unhandled promise rejection in renderer:', runtimeErrorCode(event.reason))
 })
 
 window.addEventListener('error', (event) => {
-  console.error('Global renderer error:', event.error || event.message)
+  event.preventDefault()
+  console.error('Global renderer error:', runtimeErrorCode(event.error))
 })
 
-createRoot(root_element).render(
+createRoot(root_element, {
+  onCaughtError: () => {}, // The boundary records a sanitized failure.
+  onUncaughtError: (error) => console.error('Uncaught renderer error:', runtimeErrorCode(error)),
+  onRecoverableError: (error) => console.warn('Recoverable renderer error:', runtimeErrorCode(error)),
+}).render(
   <RootErrorBoundary>
     <StrataApp />
   </RootErrorBoundary>,

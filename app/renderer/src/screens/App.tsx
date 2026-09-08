@@ -1,3 +1,4 @@
+import { runtimeErrorCode } from '@shared/runtimeLogging'
 import { DraftConflict } from '../components/KnowledgeStatus'
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -705,7 +706,7 @@ export function App() {
           store.openNoteInTab(opened_note_id)
         }
       } catch (err) {
-        console.error('Failed to import markdown file', err)
+        console.error('Failed to import markdown file', runtimeErrorCode(err))
       }
     }
 

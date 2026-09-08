@@ -130,8 +130,19 @@ try {
   await choices.getByRole('button', { name: /Choice two/ }).click()
   await expect(page.locator('.cm-content').first()).toContainText('Choice two', { timeout: 20000 })
   expect(unexpectedCreatePrompt).toBe(false)
+  const failureLogs = []
+  page.on('console', (message) => failureLogs.push(message.text()))
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new Error('private-runtime-fixture')
+    }, 0)
+  })
+  await expect
+    .poll(() => failureLogs.some((message) => message.includes('Global renderer error:')))
+    .toBe(true)
+  expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, and explicit ambiguous-link choice.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, explicit ambiguous-link choice, and sanitized renderer failures.',
   )
 } finally {
   try {

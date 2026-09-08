@@ -112,7 +112,7 @@ export class StrataApiClient {
 
       try {
         if (this.verbose) {
-          process.stderr.write(`[strata-cli] ${method} ${url} (attempt ${attempt})\n`)
+          process.stderr.write(`[strata-cli] ${method} request (attempt ${attempt})\n`)
         }
 
         const response = await fetch(url, {

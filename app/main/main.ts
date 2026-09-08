@@ -1,3 +1,4 @@
+import { debugRuntime, runtimeErrorCode } from '../shared/runtimeLogging'
 import { EncryptedSecretStore } from './security/secretStore'
 import { protectNavigation } from './security/navigation'
 import path from 'node:path'
@@ -271,25 +272,25 @@ const createWindow = () => {
 void app
   .whenReady()
   .then(async () => {
-    console.info('[strata-startup] app ready')
+    debugRuntime('[strata-startup] app ready')
     setCspHeaders()
 
     const user_data_path = app.getPath('userData')
-    console.info('[strata-startup] opening database')
+    debugRuntime('[strata-startup] opening database')
     try {
       database_recovery = await openStrataDatabaseWithRecovery(user_data_path)
       db = database_recovery.db
       db.attachSecretStore(new EncryptedSecretStore(path.join(user_data_path, 'credentials'), safeStorage))
     } catch (error) {
-      console.error('[strata-startup] failed to open database', error)
+      console.error('[strata-startup] failed to open database', runtimeErrorCode(error))
       const message = error instanceof Error ? error.message : String(error)
       dialog.showErrorBox('Strata Could Not Start', `Strata could not open its local database.\n\n${message}`)
       app.quit()
       return
     }
-    console.info('[strata-startup] database open')
+    debugRuntime('[strata-startup] database open')
     current_settings = db.getSettings()
-    console.info('[strata-startup] settings loaded')
+    debugRuntime('[strata-startup] settings loaded')
     const db_file_path = path.join(user_data_path, 'data', 'strata.sqlite')
     const backup_directory = process.env.VITE_DEV_SERVER_URL
       ? path.join(process.cwd(), 'backups')
@@ -304,7 +305,7 @@ void app
         db!.setSettings({ lastAutoBackupAt: created_at })
       },
     })
-    console.info('[strata-startup] backup manager ready')
+    debugRuntime('[strata-startup] backup manager ready')
 
     registerNotesHandlers(db)
     registerSettingsHandlers(db, (settings) => {
@@ -318,11 +319,11 @@ void app
     registerPublishHandlers()
     registerProjectsHandlers(db, () => main_window?.webContents.send('notes:changed'))
     backup_manager.start()
-    console.info('[strata-startup] ipc registered')
+    debugRuntime('[strata-startup] ipc registered')
 
-    console.info('[strata-startup] creating window')
+    debugRuntime('[strata-startup] creating window')
     createWindow()
-    console.info('[strata-startup] window created')
+    debugRuntime('[strata-startup] window created')
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
@@ -334,7 +335,7 @@ void app
         notes_api_server = server
       })
       .catch((error: unknown) => {
-        console.error('[strata-api] Failed to start notes API server', error)
+        console.error('[strata-api] Failed to start notes API server', runtimeErrorCode(error))
       })
   })
   .catch((error: unknown) => {
@@ -346,7 +347,7 @@ void app
 app.on('before-quit', () => {
   backup_manager?.stop()
   void notes_api_server?.close().catch((error) => {
-    console.error('[strata-api] Failed to stop notes API server', error)
+    console.error('[strata-api] Failed to stop notes API server', runtimeErrorCode(error))
   })
   db?.close()
 })
