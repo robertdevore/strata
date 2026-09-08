@@ -73,7 +73,7 @@ describe('autosave revision safety', () => {
     await hydration
     expect(useAppStore.getState().notes[0].revision).toBe(5)
     expect(useAppStore.getState().drafts[note.id]).toBe('human draft')
-    expect(useAppStore.getState().saveState).toBe('conflict')
+    expect(useAppStore.getState().saveStates[note.id]).toBe('conflict')
   })
 
   it('preserves a draft when the API rejects a stale revision', async () => {
@@ -83,7 +83,7 @@ describe('autosave revision safety', () => {
     await useAppStore.getState().flushDraft(note.id)
     expect(update).toHaveBeenCalledWith(note.id, { content: 'Human draft', expectedRevision: 5 })
     expect(useAppStore.getState().drafts[note.id]).toBe('Human draft')
-    expect(useAppStore.getState().saveState).toBe('conflict')
+    expect(useAppStore.getState().saveStates[note.id]).toBe('conflict')
   })
   it('serializes overlapping saves and does not clear edits typed during a save', async () => {
     let resolveFirst: (note: Note) => void = () => {}
@@ -130,4 +130,37 @@ describe('autosave revision safety', () => {
     expect(useAppStore.getState().notes.some((item) => item.id === note.id)).toBe(true)
     expect(useAppStore.getState().nextCursor).toBe('next')
   })
+})
+it('keeps each pane status independent when another note finishes saving', async () => {
+  const other = { ...note, id: '00000000-0000-4000-8000-000000000002' }
+  let finishOther!: (value: Note) => void
+  vi.stubGlobal('window', {
+    strata: {
+      notes: {
+        update: vi.fn((id: string) =>
+          id === note.id
+            ? Promise.reject(new Error('REVISION_CONFLICT'))
+            : new Promise((resolve) => {
+                finishOther = resolve
+              }),
+        ),
+      },
+    },
+  })
+  useAppStore.setState({ notes: [note, other] })
+  useAppStore.getState().setDraft(note.id, 'first draft')
+  useAppStore.getState().setDraft(other.id, 'second draft')
+  const first = useAppStore.getState().flushDraft(note.id)
+  const second = useAppStore.getState().flushDraft(other.id)
+  await first
+  expect(useAppStore.getState().saveStates[note.id]).toBe('conflict')
+  expect(useAppStore.getState().saveStates[other.id]).toBe('saving')
+  finishOther({ ...other, revision: 6, content: 'second draft' })
+  await second
+  expect(useAppStore.getState().saveStates[other.id]).toBe('saved')
+  expect(useAppStore.getState().saveStates[note.id]).toBe('conflict')
+  useAppStore.getState().setDraft(note.id, 'continued conflicted draft')
+  expect(useAppStore.getState().saveStates[note.id]).toBe('conflict')
+  await useAppStore.getState().flushDraft(note.id)
+  expect(window.strata.notes.update).toHaveBeenCalledTimes(2)
 })

@@ -116,12 +116,18 @@ try {
   })
   await page.evaluate(async () => {
     await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice one' })
-    await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice two' })
+    return (await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice two' })).id
   })
-  await page.locator('.cm-content[contenteditable="true"]').first().fill('[[Ambiguous target]]')
+  const wikiEditor = page.locator('.cm-content[contenteditable="true"]').first()
+  await wikiEditor.focus()
+  await wikiEditor.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a')
+  await wikiEditor.pressSequentially('[[Ambiguous target]]')
   await expect
-    .poll(async () => (await page.evaluate((id) => window.strata.notes.get(id), distantId)).content)
+    .poll(async () => (await page.evaluate((id) => window.strata.notes.get(id), distantId)).content, {
+      timeout: 15000,
+    })
     .toContain('[[Ambiguous target]]')
+
   const previewButton = page.getByTitle('Preview', { exact: true })
   if (!(await previewButton.getAttribute('class')).includes('chip-active')) await previewButton.click()
   await page.getByRole('link', { name: 'Ambiguous target', exact: true }).click()
@@ -130,6 +136,37 @@ try {
   await choices.getByRole('button', { name: /Choice two/ }).click()
   await expect(page.locator('.cm-content').first()).toContainText('Choice two', { timeout: 20000 })
   expect(unexpectedCreatePrompt).toBe(false)
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+o' : 'Control+o')
+  await page.getByRole('textbox', { name: 'Quick open notes' }).fill('Desktop verification')
+  await page.locator('.palette-item-title').filter({ hasText: 'Desktop verification' }).click()
+  await page.locator('.tab-item').filter({ hasText: 'Desktop verification' }).click({ button: 'right' })
+  await page.getByRole('button', { name: 'Pin to Split View', exact: true }).click()
+  await page.locator('.tab-item').filter({ hasText: 'Distant lookup target' }).click()
+  const panes = page.locator('.split-pane')
+  await expect(panes).toHaveCount(2)
+  const pinnedPane = panes.first()
+  const activePane = panes.last()
+  await expect(pinnedPane.locator('.cm-content')).toContainText('Persisted through the real editor')
+  // An independent IPC writer changes storage without updating the editor's loaded revision.
+  await page.evaluate(async (id) => {
+    const latest = await window.strata.notes.get(id)
+    await window.strata.notes.update(id, {
+      content: '# Desktop verification\n\nExternal update',
+      expectedRevision: latest.revision,
+    })
+  }, saved.id)
+  await pinnedPane.locator('.cm-content[contenteditable="true"]').fill('Preserved pinned draft')
+  await expect(pinnedPane.getByRole('alert')).toContainText('Your draft is preserved')
+  await expect(activePane.getByRole('alert')).toHaveCount(0)
+  await activePane.locator('.cm-content[contenteditable="true"]').fill('Another pane saved')
+  await expect
+    .poll(async () => (await page.evaluate((id) => window.strata.notes.get(id), distantId)).content)
+    .toContain('Another pane saved')
+  await expect(activePane.getByRole('status')).toContainText('Saved')
+  await expect(pinnedPane.getByRole('alert')).toContainText('Your draft is preserved')
+  expect((await page.evaluate((id) => window.strata.notes.get(id), saved.id)).content).toContain(
+    'External update',
+  )
   const failureLogs = []
   page.on('console', (message) => failureLogs.push(message.text()))
   await page.evaluate(() => {
@@ -142,7 +179,7 @@ try {
     .toBe(true)
   expect(failureLogs.join('\n')).not.toContain('private-runtime-fixture')
   console.log(
-    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, explicit ambiguous-link choice, and sanitized renderer failures.',
+    'Desktop verified: real editor autosave, history restore, reload persistence, sandboxed preload, and Quick Open/wiki/related navigation beyond 100 notes, explicit ambiguous-link choice, sanitized renderer failures, and independent split-pane conflicts.',
   )
 } finally {
   try {

@@ -22,9 +22,8 @@ export const MoreNotes = () => {
     </div>
   )
 }
-export const DraftConflict = () => {
-  const status = useAppStore((state) => state.saveState)
-  const id = useAppStore((state) => state.selectedNoteId)
+export const DraftConflict = ({ noteId: id }: { noteId: string }) => {
+  const status = useAppStore((state) => state.saveStates[id])
   const resolve = useAppStore((state) => state.resolveConflict)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

@@ -20,6 +20,7 @@ import { markdown_from_clipboard } from '@renderer/src/domain/markdownPaste'
 import { AmbiguousWikiLinkError, openWikiLink } from '../services/wikiNavigation'
 import { aiService } from '@renderer/src/services/aiService'
 import { useAppStore } from '@renderer/src/state/useAppStore'
+import { DraftConflict } from './KnowledgeStatus'
 import { TagsEditor } from './TagsEditor'
 import {
   ArchiveIcon,
@@ -67,8 +68,6 @@ interface EditorPaneProps {
   openAiModel: string
   content: string
   tags: Array<{ name: string; count: number }>
-  saveState: 'idle' | 'saving' | 'saved' | 'failed' | 'conflict' | 'unsaved'
-  lastSavedAt: string | null
   onChangeDraft: (id: string, content: string) => void
   onFlush: (id: string) => Promise<void>
   onToggleStar: (id: string) => void
@@ -399,8 +398,6 @@ export function EditorPane(props: EditorPaneProps) {
     openAiModel,
     content,
     tags,
-    saveState,
-    lastSavedAt,
     sidebarCollapsed,
     theme,
     onChangeDraft,
@@ -442,6 +439,8 @@ export function EditorPane(props: EditorPaneProps) {
   const [chatSending, setChatSending] = useState(false)
   const [chatAssistantTyping, setChatAssistantTyping] = useState(false)
   const [chatDeleting, setChatDeleting] = useState(false)
+  const saveState = useAppStore((state) => (note ? (state.saveStates[note.id] ?? 'saved') : 'idle'))
+  const lastSavedAt = note?.updatedAt ?? null
   const [wikiChoices, setWikiChoices] = useState<{
     noteId: string
     newTab: boolean
@@ -1664,6 +1663,7 @@ export function EditorPane(props: EditorPaneProps) {
 
   return (
     <section className="editor">
+      <DraftConflict key={note.id} noteId={note.id} />
       {wikiChoices?.noteId === note.id && (
         <div
           role="region"
@@ -1718,7 +1718,12 @@ export function EditorPane(props: EditorPaneProps) {
           </h2>
         )}
         <div className="editor-actions">
-          {toolbar_status && <span className="save-status">{toolbar_status}</span>}
+          {toolbar_status && (
+            <span className="save-status" role="status">
+              {toolbar_status}
+            </span>
+          )}
+          {saveState === 'failed' && <button onClick={() => void onFlush(note.id)}>Retry save</button>}
           <button
             className="icon-button"
             onClick={async () => {
@@ -1780,7 +1785,8 @@ export function EditorPane(props: EditorPaneProps) {
         ref={editorBodyRef}
         style={{ gridTemplateColumns: editorBodyColumns }}
         onClick={(event) => {
-          // Handle wiki link clicks in the CodeMirror editor
+          // Ordinary clicks place the caret; Ctrl/Cmd-click explicitly opens a wiki link.
+          if (!event.ctrlKey && !event.metaKey) return
           const view = editorViewRef.current
           if (!view) return
           const target = event.target as HTMLElement

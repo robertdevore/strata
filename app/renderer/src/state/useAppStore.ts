@@ -61,8 +61,7 @@ interface AppState {
   settings: Settings
   showSettings: boolean
   showFiltersPanel: boolean
-  saveState: SaveState
-  lastSavedAt: string | null
+  saveStates: Record<string, SaveState>
   openTabs: string[]
   navigationBackStack: string[]
   navigationForwardStack: string[]
@@ -165,8 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: defaultSettings,
   showSettings: false,
   showFiltersPanel: false,
-  saveState: 'idle',
-  lastSavedAt: null,
+  saveStates: {},
   openTabs: [],
   navigationBackStack: [],
   navigationForwardStack: [],
@@ -232,7 +230,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (generation !== searchGeneration) return
       set((current) => {
         const existing = new Map(current.notes.map((note) => [note.id, note]))
-        const conflicts = page.notes.some(
+        const conflicts = page.notes.filter(
           (note) =>
             existing.get(note.id)?.revision !== note.revision && current.drafts[note.id] !== undefined,
         )
@@ -259,7 +257,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             : page.notes.map((note) => note.id),
           nextCursor: page.nextCursor,
           retrievalError: null,
-          ...(conflicts ? { saveState: 'conflict' as const } : {}),
+          saveStates: {
+            ...current.saveStates,
+            ...Object.fromEntries(conflicts.map((note) => [note.id, 'conflict' as const])),
+          },
         }
       })
     } catch {
@@ -284,7 +285,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((current) => {
           const existing = current.notes.find((note) => note.id === id)
           if (current.drafts[id] !== undefined)
-            return full?.revision !== existing?.revision ? { saveState: 'conflict' as const } : {}
+            return full?.revision !== existing?.revision
+              ? { saveStates: { ...current.saveStates, [id]: 'conflict' as const } }
+              : {}
           if (!full)
             return {
               notes: current.notes.filter((note) => note.id !== id),
@@ -306,7 +309,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((current) => ({
       drafts: Object.fromEntries(Object.entries(current.drafts).filter(([key]) => key !== id)),
       notes: latest ? upsert_note(current.notes, latest) : current.notes.filter((note) => note.id !== id),
-      saveState: 'saved',
+      saveStates: { ...current.saveStates, [id]: 'saved' },
     }))
     await get().load()
   },
@@ -370,7 +373,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // A delayed read must not resurrect a removed note or replace a newer revision.
       if (!latest || latest.revision > full_note.revision) return state
       if (state.drafts[id] !== undefined && full_note.revision !== latest.revision) {
-        return { saveState: 'conflict' }
+        return { saveStates: { ...state.saveStates, [id]: 'conflict' } }
       }
       return {
         notes: upsert_note(state.notes, full_note),
@@ -549,8 +552,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       noteSummaryCache: { ...state.noteSummaryCache, [note.id]: summarize_note_content(note.content) },
       noteLastAccessedAt: { ...state.noteLastAccessedAt, [note.id]: Date.now() },
       untouchedNewNoteIds: { ...state.untouchedNewNoteIds, [note.id]: true },
-      saveState: 'saved',
-      lastSavedAt: note.updatedAt,
+      saveStates: { ...state.saveStates, [note.id]: 'saved' },
     }))
     await get().refreshTags()
   },
@@ -571,7 +573,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           [id]: Date.now(),
         },
         untouchedNewNoteIds: untouched_new_note_ids,
-        saveState: 'unsaved',
+        saveStates: {
+          ...state.saveStates,
+          [id]: state.saveStates[id] === 'conflict' ? 'conflict' : 'unsaved',
+        },
       }
     })
   },
@@ -584,7 +589,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const state = get()
     const draft = state.drafts[id]
-    if ('string' !== typeof draft) return
+    if ('string' !== typeof draft || state.saveStates[id] === 'conflict') return
 
     const note = state.notes.find((item) => item.id === id)
     if (
@@ -610,7 +615,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             openTabs: current.openTabs.filter((tab_id) => tab_id !== id),
             navigationBackStack: current.navigationBackStack.filter((tab_id) => tab_id !== id),
             navigationForwardStack: current.navigationForwardStack.filter((tab_id) => tab_id !== id),
-            saveState: 'saved',
+            saveStates: { ...current.saveStates, [id]: 'saved' },
           }
         })
         await get().refreshTags()
@@ -620,7 +625,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       if (!note) return
-      set({ saveState: 'saving' })
+      set((current) => ({ saveStates: { ...current.saveStates, [id]: 'saving' } }))
       const saving = notesService.update(id, { content: draft, expectedRevision: note.revision })
       savesInFlight.set(
         id,
@@ -630,7 +635,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       )
       const updated = await saving
-      if (!updated) return
+      if (!updated) throw new Error('Note unavailable')
       set((current) => {
         const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
         if (untouched_new_note_ids[id] && !is_effectively_untouched_content(draft)) {
@@ -647,16 +652,20 @@ export const useAppStore = create<AppState>((set, get) => ({
             [id]: Date.now(),
           },
           untouchedNewNoteIds: untouched_new_note_ids,
-          saveState: current.drafts[id] === draft ? 'saved' : 'unsaved',
+          saveStates: { ...current.saveStates, [id]: current.drafts[id] === draft ? 'saved' : 'unsaved' },
           drafts:
             current.drafts[id] === draft
               ? Object.fromEntries(Object.entries(current.drafts).filter(([key]) => key !== id))
               : current.drafts,
-          lastSavedAt: updated.updatedAt,
         }
       })
     } catch (error) {
-      set({ saveState: String(error).includes('REVISION_CONFLICT') ? 'conflict' : 'failed' })
+      set((current) => ({
+        saveStates: {
+          ...current.saveStates,
+          [id]: String(error).includes('REVISION_CONFLICT') ? 'conflict' : 'failed',
+        },
+      }))
     } finally {
       savesInFlight.delete(id)
     }
@@ -743,8 +752,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...state.noteLastAccessedAt,
         [restored.id]: Date.now(),
       },
-      saveState: 'saved',
-      lastSavedAt: restored.updatedAt,
+      saveStates: { ...state.saveStates, [restored.id]: 'saved' },
     }))
     await get().refreshTags()
     return true

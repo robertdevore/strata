@@ -1,5 +1,4 @@
 import { runtimeErrorCode } from '@shared/runtimeLogging'
-import { DraftConflict } from '../components/KnowledgeStatus'
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { HomePane } from '@renderer/src/components/HomePane'
@@ -752,8 +751,6 @@ export function App() {
           gridTemplateColumns: sidebarCollapsed ? 'minmax(0, 1fr)' : `${sidebarWidth}px 3px minmax(0, 1fr)`,
         }}
       >
-        <DraftConflict />
-
         <Sidebar
           notes={notes}
           projects={store.projects}
@@ -864,8 +861,6 @@ export function App() {
                         openAiModel={store.settings.openAiModel}
                         content={pinned.content}
                         tags={store.tags}
-                        saveState={store.saveState}
-                        lastSavedAt={store.lastSavedAt}
                         sidebarCollapsed={sidebarCollapsed}
                         theme={store.settings.theme}
                         onChangeDraft={store.setDraft}
@@ -912,8 +907,6 @@ export function App() {
                       openAiModel={store.settings.openAiModel}
                       content={store.effectiveContent()}
                       tags={store.tags}
-                      saveState={store.saveState}
-                      lastSavedAt={store.lastSavedAt}
                       sidebarCollapsed={sidebarCollapsed}
                       theme={store.settings.theme}
                       onChangeDraft={store.setDraft}
@@ -975,8 +968,6 @@ export function App() {
                           openAiModel={store.settings.openAiModel}
                           content={pinned.content}
                           tags={store.tags}
-                          saveState={store.saveState}
-                          lastSavedAt={store.lastSavedAt}
                           sidebarCollapsed={sidebarCollapsed}
                           theme={store.settings.theme}
                           onChangeDraft={store.setDraft}
@@ -1031,8 +1022,6 @@ export function App() {
                       openAiModel={store.settings.openAiModel}
                       content={store.effectiveContent()}
                       tags={store.tags}
-                      saveState={store.saveState}
-                      lastSavedAt={store.lastSavedAt}
                       sidebarCollapsed={sidebarCollapsed}
                       theme={store.settings.theme}
                       onChangeDraft={store.setDraft}
@@ -1080,8 +1069,6 @@ export function App() {
                 openAiModel={store.settings.openAiModel}
                 content={store.effectiveContent()}
                 tags={store.tags}
-                saveState={store.saveState}
-                lastSavedAt={store.lastSavedAt}
                 sidebarCollapsed={sidebarCollapsed}
                 theme={store.settings.theme}
                 onChangeDraft={store.setDraft}
