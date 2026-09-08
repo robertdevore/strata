@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { Note } from '@shared/types'
 import { useAppStore } from '../state/useAppStore'
 export const MoreNotes = () => {
   const cursor = useAppStore((state) => state.nextCursor)
@@ -53,26 +54,34 @@ export const NoteHistory = () => {
   const dirty = useAppStore((state) =>
     state.selectedNoteId ? state.drafts[state.selectedNoteId] !== undefined : false,
   )
+  return note ? <NoteHistoryDetails key={note.id} note={note} dirty={dirty} /> : null
+}
+
+const NoteHistoryDetails = ({ note, dirty }: { note: Note; dirty: boolean }) => {
+  const request = useRef(0)
+  const expectedRevision = useRef(note.revision)
   const [revisions, setRevisions] = useState<Array<{ revision: number; source: string; createdAt: string }>>(
     [],
   )
   const [snapshot, setSnapshot] = useState<import('@shared/types').NoteRevision | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  if (!note) return null
   const load = async () => {
+    const generation = ++request.current
     try {
       setSnapshot(null)
-      setRevisions(await window.strata.notes.history(note.id))
+      setError('')
+      const history = await window.strata.notes.history(note.id)
+      if (generation === request.current) setRevisions(history)
     } catch {
-      setError('Could not load revision history')
+      if (generation === request.current) setError('Could not load revision history')
     }
   }
   const restore = async () => {
-    if (!snapshot || dirty) return
+    if (!snapshot || snapshot.noteId !== note.id || dirty) return
     setBusy(true)
     try {
-      await window.strata.notes.restoreRevision(note.id, snapshot.revision, note.revision)
+      await window.strata.notes.restoreRevision(note.id, snapshot.revision, expectedRevision.current)
       setSnapshot(null)
       await useAppStore.getState().load()
       await load()
@@ -93,12 +102,22 @@ export const NoteHistory = () => {
       {revisions.map((revision) => (
         <button
           key={revision.revision}
-          onClick={() =>
+          onClick={() => {
+            const generation = ++request.current
+            const baseRevision = note.revision
+            setSnapshot(null)
+            setError('')
             void window.strata.notes
               .getRevision(note.id, revision.revision)
-              .then(setSnapshot)
-              .catch(() => setError('Could not read revision'))
-          }
+              .then((value) => {
+                if (generation !== request.current) return
+                expectedRevision.current = baseRevision
+                setSnapshot(value)
+              })
+              .catch(() => {
+                if (generation === request.current) setError('Could not read revision')
+              })
+          }}
         >
           Revision {revision.revision} · {revision.source} · {revision.createdAt}
         </button>

@@ -149,3 +149,9 @@ Custom endpoints now have explicit tools, system-message and temperature capabil
 
 Added offline request-shape and capability-rejection tests. Typecheck caught test-fixture/tool-type and duplicated-default issues, which were corrected. Final verification result follows. Desktop interaction, broader provider compatibility and remaining full-goal audit work are still open.
 Verification passed all 131 tests/28 files, formatting and lint. After explicitly typing the conformance fixture, final TypeScript/production build and changed-file lint passed. Full hardening goal remains active.
+
+### History navigation race checkpoint
+
+Note-history state is now scoped to the selected note through a keyed component. Snapshot requests use a generation guard so a slower earlier response cannot replace a later selection. Historical restore retains the note revision read when that snapshot was selected, rather than silently adopting a newly refreshed revision after an external mutation.
+
+The existing full verification command passed formatting, lint, 131 tests/28 files, typecheck and production build. Two additional rendered UI tests passed for response ordering/note switching and preserving the original restore revision after an external write; their lint passed and they were included in the final TypeScript build. Broader desktop interaction and remaining full-goal requirements remain outstanding.
