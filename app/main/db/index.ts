@@ -910,6 +910,27 @@ export class StrataDatabase {
     return this.mapProject(row)
   }
 
+  projectReviewState(
+    id: string,
+    includeNotes: boolean,
+  ): { project: Project | null; noteCount: number; fingerprint: string } {
+    const project = this.getProject(id)
+    const hash = createHash('sha256').update(JSON.stringify(project))
+    let noteCount = 0
+    if (includeNotes) {
+      // Stream IDs/revisions only; project deletion also affects archived/deleted members.
+      const rows = this.db
+        .prepare('SELECT id, revision FROM notes WHERE project_id = ? ORDER BY id')
+        .iterate(id)
+      for (const row of rows) {
+        const note = row as { id: string; revision: number }
+        hash.update(JSON.stringify([note.id, note.revision]))
+        noteCount++
+      }
+    }
+    return { project, noteCount, fingerprint: hash.digest('hex') }
+  }
+
   getProjectByName(name: string): Project | null {
     const normalized = name.trim()
     if (!normalized) return null

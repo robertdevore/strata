@@ -50,7 +50,7 @@ export const AiProposals = ({ sending, threadId }: { sending: boolean; threadId:
     } catch {
       if (currentThread.current !== requestThread) return
       setError(
-        'The edit could not be applied. The note may have changed; reject this proposal and request a fresh edit.',
+        'The edit could not be applied. The note or project may have changed; reject this proposal and request a fresh edit.',
       )
     } finally {
       if (currentThread.current === requestThread) setBusy(null)
@@ -64,7 +64,13 @@ export const AiProposals = ({ sending, threadId }: { sending: boolean; threadId:
         return (
           <details key={proposal.id}>
             <summary>AI edit awaiting approval: {payload.operation.op.replaceAll('_', ' ')}</summary>
-            <p>Review the proposed changes. Note updates check the original revision before applying.</p>
+            <p>Review the proposed changes. Approval checks the original note revision or project state.</p>
+            {payload.operation.op === 'delete_project' && (
+              <p>
+                Removing this project clears its notes’ project assignment. The notes and their history remain
+                saved.
+              </p>
+            )}
             <ProposalDiff before={payload.before} after={payload.after} />
             <button disabled={busy !== null} onClick={() => void resolve(proposal.id, true)}>
               Approve edit

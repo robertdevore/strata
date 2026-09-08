@@ -27,6 +27,54 @@ const open = () => {
   return { db, call, service: new KnowledgeService(db) }
 }
 describe('AI mutation permissions', () => {
+  it('rejects stale project renames and reorders while keeping the proposal pending', () => {
+    const { db, service } = open()
+    const project = db.createProject('Original')
+    const rename = service.propose({ op: 'rename_project', id: project.id, name: 'AI name' })
+    db.renameProject(project.id, 'Human name')
+    expect(() => service.approve(rename.id, true)).toThrow('project changed')
+    expect(db.getProject(project.id)?.name).toBe('Human name')
+    expect(db.listProposals().map((item) => item.id)).toContain(rename.id)
+    const reorder = service.propose({ op: 'reorder_projects', projectIds: [project.id] })
+    const added = db.createProject('New project')
+    expect(() => service.approve(reorder.id, true)).toThrow('project changed')
+    expect(db.getProject(added.id)).not.toBeNull()
+    const fresh = service.propose({ op: 'rename_project', id: project.id, name: 'Approved name' })
+    service.approve(fresh.id, true)
+    expect(db.getProject(project.id)?.name).toBe('Approved name')
+  })
+  it('checks project deletion against every affected note revision and membership', () => {
+    const { db, service } = open()
+    const project = db.createProject('Members')
+    const note = db.createNote({ content: 'Original', projectId: project.id })
+    const deleted = db.createNote({ content: 'Deleted member', projectId: project.id, archived: true })
+    db.deleteNote(deleted.id)
+    const proposal = service.propose({ op: 'delete_project', id: project.id })
+    expect(proposal.before).toMatchObject({ id: project.id, affectedNotes: 2 })
+    db.updateNote(note.id, { content: 'Human edit', expectedRevision: note.revision })
+    expect(() => service.approve(proposal.id, true)).toThrow('project changed')
+    const beforeAddition = service.propose({ op: 'delete_project', id: project.id })
+    const added = db.createNote({ content: 'New member', projectId: project.id })
+    expect(() => service.approve(beforeAddition.id, true)).toThrow('project changed')
+    const fresh = service.propose({ op: 'delete_project', id: project.id })
+    service.approve(fresh.id, true)
+    expect(db.getProject(project.id)).toBeNull()
+    expect(db.getNote(note.id)).toMatchObject({ content: 'Human edit', projectId: null })
+    expect(db.getNote(added.id)?.projectId).toBeNull()
+    expect(db.aiGetNoteById(deleted.id, true)?.projectId).toBeNull()
+  })
+  it('requires a fresh proposal for legacy project approvals without a precondition', () => {
+    const { db, service } = open()
+    const project = db.createProject('Legacy')
+    const id = db.createProposal({
+      operation: { op: 'delete_project', id: project.id },
+      before: null,
+      after: { deleted: true },
+    })
+    expect(() => service.approve(id, true)).toThrow('predates project checks')
+    expect(db.getProject(project.id)).not.toBeNull()
+    expect(service.approve(id, false)).toBeNull()
+  })
   it('rejects pending proposals when their conversation is deleted and refuses late mutations', () => {
     const { db, service } = open()
     const thread = db.createAiThread('Removed', '')
@@ -64,7 +112,7 @@ describe('AI mutation permissions', () => {
     expect(rename.before).toEqual(first)
     expect(rename.after).toMatchObject({ id: first.id, name: 'Proposed name' })
     const removal = service.propose({ op: 'delete_project', id: first.id })
-    expect(removal.before).toEqual(first)
+    expect(removal.before).toEqual({ ...first, affectedNotes: 0 })
     expect(db.getProject(first.id)).toEqual(first)
     const order = db.listProjects()
     const reorder = service.propose({ op: 'reorder_projects', projectIds: [second.id, first.id] })

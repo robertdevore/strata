@@ -34,6 +34,9 @@ export const ProposalDiff = ({ before, after }: { before: unknown; after: unknow
   )
   return (
     <>
+      {typeof previous.affectedNotes === 'number' && (
+        <p>{previous.affectedNotes} note assignments affected, including archived and deleted notes.</p>
+      )}
       {hasText && (
         <>
           <h4>Text changes</h4>

@@ -273,6 +273,23 @@ export class KnowledgeService {
     if (!options.dryRun && applied) this.notify?.(ALL_CHANGED)
     return result
   }
+  private projectReview(operation: Operation): { before: unknown; fingerprint: string } | undefined {
+    if (operation.op === 'rename_project' || operation.op === 'delete_project') {
+      const state = this.db.projectReviewState(operation.id, operation.op === 'delete_project')
+      return {
+        before:
+          operation.op === 'delete_project' && state.project
+            ? { ...state.project, affectedNotes: state.noteCount }
+            : state.project,
+        fingerprint: state.fingerprint,
+      }
+    }
+    if (operation.op === 'reorder_projects') {
+      const before = this.db.listProjects()
+      return { before, fingerprint: createHash('sha256').update(JSON.stringify(before)).digest('hex') }
+    }
+  }
+
   propose(
     input: unknown,
     actor?: { threadId?: string; messageId?: string; model?: string },
@@ -281,16 +298,13 @@ export class KnowledgeService {
     return this.db.transaction(() => {
       if (actor?.threadId && !this.db.getAiThread(actor.threadId))
         throw new DomainError('CANCELLED', 'Chat was deleted')
+      const projectReview = this.projectReview(operation)
       const before =
         operation.op === 'update_note' || operation.op === 'delete_note' || operation.op === 'restore_note'
           ? this.db.aiGetNoteById(operation.id, true)
-          : operation.op === 'rename_project' || operation.op === 'delete_project'
-            ? this.db.getProject(operation.id)
-            : operation.op === 'reorder_projects'
-              ? this.db.listProjects()
-              : null
+          : (projectReview?.before ?? null)
       const after = this.mutate(operation, { source: 'ai', dryRun: true })
-      const proposal = { operation, before, after, actor }
+      const proposal = { operation, before, after, actor, projectFingerprint: projectReview?.fingerprint }
       const id = this.db.createProposal(proposal)
       return { id, ...proposal }
     })
@@ -298,7 +312,22 @@ export class KnowledgeService {
   approve(id: string, approved: boolean): unknown {
     let changed: ChangedDomains | undefined
     const result = this.db.resolveProposal(idSchema.parse(id), approved, (payload) => {
-      const proposal = z.object({ operation: operationSchema }).parse(payload)
+      const proposal = z
+        .object({
+          operation: operationSchema,
+          projectFingerprint: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .optional(),
+        })
+        .parse(payload)
+      const currentProject = this.projectReview(proposal.operation)
+      if (currentProject && currentProject.fingerprint !== proposal.projectFingerprint)
+        throw new DomainError(
+          'REVISION_CONFLICT',
+          'The project changed or this proposal predates project checks. Request a fresh proposal.',
+          { operation: proposal.operation.op },
+        )
       const result = this.apply(proposal.operation)
       changed = operationChanges(proposal.operation)
       return result

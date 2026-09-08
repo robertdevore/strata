@@ -401,3 +401,11 @@ Chat deletion now rejects its pending proposals atomically with message/thread r
 The confirmation text now explains pending-proposal rejection and preservation of saved notes. Focused tests passed 27 cases across mutation safety, fallback, request ownership and IPC cancellation, including a provider response arriving after direct database thread deletion. TypeScript, scoped lint and production build passed. Current inventory is 234 tests; last full suite checkpoint is 227. The expanded desktop fixture creates another pending proposal, deletes its chat, confirms the proposal cannot be approved, and checks the previously approved note remains.
 
 Desktop deletion verification passed, including refusal to approve the deleted chat's proposal and preservation of the already-approved note. All prior desktop scenarios also passed. Log: `/tmp/strata-deleted-chat-desktop.log`.
+
+### Project proposal preconditions
+
+Confirmed that project proposals previously checked no original state during approval. Rename/reorder proposals now fingerprint the reviewed project metadata/order. Deletion additionally streams affected note IDs/revisions (including archived/deleted members) without loading their Markdown bodies. The review shows the affected assignment count and explains that notes/history remain saved after project removal. The fingerprint is captured before dry-run and compared inside the approval transaction; changed state leaves the proposal pending and makes no mutation. Legacy project proposals lacking a fingerprint fail closed and can still be rejected.
+
+Nineteen targeted proposal/mutation/UI tests passed, including stale rename, a new project after reorder review, changed note revisions/membership before project deletion, archived/deleted members, successful fresh approval, and legacy rejection. Current inventory is 237; final scoped type/lint/build results follow. No schema migration was needed because proposal metadata is already stored as JSON.
+
+Scoped TypeScript, ESLint and production build passed for project preconditions. The previously passing desktop approval/deletion fixture is retained; a final full-suite/release run remains required by the goal.

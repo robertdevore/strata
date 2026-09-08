@@ -16,7 +16,7 @@ Pending proposals appear in the conversation that created them. Expand **AI edit
 
 Choose **Approve edit** or **Reject**. Approval rechecks the original note revision and applies the change transactionally. If another writer changed the note, approval fails; reject the stale proposal and request a fresh one. Rejection changes no notes or projects. Changing chats cannot make a late response replace the current review state.
 
-The text view shows a contiguous replacement region with shared leading/trailing lines omitted explicitly. The complete snapshots remain available for detailed review. Project operations do not yet have the same revision precondition as note updates; the ongoing hardening audit tracks that limitation.
+The text view shows a contiguous replacement region with shared leading/trailing lines omitted explicitly. The complete snapshots remain available for detailed review. Project rename/reorder approval checks a fingerprint of the original project state. Project deletion also checks every affected note ID/revision, including archived and deleted members, and shows the affected assignment count. Changes after review cause a conflict and leave the proposal pending. Older project proposals without this check must be rejected and recreated.
 
 ## History and recovery
 
