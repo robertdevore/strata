@@ -1,4 +1,5 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { handleTrustedIpc } from '../security/trustedIpc'
+import { BrowserWindow, dialog, shell } from 'electron'
 import { IPC_CHANNELS } from '../../shared/ipc'
 import type { BackupManager, BackupRestorePreparation } from '../backup/backupManager'
 
@@ -6,21 +7,21 @@ export const registerBackupHandlers = (
   backup_manager: BackupManager,
   on_restore_prepared: (preparation: BackupRestorePreparation) => Promise<void>,
 ) => {
-  ipcMain.handle(IPC_CHANNELS.backupCreateNow, () => {
+  handleTrustedIpc(IPC_CHANNELS.backupCreateNow, () => {
     return backup_manager.createBackupNow('manual')
   })
 
-  ipcMain.handle(IPC_CHANNELS.backupListRecent, () => {
+  handleTrustedIpc(IPC_CHANNELS.backupListRecent, () => {
     return backup_manager.listRecentBackups()
   })
 
-  ipcMain.handle(IPC_CHANNELS.backupOpenFolder, async () => {
+  handleTrustedIpc(IPC_CHANNELS.backupOpenFolder, async () => {
     const error = await shell.openPath(backup_manager.getBackupDirectory())
     if (error) throw new Error(error)
     return true
   })
 
-  ipcMain.handle(IPC_CHANNELS.backupRestoreSelect, async (event) => {
+  handleTrustedIpc(IPC_CHANNELS.backupRestoreSelect, async (event) => {
     const parent_window = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const options: Electron.OpenDialogOptions = {
       title: 'Select a Strata backup',
@@ -37,7 +38,7 @@ export const registerBackupHandlers = (
     return { canceled: false }
   })
 
-  ipcMain.handle(IPC_CHANNELS.backupRestoreNamed, async (_event, payload: { name?: unknown }) => {
+  handleTrustedIpc(IPC_CHANNELS.backupRestoreNamed, async (_event, payload: { name?: unknown }) => {
     if ('string' !== typeof payload?.name) throw new Error('Backup name is required.')
     const preparation = await backup_manager.prepareRestore(backup_manager.getBackupPath(payload.name))
     await on_restore_prepared(preparation)

@@ -32,6 +32,27 @@ try {
   })
   await expect(page.getByRole('button', { name: 'New Note', exact: true })).toBeVisible()
   expect(
+    await application.evaluate(async ({ BrowserWindow }, preload) => {
+      const auxiliary = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          preload,
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      })
+      try {
+        await auxiliary.loadURL('data:text/html,<title>Untrusted IPC fixture</title>')
+        return await auxiliary.webContents.executeJavaScript(
+          "window.strata.notes.list({}).then(() => 'unexpectedly allowed', error => error.message)",
+        )
+      } finally {
+        auxiliary.destroy()
+      }
+    }, path.resolve('dist/preload/preload.mjs')),
+  ).toContain('UNTRUSTED_IPC_SENDER')
+  expect(
     await page.evaluate(async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const kinds = stream.getTracks().map((track) => track.kind)

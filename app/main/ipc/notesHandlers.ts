@@ -1,5 +1,5 @@
+import { handleTrustedIpc } from '../security/trustedIpc'
 import { KnowledgeService, listSchema, updateSchema, createSchema } from '../services/knowledgeService'
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { StrataDatabase } from '../db/index'
 import { IPC_CHANNELS } from '../../shared/ipc'
@@ -12,27 +12,29 @@ const star_schema = mutation_schema.extend({ starred: z.boolean() })
 
 export const registerNotesHandlers = (db: StrataDatabase) => {
   const service = new KnowledgeService(db)
-  ipcMain.handle('history:storage', () => db.historyStats())
-  ipcMain.handle('history:prune:preview', (_event, payload) => {
+  handleTrustedIpc('history:storage', () => db.historyStats())
+  handleTrustedIpc('history:prune:preview', (_event, payload) => {
     const { keep } = z
       .object({ keep: z.number().int().min(20).max(10000) })
       .strict()
       .parse(payload)
     return db.historyPrunePlan(keep)
   })
-  ipcMain.handle('history:prune:apply', (_event, payload) => {
+  handleTrustedIpc('history:prune:apply', (_event, payload) => {
     const { keep, fingerprint } = z
       .object({ keep: z.number().int().min(20).max(10000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) })
       .strict()
       .parse(payload)
     return db.pruneHistory(keep, fingerprint)
   })
-  ipcMain.handle('notes:history', (_event, payload) => db.listRevisionSummaries(id_schema.parse(payload).id))
-  ipcMain.handle('notes:revision', (_event, payload) => {
+  handleTrustedIpc('notes:history', (_event, payload) =>
+    db.listRevisionSummaries(id_schema.parse(payload).id),
+  )
+  handleTrustedIpc('notes:revision', (_event, payload) => {
     const p = z.object({ id: z.string().uuid(), revision: z.number().int().positive() }).parse(payload)
     return db.getRevision(p.id, p.revision)
   })
-  ipcMain.handle('notes:revision:restore', (_event, payload) => {
+  handleTrustedIpc('notes:revision:restore', (_event, payload) => {
     const p = z
       .object({
         id: z.string().uuid(),
@@ -42,7 +44,7 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
       .parse(payload)
     return db.restoreRevision(p.id, p.revision, p.expectedRevision)
   })
-  ipcMain.handle('notes:page', (_event, payload) => {
+  handleTrustedIpc('notes:page', (_event, payload) => {
     const page = db.listSummaryPage(listSchema.optional().parse(payload))
     return {
       ...page,
@@ -50,25 +52,25 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesList, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesList, (_event, payload) => {
     const filters = listSchema.optional().parse(payload)
     return db.listNotes(filters)
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesListSummaries, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesListSummaries, (_event, payload) => {
     const filters = listSchema.optional().parse(payload)
     return db.listNoteSummaries(filters)
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesGet, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesGet, (_event, payload) => {
     const { id } = id_schema.parse(payload)
     return db.getNote(id)
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesCreate, (_event, payload) =>
+  handleTrustedIpc(IPC_CHANNELS.notesCreate, (_event, payload) =>
     service.mutate({ op: 'create_note', payload: createSchema.parse(payload ?? {}) }, { source: 'human' }),
   )
-  ipcMain.handle(IPC_CHANNELS.notesUpdate, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesUpdate, (_event, payload) => {
     const parsed = z.object({ id: z.string().uuid(), patch: updateSchema }).parse(payload)
     try {
       return service.mutate(
@@ -82,7 +84,7 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesDelete, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesDelete, (_event, payload) => {
     const { id, expectedRevision } = mutation_schema.parse(payload)
     const result = service.mutate({ op: 'delete_note', id, expectedRevision }, { source: 'human' }) as {
       deleted: boolean
@@ -90,12 +92,12 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
     return result.deleted
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesRestore, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesRestore, (_event, payload) => {
     const { id, expectedRevision } = mutation_schema.parse(payload)
     return service.mutate({ op: 'restore_note', id, expectedRevision }, { source: 'restore' })
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesArchive, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesArchive, (_event, payload) => {
     const { id, archived, expectedRevision } = archive_schema.parse(payload)
     return service.mutate(
       { op: 'update_note', id, payload: { archived, expectedRevision } },
@@ -103,7 +105,7 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
     )
   })
 
-  ipcMain.handle(IPC_CHANNELS.notesStar, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.notesStar, (_event, payload) => {
     const { id, starred, expectedRevision } = star_schema.parse(payload)
     return service.mutate(
       { op: 'update_note', id, payload: { starred, expectedRevision } },
@@ -111,5 +113,5 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
     )
   })
 
-  ipcMain.handle(IPC_CHANNELS.tagsList, () => db.listTags())
+  handleTrustedIpc(IPC_CHANNELS.tagsList, () => db.listTags())
 }

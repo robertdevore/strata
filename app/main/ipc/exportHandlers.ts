@@ -1,5 +1,6 @@
+import { handleTrustedIpc } from '../security/trustedIpc'
 import { protectNavigation } from '../security/navigation'
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/ipc'
 
@@ -12,7 +13,7 @@ const print_html_schema = z.object({
 })
 
 export const registerExportHandlers = () => {
-  ipcMain.handle(IPC_CHANNELS.exportPdf, async (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.exportPdf, async (_event, payload) => {
     const { html } = export_pdf_schema.parse(payload)
 
     const export_window = new BrowserWindow({
@@ -49,7 +50,7 @@ export const registerExportHandlers = () => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.printHtml, async (event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.printHtml, async (event, payload) => {
     const { html } = print_html_schema.parse(payload)
 
     const parent_window = BrowserWindow.fromWebContents(event.sender)

@@ -1,4 +1,5 @@
-import { dialog, ipcMain } from 'electron'
+import { handleTrustedIpc } from '../security/trustedIpc'
+import { dialog } from 'electron'
 import { z } from 'zod'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
@@ -12,7 +13,7 @@ const publish_schema = z.object({
 
 export const registerPublishHandlers = () => {
   const destinations = new Set<string>()
-  ipcMain.handle(IPC_CHANNELS.dialogSelectFolder, async () => {
+  handleTrustedIpc(IPC_CHANNELS.dialogSelectFolder, async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select publish destination',
@@ -22,7 +23,7 @@ export const registerPublishHandlers = () => {
     return result.filePaths[0]
   })
 
-  ipcMain.handle(IPC_CHANNELS.publishHtmlFile, async (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.publishHtmlFile, async (_event, payload) => {
     const { destination, title, html } = publish_schema.parse(payload)
     if (!destinations.has(await fs.realpath(destination)))
       throw new Error('Select the publish destination first')

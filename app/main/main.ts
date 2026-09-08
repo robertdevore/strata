@@ -3,6 +3,7 @@ import { debugRuntime, runtimeErrorCode } from '../shared/runtimeLogging'
 import { EncryptedSecretStore } from './security/secretStore'
 import { protectNavigation } from './security/navigation'
 import { installPermissionPolicy } from './security/permissions'
+import { configureTrustedIpc } from './security/trustedIpc'
 import path from 'node:path'
 import fs from 'node:fs'
 import { app, BrowserWindow, dialog, Menu, session, shell, safeStorage } from 'electron'
@@ -276,13 +277,11 @@ void app
   .then(async () => {
     debugRuntime('[strata-startup] app ready')
     setCspHeaders()
-    installPermissionPolicy(
-      session.defaultSession,
-      () => main_window?.webContents ?? null,
-      process.env.VITE_DEV_SERVER_URL
-        ? new URL(process.env.VITE_DEV_SERVER_URL).href
-        : pathToFileURL(path.join(__dirname, '../renderer/index.html')).href,
-    )
+    const rendererUrl = process.env.VITE_DEV_SERVER_URL
+      ? new URL(process.env.VITE_DEV_SERVER_URL).href
+      : pathToFileURL(path.join(__dirname, '../renderer/index.html')).href
+    configureTrustedIpc(() => main_window?.webContents ?? null, rendererUrl)
+    installPermissionPolicy(session.defaultSession, () => main_window?.webContents ?? null, rendererUrl)
 
     const user_data_path = app.getPath('userData')
     debugRuntime('[strata-startup] opening database')

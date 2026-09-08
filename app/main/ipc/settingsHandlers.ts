@@ -1,6 +1,6 @@
+import { handleTrustedIpc } from '../security/trustedIpc'
 import { validateProviderUrl } from '../ai/providerRequest'
 import { redactSettings } from '../security/secretStore'
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { Settings } from '../../shared/types'
 import type { HotkeysSettings } from '../../shared/hotkeys'
@@ -88,8 +88,8 @@ export const registerSettingsHandlers = (
   db: StrataDatabase,
   on_settings_set?: (settings: Settings) => void,
 ) => {
-  ipcMain.handle(IPC_CHANNELS.settingsGet, () => redactSettings(db.getSettings()))
-  ipcMain.handle(IPC_CHANNELS.settingsSet, (_event, patch) => {
+  handleTrustedIpc(IPC_CHANNELS.settingsGet, () => redactSettings(db.getSettings()))
+  handleTrustedIpc(IPC_CHANNELS.settingsSet, (_event, patch) => {
     const parsed = settings_patch_schema.parse(patch)
     if (parsed.aiCustomBaseUrl) validateProviderUrl(parsed.aiCustomBaseUrl)
     const updated = db.setSettings(parsed)

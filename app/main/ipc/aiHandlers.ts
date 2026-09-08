@@ -1,7 +1,7 @@
+import { handleTrustedIpc } from '../security/trustedIpc'
 import { requestProviderJson } from '../ai/providerRequest'
 import { transcriptionSchema } from '../ai/transcriptionInput'
 import { KnowledgeService } from '../services/knowledgeService'
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/ipc'
 import type { AiChatResponse } from '../../shared/types'
@@ -94,41 +94,41 @@ const build_open_notes_context = (
 }
 
 export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => void) => {
-  ipcMain.handle('ai:proposals:list', () => db.listProposals())
-  ipcMain.handle('ai:proposals:resolve', (_event, payload) => {
+  handleTrustedIpc('ai:proposals:list', () => db.listProposals())
+  handleTrustedIpc('ai:proposals:resolve', (_event, payload) => {
     const parsed = z.object({ id: z.string().uuid(), approved: z.boolean() }).strict().parse(payload)
     return new KnowledgeService(db, () => on_notes_changed?.()).approve(parsed.id, parsed.approved)
   })
-  ipcMain.handle(IPC_CHANNELS.aiThreadsList, () => {
+  handleTrustedIpc(IPC_CHANNELS.aiThreadsList, () => {
     return db.listAiThreads()
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiThreadDelete, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiThreadDelete, (_event, payload) => {
     const { threadId } = thread_id_schema.parse(payload)
     return db.deleteAiThread(threadId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiThreadRename, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiThreadRename, (_event, payload) => {
     const { threadId, title } = rename_thread_schema.parse(payload)
     return Boolean(db.setAiThreadTitle(threadId, title))
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiThreadSetModel, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiThreadSetModel, (_event, payload) => {
     const { threadId, model } = set_thread_model_schema.parse(payload)
     return Boolean(db.setAiThreadModel(threadId, model || ''))
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiMessagesList, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiMessagesList, (_event, payload) => {
     const { threadId } = thread_id_schema.parse(payload)
     return db.listAiMessages(threadId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiSearchChats, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiSearchChats, (_event, payload) => {
     const { query, limit } = search_schema.parse(payload)
     return db.searchAiMessages(query, limit)
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
+  handleTrustedIpc(IPC_CHANNELS.aiSendMessage, async (_event, payload): Promise<AiChatResponse> => {
     const { derive_chat_title, run_ai_turn } = await import('../ai/aiRunner')
     const { threadId, message, openNotes } = send_schema.parse(payload)
     const thread = threadId ? db.getAiThread(threadId) : db.createAiThread(derive_chat_title(message), '')
@@ -154,7 +154,7 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiTranscribeAudio, async (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiTranscribeAudio, async (_event, payload) => {
     const { resolve_ai_settings } = await import('../ai/aiRunner')
     const { base64Audio, mimeType, prompt, language } = transcriptionSchema.parse(payload)
     const ai_settings = resolve_ai_settings(db)
@@ -191,9 +191,9 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
     return { text }
   })
 
-  ipcMain.handle('ai:route-logs:clear', () => db.clearRouteLogs())
+  handleTrustedIpc('ai:route-logs:clear', () => db.clearRouteLogs())
   // Route logs listing
-  ipcMain.handle(IPC_CHANNELS.aiRouteLogsList, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiRouteLogsList, (_event, payload) => {
     const parsed = route_logs_schema.parse(payload)
     if (parsed?.threadId) {
       return db.listAiRouteLogsForThread(parsed.threadId, parsed.limit ?? 500)
@@ -202,19 +202,19 @@ export const registerAiHandlers = (db: StrataDatabase, on_notes_changed?: () => 
   })
 
   // AI edits list (unchanged)
-  ipcMain.handle(IPC_CHANNELS.aiEditsList, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiEditsList, (_event, payload) => {
     const { noteId } = z.object({ noteId: z.string().uuid() }).parse(payload)
     return db.listAiEdits(noteId)
   })
 
   // AI edits revert (unchanged)
-  ipcMain.handle(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
+  handleTrustedIpc(IPC_CHANNELS.aiEditsRevert, (_event, payload) => {
     const { editId } = z.object({ editId: z.string().uuid() }).parse(payload)
     return db.revertAiEdit(editId)
   })
 
   // AI model catalog
-  ipcMain.handle(IPC_CHANNELS.aiModelCatalog, () => {
+  handleTrustedIpc(IPC_CHANNELS.aiModelCatalog, () => {
     const load_catalog = async () => {
       const [{ resolve_ai_settings }, { build_model_catalog }] = await Promise.all([
         import('../ai/aiRunner'),
