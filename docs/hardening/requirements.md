@@ -14,7 +14,7 @@ This is a working gap ledger, not a completion verdict. â€œScoped tests passedâ€
 | 7 | Introduce Universal Note Revisions | Implemented; final audit pending | note_revisions migration, transaction snapshots, revisionsSearch tests. Final mutation-source coverage sweep outstanding. |
 | 8 | Add Optimistic Concurrency | Partial | Expected revisions required at main write transports; autosave/history tests. Per-note/split-pane status and remaining UI race audit outstanding. |
 | 9 | Make Revert Conflict-Safe | Implemented; scoped tests passed | Legacy AI revert after_revision check; selected-history expected revision; revisionsSearch and noteHistoryNavigation tests. |
-| 10 | Make Core Mutations Transactional | Partial | Shared service note/project/batch and atomic desktop imports. CLI folder import and other legacy mutation paths still need unification. |
+| 10 | Make Core Mutations Transactional | Partial | Shared service note/project/batch and atomic desktop imports. CLI folder imports now use the shared atomic service and real dry runs; remaining legacy mutation paths still need audit. |
 | 11 | Enable SQLite Foreign Keys | Implemented; scoped tests passed | StrataDatabase foreign_keys ON; legacy migration/foreign-key tests in revisionsSearch. |
 | 12 | Build a Proper Indexed Note Title Model | Implemented; scoped tests passed | Migration 10 materializes/indexes normalized titles; duplicate-title retrieval tests. |
 | 13 | Replace Global Wiki-Link Rebuild Behavior | Partial | Incremental affected-title/link maintenance; sparse-link benchmarks recorded. Dense graph/real Markdown benchmark still needed. |
@@ -57,7 +57,7 @@ This is a working gap ledger, not a completion verdict. â€œScoped tests passedâ€
 | 50 | Review API Error Shape | Partial | Domain/API structured codes and CLI preservation tested; client response-validation/timer/error audit remains. |
 | 51 | Add API Versioning | Implemented; scoped tests passed | API v1 prefix/header/capabilities with unversioned aliases. |
 | 52 | Consider MCP After Core Contracts Stabilize | Considered; optional deferred | MCP is not required to stabilize the core and is intentionally not added; future adapter must use shared services. |
-| 53 | Formalize the Domain Service Layer | Partial | Shared KnowledgeService handles principal writes/proposals/batch/import. Remaining legacy transports and invalidation need consolidation. |
+| 53 | Formalize the Domain Service Layer | Partial | Shared KnowledgeService handles principal writes/proposals/batch/import. CLI folder imports now share the service. Remaining legacy paths and invalidation need consolidation. |
 | 54 | Keep Documentation Agent-Safe | Partial | AGENTS.md/current CLI/README/checkpoints updated. Historical docs and final architecture/contract sweep still needed. |
 | 55 | Consolidate Verification | Implemented; scoped tests passed | npm run verify covers formatting/lint/offline TS+TSX tests/build; heavy CLI/Electron package commands separate. desktop:verify covers real autosave/history restore/reload/sandbox in an isolated Electron library; broader scenarios remain. |
 | 56 | Add/Improve CI | Partial | Pinned read-only Linux/macOS Actions workflow includes audit and package smoke. Not pushed/executed remotely yet. |

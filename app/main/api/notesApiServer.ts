@@ -4,7 +4,13 @@ import { z } from 'zod'
 import type { StrataDatabase } from '../db'
 import { ensureLocalCredential, isLoopbackHost, tokensEqual } from '../../shared/apiCredential'
 import { DomainError } from '../../shared/errors'
-import { KnowledgeService, idSchema, listSchema, revisionSchema } from '../services/knowledgeService'
+import {
+  KnowledgeService,
+  idSchema,
+  listSchema,
+  revisionSchema,
+  importSchema,
+} from '../services/knowledgeService'
 
 const MAX_BODY = 1024 * 1024
 interface Options {
@@ -117,6 +123,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
           'optimistic-concurrency',
           'history',
           'batch',
+          'atomic_project_import',
           'memory_capture_dedupe',
           'idempotency',
         ],
@@ -126,6 +133,14 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
       })
     if (method === 'GET' && (route === 'notes' || route === 'search'))
       return ok(db.listSummaryPage(filters()))
+    if (method === 'POST' && route === 'projects/import') {
+      const parsed = z
+        .object({ payload: importSchema, dryRun: z.boolean().default(false) })
+        .strict()
+        .parse(await body(request))
+      const result = service.importFolder(parsed.payload, { dryRun: parsed.dryRun, key: mutationOptions.key })
+      return ok({ ...result, notes: result.notes.map((note) => db.summarize(note)), dryRun: parsed.dryRun })
+    }
     if (method === 'POST' && route === 'memory/capture') return ok(service.capture(await body(request)))
     if (method === 'POST' && route === 'batch') return ok(service.batch(await body(request), mutationOptions))
     if (method === 'POST' && route === 'notes')

@@ -27,7 +27,7 @@ npm run dev
 npm run strata -- health
 npm run strata -- notes list --json
 npm run strata -- notes create --content "# Note\n\nCreated from CLI"
-npm run strata -- projects import ./my-notes-folder
+npm run strata -- --confirm projects import ./my-notes-folder
 curl http://127.0.0.1:3939/health
 ```
 

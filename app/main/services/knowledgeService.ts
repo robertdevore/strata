@@ -214,26 +214,33 @@ export class KnowledgeService {
     if (!parsed.dryRun && !result.duplicate) this.notify?.(ALL_CHANGED)
     return result
   }
-  importFolder(input: unknown) {
+  importFolder(input: unknown, options: { dryRun?: boolean; key?: string } = {}) {
     const parsed = importSchema.parse(input)
-    const result = this.db.transaction(() => {
-      const project = this.apply({
-        op: 'create_project',
-        name: parsed.projectName,
-      }) as import('../../shared/types').Project
-      const notes = parsed.files.map(
-        (file) =>
-          this.apply({
-            op: 'create_note',
-            payload: createSchema.parse({
-              content: normalize_markdown_content(file.content, file.name.replace(/\.md$/i, '')),
-              projectId: project.id,
-            }),
-          }) as import('../../shared/types').Note,
-      )
-      return { project, notes, count: notes.length }
-    }, 'import')
-    this.notify?.(ALL_CHANGED)
+    const result = this.db.executeOperation(
+      () => {
+        const project = this.apply({
+          op: 'create_project',
+          name: parsed.projectName,
+        }) as import('../../shared/types').Project
+        const notes = parsed.files.map(
+          (file) =>
+            this.apply({
+              op: 'create_note',
+              payload: createSchema.parse({
+                content: normalize_markdown_content(file.content, file.name.replace(/\.md$/i, '')),
+                projectId: project.id,
+              }),
+            }) as import('../../shared/types').Note,
+        )
+        return { project, notes, count: notes.length }
+      },
+      {
+        ...options,
+        source: 'import',
+        fingerprint: createHash('sha256').update(JSON.stringify(parsed)).digest('hex'),
+      },
+    )
+    if (!options.dryRun) this.notify?.(ALL_CHANGED)
     return result
   }
   propose(

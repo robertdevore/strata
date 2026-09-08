@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { Command } from 'commander'
+import { ensure_confirm_or_dry_run } from '../lib/agentMode'
 import { CliError } from '../lib/errors'
 import { print_success, format_table } from '../lib/output'
 import type { CliRuntimeOptions } from '../types'
@@ -34,20 +35,14 @@ const collect_markdown_files = async (root_path: string): Promise<string[]> => {
       }
       if (entry.isFile() && is_markdown_file(entry_path)) {
         files.push(entry_path)
+        if (files.length > 50)
+          throw new CliError({ message: 'Imports support at most 50 Markdown files.', code: 'INVALID_INPUT' })
       }
     }
   }
 
   await walk(root_path)
   return files.sort((a, b) => a.localeCompare(b))
-}
-
-const resolve_project = async (
-  client: StrataApiClient,
-  project_name: string,
-): Promise<{ id: string; name: string }> => {
-  const created = await client.createProject({ name: normalize_project_name(project_name) })
-  return created
 }
 
 export const register_projects_commands = (
@@ -137,6 +132,7 @@ export const register_projects_commands = (
     .option('--project <name>', 'Override the project name (defaults to folder name)')
     .action(async function (input_path: string, command_options: { project?: string }) {
       const { options, client } = get_context(this)
+      ensure_confirm_or_dry_run(options, 'projects import')
       const stat = await fs.stat(input_path)
 
       if (stat.isFile()) {
@@ -146,11 +142,17 @@ export const register_projects_commands = (
             code: 'INVALID_INPUT',
           })
         }
+        if (stat.size > 790000)
+          throw new CliError({ message: 'Markdown file is too large.', code: 'INVALID_INPUT' })
         const content = await fs.readFile(input_path, 'utf-8')
         const title = derive_title_from_markdown(content)
         const payload = note_create_patch_schema.parse({
           content: content.trim().startsWith('# ') ? content : `# ${title}\n\n${content}`,
         })
+        if (options.dryRun) {
+          print_success(options, { action: 'notes.create', payload }, { dryRun: true })
+          return
+        }
         const note = await client.createNote(payload)
         print_success(options, { ok: true, note })
         return
@@ -165,40 +167,22 @@ export const register_projects_commands = (
         })
       }
 
-      if (options.dryRun) {
-        print_success(
-          options,
-          {
-            action: 'projects.import',
-            project: { name: project_name },
-            count: file_paths.length,
-            filePaths: file_paths,
-          },
-          { dryRun: true },
-        )
-        return
-      }
-
-      const project = await resolve_project(client, project_name)
-      const imported_notes = []
+      const files = []
+      let bytes = 0
       for (const file_path of file_paths) {
-        const content = await fs.readFile(file_path, 'utf-8')
-        const fallback_title = path.basename(file_path, path.extname(file_path))
-        const note_content = content.trim().startsWith('# ')
-          ? content
-          : `# ${derive_title_from_markdown(content) || fallback_title}\n\n${content}`
-        const note = await client.createNote({
-          content: note_content,
-          projectId: project.id,
-        })
-        imported_notes.push(note)
+        const fileStat = await fs.stat(file_path)
+        bytes += fileStat.size
+        if (fileStat.size > 790000 || bytes > 900000)
+          throw new CliError({
+            message: 'Import exceeds the local API request limit. Use smaller folders.',
+            code: 'INVALID_INPUT',
+          })
+        files.push({ name: path.basename(file_path), content: await fs.readFile(file_path, 'utf-8') })
       }
-
-      print_success(options, {
-        ok: true,
-        project,
-        count: imported_notes.length,
-        notes: imported_notes,
-      })
+      const body = { payload: { projectName: project_name, files }, dryRun: Boolean(options.dryRun) }
+      if (Buffer.byteLength(JSON.stringify(body)) > 1024 * 1024)
+        throw new CliError({ message: 'Encoded import exceeds 1 MiB.', code: 'INVALID_INPUT' })
+      const result = await client.request('POST', '/projects/import', { body })
+      print_success(options, result, { dryRun: Boolean(options.dryRun) })
     })
 }

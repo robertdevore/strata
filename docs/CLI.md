@@ -37,3 +37,9 @@ For release verification, run `npm run package:verify`. It creates and installs 
 ### Legacy provider credentials and standalone libraries
 
 The standalone knowledge server does not decrypt or configure desktop provider credentials. If its library contains legacy plaintext credentials or an unfinished sanitization marker, startup fails with `CREDENTIAL_MIGRATION_REQUIRED` before exposing the API. Open that library once in the desktop app to complete the verified OS-encrypted migration; the server preserves the original credential until migration succeeds. Both desktop and standalone honor `STRATA_USER_DATA_DIR`, so use the same explicit directory for a non-default library. Fresh libraries and already-migrated libraries start normally without a credential vault in the CLI process.
+
+### Markdown imports
+
+Use `strata --dry-run projects import ./notes` to validate a folder import, then `strata --confirm projects import ./notes` to apply it. Folder imports create the project and all notes in one transaction; a rejected file leaves neither partial notes nor a partial project. Both folder and single-file imports require `--confirm` or `--dry-run`. Single-file dry runs do not create a note.
+
+Folder imports accept at most 50 Markdown files, with at most 790,000 bytes per file and 900,000 source bytes in total; the encoded API request must also fit within 1 MiB. Split larger inputs into smaller folders. Imported folder contents use the same title normalization and import revision source as desktop folder imports. API callers use `POST /v1/projects/import` with `{ "payload": { "projectName": "Notes", "files": [{ "name": "a.md", "content": "# A" }] }, "dryRun": true }`. Responses contain note summaries; fetch individual notes for full content.
