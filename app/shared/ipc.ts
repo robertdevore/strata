@@ -1,6 +1,4 @@
 export const IPC_CHANNELS = {
-  notesList: 'notes:list',
-  notesListSummaries: 'notes:list-summaries',
   notesGet: 'notes:get',
   notesCreate: 'notes:create',
   notesUpdate: 'notes:update',

@@ -45,7 +45,7 @@ try {
       try {
         await auxiliary.loadURL('data:text/html,<title>Untrusted IPC fixture</title>')
         return await auxiliary.webContents.executeJavaScript(
-          "window.strata.notes.list({}).then(() => 'unexpectedly allowed', error => error.message)",
+          "window.strata.notes.page({}).then(() => 'unexpectedly allowed', error => error.message)",
         )
       } finally {
         auxiliary.destroy()
@@ -83,7 +83,7 @@ try {
   await expect
     .poll(
       async () => {
-        const notes = await page.evaluate(() => window.strata.notes.list({}))
+        const notes = await page.evaluate(async () => (await window.strata.notes.page({})).notes)
         saved = notes.find((note) => note.content === content)
         return Boolean(saved)
       },
@@ -115,8 +115,16 @@ try {
       require: typeof window.require,
       process: typeof window.process,
       shell: typeof window.strata.shell,
+      fullList: typeof window.strata.notes.list,
+      legacySummaries: typeof window.strata.notes.listSummaries,
     })),
-  ).toEqual({ require: 'undefined', process: 'undefined', shell: 'undefined' })
+  ).toEqual({
+    require: 'undefined',
+    process: 'undefined',
+    shell: 'undefined',
+    fullList: 'undefined',
+    legacySummaries: 'undefined',
+  })
   const distantId = await page.evaluate(async (savedId) => {
     const original = await window.strata.notes.get(savedId)
     await window.strata.notes.update(savedId, {

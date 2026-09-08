@@ -52,16 +52,6 @@ export const registerNotesHandlers = (db: StrataDatabase) => {
     }
   })
 
-  handleTrustedIpc(IPC_CHANNELS.notesList, (_event, payload) => {
-    const filters = listSchema.optional().parse(payload)
-    return db.listNotes(filters)
-  })
-
-  handleTrustedIpc(IPC_CHANNELS.notesListSummaries, (_event, payload) => {
-    const filters = listSchema.optional().parse(payload)
-    return db.listNoteSummaries(filters)
-  })
-
   handleTrustedIpc(IPC_CHANNELS.notesGet, (_event, payload) => {
     const { id } = id_schema.parse(payload)
     return db.getNote(id)

@@ -14,8 +14,6 @@ const api: StrataApi = {
     restoreRevision: (id, revision, expectedRevision) =>
       ipcRenderer.invoke('notes:revision:restore', { id, revision, expectedRevision }),
     page: (filters) => ipcRenderer.invoke('notes:page', filters),
-    list: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesList, filters),
-    listSummaries: (filters) => ipcRenderer.invoke(IPC_CHANNELS.notesListSummaries, filters),
     get: (id) => ipcRenderer.invoke(IPC_CHANNELS.notesGet, { id }),
     create: (payload) => ipcRenderer.invoke(IPC_CHANNELS.notesCreate, payload),
     update: (id, patch) => ipcRenderer.invoke(IPC_CHANNELS.notesUpdate, { id, patch }),

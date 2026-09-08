@@ -37,8 +37,6 @@ export interface StrataApi {
     getRevision: (id: string, revision: number) => Promise<import('../shared/types').NoteRevision | null>
     restoreRevision: (id: string, revision: number, expectedRevision: number) => Promise<Note | null>
     page: (filters?: NotesFilter) => Promise<{ notes: Note[]; nextCursor: string | null }>
-    list: (filters?: NotesFilter) => Promise<Note[]>
-    listSummaries: (filters?: NotesFilter) => Promise<Note[]>
     get: (id: string) => Promise<Note | null>
     create: (payload?: {
       content?: string
