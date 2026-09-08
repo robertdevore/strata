@@ -1,3 +1,4 @@
+import { requestProviderJson, validateProviderUrl } from '../providerRequest'
 // Generic Chat Completions provider (OpenAI-compatible)
 // Supports DeepSeek, Kimi/Moonshot, OpenRouter, custom endpoints, llama.cpp
 
@@ -88,7 +89,7 @@ export class ChatCompletionsProvider implements AiProvider {
 		providerId: string,
 	) {
 		this.apiKey = apiKey
-		this.baseUrl = baseUrl
+		this.baseUrl = validateProviderUrl(baseUrl)
 		this.providerId = providerId
 	}
 
@@ -120,7 +121,7 @@ export class ChatCompletionsProvider implements AiProvider {
 			body.temperature = input.temperature
 		}
 
-		const response = await fetch(`${base_url}/chat/completions`, {
+		const payload = await requestProviderJson(`${base_url}/chat/completions`, {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${this.apiKey}`,
@@ -129,13 +130,7 @@ export class ChatCompletionsProvider implements AiProvider {
 			body: JSON.stringify(body),
 		})
 
-		if (!response.ok) {
-			const details = await response.text().catch(() => '')
-			throw new Error(`Chat Completions request failed (${response.status}): ${details || response.statusText}`)
-		}
-
-		const payload = (await response.json()) as ChatCompletionsResponse
-		return this.normalize(payload)
+		return this.normalize(payload as ChatCompletionsResponse)
 	}
 
 	private normalize(payload: ChatCompletionsResponse): AiProviderTurnOutput {

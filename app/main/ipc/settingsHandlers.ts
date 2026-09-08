@@ -1,3 +1,4 @@
+import { validateProviderUrl } from '../ai/providerRequest'
 import { redactSettings } from '../security/secretStore'
 import { ipcMain } from 'electron'
 import { z } from 'zod'
@@ -80,7 +81,9 @@ const settings_patch_schema = z.object({
 export const registerSettingsHandlers = (db: StrataDatabase, on_settings_set?: (settings: Settings) => void) => {
 	ipcMain.handle(IPC_CHANNELS.settingsGet, () => redactSettings(db.getSettings()))
 	ipcMain.handle(IPC_CHANNELS.settingsSet, (_event, patch) => {
-		const updated = db.setSettings(settings_patch_schema.parse(patch))
+		const parsed = settings_patch_schema.parse(patch)
+		if (parsed.aiCustomBaseUrl) validateProviderUrl(parsed.aiCustomBaseUrl)
+		const updated = db.setSettings(parsed)
 		on_settings_set?.(updated)
 		return redactSettings(updated)
 	})

@@ -21,28 +21,28 @@ import type { AiProviderTurnOutput, ProviderMessage } from './types'
  * answer.
  */
 export const record_assistant_turn = (
-	messages: ProviderMessage[],
-	content: string,
-	tool_calls: AiProviderTurnOutput['toolCalls'],
-	tool_results: Array<{ id: string; output: string }>,
+  messages: ProviderMessage[],
+  content: string,
+  tool_calls: AiProviderTurnOutput['toolCalls'],
+  tool_results: Array<{ id: string; output: string }>,
 ): void => {
-	if (tool_calls.length > 0) {
-		messages.push({
-			role: 'assistant',
-			content,
-			toolCalls: tool_calls,
-		})
-	} else if (content) {
-		messages.push({ role: 'assistant', content })
-	}
+  if (tool_calls.length > 0) {
+    messages.push({
+      role: 'assistant',
+      content,
+      toolCalls: tool_calls,
+    })
+  } else if (content) {
+    messages.push({ role: 'assistant', content })
+  }
 
-	for (const result of tool_results) {
-		messages.push({
-			role: 'tool',
-			content: result.output,
-			toolCallId: result.id,
-		})
-	}
+  for (const result of tool_results) {
+    messages.push({
+      role: 'tool',
+      content: result.output,
+      toolCallId: result.id,
+    })
+  }
 }
 
 /**
@@ -50,14 +50,99 @@ export const record_assistant_turn = (
  * Only `user` and `assistant` turns are carried over; tool call/result
  * history is reconstructed in-memory for the current turn.
  */
-export const build_history_messages = (history: Array<{ role: string; content?: string | null }>): ProviderMessage[] => {
-	const messages: ProviderMessage[] = []
-	for (const m of history) {
-		if ('user' === m.role) {
-			messages.push({ role: 'user', content: m.content || '' })
-		} else if ('assistant' === m.role) {
-			messages.push({ role: 'assistant', content: m.content || '' })
-		}
-	}
-	return messages
+export const build_history_messages = (
+  history: Array<{ role: string; content?: string | null }>,
+): ProviderMessage[] => {
+  const messages: ProviderMessage[] = []
+  for (const m of history) {
+    if ('user' === m.role) {
+      messages.push({ role: 'user', content: m.content || '' })
+    } else if ('assistant' === m.role) {
+      messages.push({ role: 'assistant', content: m.content || '' })
+    }
+  }
+  return messages
+}
+
+export const budgetHistory = (
+  history: Array<{ role: string; content?: string | null }>,
+  maxCharacters = 24000,
+): ProviderMessage[] => {
+  const messages = build_history_messages(history)
+  const selected: ProviderMessage[] = []
+  let remaining = maxCharacters
+  for (const message of messages.reverse()) {
+    if (remaining <= 0) break
+    const content = message.content.slice(-remaining)
+    selected.unshift({ ...message, content })
+    remaining -= content.length
+  }
+  return selected
+}
+
+export const runProviderToolLoop = async (options: {
+  provider: import('./types').AiProvider
+  model: string
+  systemPrompt: string
+  messages: ProviderMessage[]
+  tools: import('./types').AiToolDefinition[]
+  execute: (call: import('./types').NormalizedToolCall) => {
+    output: string
+    notesChanged: boolean
+    proposalId?: string
+  }
+  onUsage?: (usage: AiProviderTurnOutput['usage']) => void
+}): Promise<{ content: string; notesChanged: boolean; proposalIds: string[]; toolCalls: number }> => {
+  let notesChanged = false
+  let toolCalls = 0
+  const proposalIds: string[] = []
+  for (let step = 0; step < 6; step++) {
+    if (JSON.stringify(options.messages).length + options.systemPrompt.length > 100000)
+      return {
+        content: 'Context budget reached. Narrow the request to continue.',
+        notesChanged,
+        proposalIds,
+        toolCalls,
+      }
+    const output = await options.provider.sendTurn({
+      model: options.model,
+      systemPrompt: options.systemPrompt,
+      messages: options.messages,
+      tools: options.tools,
+    })
+    options.onUsage?.(output.usage)
+    if (!output.toolCalls.length)
+      return {
+        content: proposalIds.length
+          ? 'Edits are awaiting your approval in the proposal panel.'
+          : output.content,
+        notesChanged,
+        proposalIds,
+        toolCalls,
+      }
+    if (output.toolCalls.length > 20 || toolCalls + output.toolCalls.length > 30)
+      return {
+        content: 'Tool-call limit reached. Narrow the request to continue.',
+        notesChanged,
+        proposalIds,
+        toolCalls,
+      }
+    const results = []
+    for (const call of output.toolCalls) {
+      const execution = options.execute(call)
+      toolCalls++
+      notesChanged ||= execution.notesChanged
+      if (execution.proposalId) proposalIds.push(execution.proposalId)
+      results.push({ id: call.id, output: execution.output })
+    }
+    record_assistant_turn(options.messages, output.content, output.toolCalls, results)
+  }
+  return {
+    content: proposalIds.length
+      ? 'Edits are awaiting your approval in the proposal panel.'
+      : 'Tool-call limit reached. Narrow the request to continue.',
+    notesChanged,
+    proposalIds,
+    toolCalls,
+  }
 }

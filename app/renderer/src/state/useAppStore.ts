@@ -10,7 +10,7 @@ import { settingsService } from '@renderer/src/services/settingsService'
 import type { Project } from '@shared/types'
 import { DEFAULT_SIDEBAR_LAYOUT } from '@shared/sidebarLayout'
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
+type SaveState = 'idle' | 'saving' | 'saved' | 'failed' | 'conflict' | 'unsaved'
 
 interface FlushDraftOptions {
 	allowDiscardUntouchedEmpty?: boolean
@@ -22,7 +22,7 @@ const is_effectively_untouched_content = (content: string): boolean => {
 }
 
 /** Maximum number of in-memory drafts before evicting stale entries. */
-const MAX_DRAFTS = 50
+const savesInFlight = new Map<string, Promise<void>>()
 const NOTE_SUMMARY_LENGTH = 280
 const HYDRATED_NOTE_IDLE_MS = 2 * 60 * 1000
 
@@ -211,7 +211,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 				? state.selectedNoteId
 				: (open_tabs[0] ?? null)
 
-			const drafts: Record<string, string> = {}
+			const drafts: Record<string, string> = { ...state.drafts }
 			for (const [note_id, draft] of Object.entries(state.drafts)) {
 				if (note_ids.has(note_id)) drafts[note_id] = draft
 			}
@@ -244,7 +244,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 			const filtered_projects = projects.filter((project) => project_ids.has(project.id))
 			const merged_notes = notes.map((note) => {
 				const existing_note = existing_notes_by_id.get(note.id)
-				return existing_note?.contentLoaded ? existing_note : note
+				return existing_note?.contentLoaded && (existing_note.revision === note.revision || state.drafts[note.id] !== undefined) ? existing_note : note
 			})
 
 			return {
@@ -454,20 +454,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 				delete untouched_new_note_ids[id]
 			}
 
-			let drafts = { ...state.drafts, [id]: content }
-			const draft_keys = Object.keys(drafts)
-			if (draft_keys.length > MAX_DRAFTS) {
-				const protected_ids = new Set([...state.openTabs, ...state.splitNoteIds, state.selectedNoteId].filter(Boolean) as string[])
-				// Evict the first draft whose id is not protected
-				for (const key of draft_keys) {
-					if (!protected_ids.has(key)) {
-						const next_drafts = { ...drafts }
-						delete next_drafts[key]
-						drafts = next_drafts
-						break
-					}
-				}
-			}
+			const drafts = { ...state.drafts, [id]: content }
 
 			return {
 				drafts,
@@ -476,12 +463,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 					[id]: Date.now(),
 				},
 				untouchedNewNoteIds: untouched_new_note_ids,
-				saveState: 'saving',
+				saveState: 'unsaved',
 			}
 		})
 	},
 
 	async flushDraft(id, options) {
+		const pending = savesInFlight.get(id)
+		if (pending) { await pending; return get().flushDraft(id, options) }
 		const state = get()
 		const draft = state.drafts[id]
 		if ('string' !== typeof draft) return
@@ -519,7 +508,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 		}
 
 		try {
-			const updated = await notesService.update(id, { content: draft })
+			if (!note) return
+			set({saveState:'saving'})
+			const saving = notesService.update(id, { content: draft, expectedRevision: note.revision })
+			savesInFlight.set(id, saving.then(()=>{},()=>{}))
+			const updated = await saving
 			if (!updated) return
 			set((current) => {
 				const untouched_new_note_ids = { ...current.untouchedNewNoteIds }
@@ -538,12 +531,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 					},
 					untouchedNewNoteIds: untouched_new_note_ids,
 					saveState: 'saved',
+					drafts: current.drafts[id] === draft ? Object.fromEntries(Object.entries(current.drafts).filter(([key])=>key!==id)) : current.drafts,
 					lastSavedAt: updated.updatedAt,
 				}
 			})
-		} catch {
-			set({ saveState: 'failed' })
-		}
+		} catch (error) {
+			set({ saveState: String(error).includes('REVISION_CONFLICT') ? 'conflict' : 'failed' })
+		} finally { savesInFlight.delete(id) }
 	},
 
 	async toggleStar(id) {
@@ -625,7 +619,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 	async setTagsForNote(id, tags) {
 		const normalized = [...new Set(tags.map((tag) => normalizeTag(tag)).filter(Boolean))]
-		const updated = await notesService.update(id, { tags: normalized })
+		const updated = await notesService.update(id, { tags: normalized, expectedRevision: get().notes.find(note=>note.id===id)?.revision })
 		if (!updated) return
 		set((state) => ({
 			notes: state.notes.map((note) => (note.id === id ? updated : note)),
@@ -635,7 +629,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 	},
 
 	async setProjectForNote(id, projectId) {
-		const updated = await notesService.update(id, { projectId })
+		const updated = await notesService.update(id, { projectId, expectedRevision: get().notes.find(note=>note.id===id)?.revision })
 		if (!updated) return
 		set((state) => ({
 			notes: state.notes.map((note) => (note.id === id ? updated : note)),

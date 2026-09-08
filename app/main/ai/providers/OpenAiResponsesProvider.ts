@@ -1,3 +1,4 @@
+import { requestProviderJson, validateProviderUrl } from '../providerRequest'
 // OpenAI Responses API provider
 // Uses the /v1/responses endpoint with input/instructions/tools
 
@@ -81,7 +82,7 @@ export class OpenAiResponsesProvider implements AiProvider {
 		baseUrl = 'https://api.openai.com',
 	) {
 		this.apiKey = apiKey
-		this.baseUrl = baseUrl
+		this.baseUrl = validateProviderUrl(baseUrl)
 	}
 
 	async sendTurn(input: AiProviderTurnInput): Promise<AiProviderTurnOutput> {
@@ -100,7 +101,7 @@ export class OpenAiResponsesProvider implements AiProvider {
 			body.temperature = input.temperature
 		}
 
-		const response = await fetch(`${this.baseUrl}/v1/responses`, {
+		const payload = await requestProviderJson(`${this.baseUrl}/v1/responses`, {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${this.apiKey}`,
@@ -109,13 +110,7 @@ export class OpenAiResponsesProvider implements AiProvider {
 			body: JSON.stringify(body),
 		})
 
-		if (!response.ok) {
-			const details = await response.text().catch(() => '')
-			throw new Error(`OpenAI Responses request failed (${response.status}): ${details || response.statusText}`)
-		}
-
-		const payload = (await response.json()) as OpenAiResponsesPayload
-		return this.normalize(payload)
+		return this.normalize(payload as OpenAiResponsesPayload)
 	}
 
 	private normalize(payload: OpenAiResponsesPayload): AiProviderTurnOutput {

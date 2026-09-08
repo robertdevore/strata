@@ -3,752 +3,465 @@
 
 import type { StrataDatabase } from '../db/index'
 import type { AiToolDefinition, NormalizedToolCall } from './types'
+import { z } from 'zod'
+import {
+  KnowledgeService,
+  operationSchema,
+  ALL_CHANGED,
+  type ChangedDomains,
+} from '../services/knowledgeService'
+import { DomainError } from '../../shared/errors'
+import { deriveNoteTitle } from '../../shared/noteTitle'
 import type { Note } from '../../shared/types'
 
 // ---- Tool Definitions ----
 
 export const AI_TOOLS: AiToolDefinition[] = [
-	{
-		type: 'function',
-		name: 'list_notes',
-		description: 'List notes with full visibility for analysis tasks.',
-		parameters: {
-			type: 'object',
-			properties: {
-				limit: { type: 'number', minimum: 1, maximum: 200 },
-				include_archived: { type: 'boolean' },
-			},
-		},
-	},
-	{
-		type: 'function',
-		name: 'search_notes',
-		description: 'Search notes by lexical substring across content, tags, and project names. Use this when the user provides exact keywords or phrases.',
-		parameters: {
-			type: 'object',
-			properties: {
-				query: { type: 'string' },
-				limit: { type: 'number', minimum: 1, maximum: 200 },
-			},
-			required: ['query'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'search_notes_by_tag',
-		description: 'Search notes that have a specific tag. Use this when the user mentions a tag name (e.g., "review", "dev", "security") to find all notes with that tag.',
-		parameters: {
-			type: 'object',
-			properties: {
-				tag: { type: 'string', description: 'The exact tag name to search for (e.g., "review", "dev", "bug")' },
-				limit: { type: 'number', minimum: 1, maximum: 200 },
-			},
-			required: ['tag'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'list_projects',
-		description: 'List all projects for organization and categorization.',
-		parameters: {
-			type: 'object',
-			properties: {},
-		},
-	},
-	{
-		type: 'function',
-		name: 'get_project',
-		description: 'Get a project by id or by exact project name.',
-		parameters: {
-			type: 'object',
-			properties: {
-				project_id: { type: 'string' },
-				project_name: { type: 'string' },
-			},
-		},
-	},
-	{
-		type: 'function',
-		name: 'search_notes_by_project',
-		description: 'List notes that belong to a specific project or category.',
-		parameters: {
-			type: 'object',
-			properties: {
-				project_id: { type: 'string' },
-				project_name: { type: 'string' },
-				limit: { type: 'number', minimum: 1, maximum: 200 },
-			},
-		},
-	},
-	{
-		type: 'function',
-		name: 'create_project',
-		description: 'Create a new project/category.',
-		parameters: {
-			type: 'object',
-			properties: {
-				name: { type: 'string' },
-			},
-			required: ['name'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'update_project',
-		description: 'Rename an existing project.',
-		parameters: {
-			type: 'object',
-			properties: {
-				project_id: { type: 'string' },
-				project_name: { type: 'string' },
-				name: { type: 'string' },
-			},
-		},
-	},
-	{
-		type: 'function',
-		name: 'delete_project',
-		description: 'Delete a project and unassign its notes.',
-		parameters: {
-			type: 'object',
-			properties: {
-				project_id: { type: 'string' },
-			},
-			required: ['project_id'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'reorder_projects',
-		description: 'Reorder projects by supplying the desired project id sequence.',
-		parameters: {
-			type: 'object',
-			properties: {
-				project_ids: { type: 'array', items: { type: 'string' } },
-			},
-			required: ['project_ids'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'get_note',
-		description: 'Get one note by note id for deep analysis.',
-		parameters: {
-			type: 'object',
-			properties: {
-				note_id: { type: 'string' },
-				include_deleted: { type: 'boolean' },
-			},
-			required: ['note_id'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'get_note_by_title',
-		description: 'Get one note by title (case-insensitive). Useful when the user names a note but does not provide an id.',
-		parameters: {
-			type: 'object',
-			properties: {
-				title: { type: 'string' },
-			},
-			required: ['title'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'create_note',
-		description: 'Create a new note and optionally set content/tags/star/archive flags.',
-		parameters: {
-			type: 'object',
-			properties: {
-				content: { type: 'string' },
-				tags: { type: 'array', items: { type: 'string' } },
-				starred: { type: 'boolean' },
-				archived: { type: 'boolean' },
-				project_id: { type: 'string' },
-				project_name: { type: 'string' },
-			},
-		},
-	},
-	{
-		type: 'function',
-		name: 'update_note',
-		description: 'Edit an existing note by id. Can replace content, append content, and update tags/star/archive.',
-		parameters: {
-			type: 'object',
-			properties: {
-				note_id: { type: 'string' },
-				content: { type: 'string' },
-				append_content: { type: 'string' },
-				tags: { type: 'array', items: { type: 'string' } },
-				starred: { type: 'boolean' },
-				archived: { type: 'boolean' },
-				project_id: { type: 'string' },
-				project_name: { type: 'string' },
-			},
-			required: ['note_id'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'update_note_by_title',
-		description: 'Edit an existing note by title when note_id is not known. Can replace content, append content, and update tags/star/archive.',
-		parameters: {
-			type: 'object',
-			properties: {
-				title: { type: 'string' },
-				content: { type: 'string' },
-				append_content: { type: 'string' },
-				tags: { type: 'array', items: { type: 'string' } },
-				starred: { type: 'boolean' },
-				archived: { type: 'boolean' },
-				project_id: { type: 'string' },
-				project_name: { type: 'string' },
-			},
-			required: ['title'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'search_chats',
-		description: 'Search previous chat messages.',
-		parameters: {
-			type: 'object',
-			properties: {
-				query: { type: 'string' },
-				limit: { type: 'number', minimum: 1, maximum: 100 },
-			},
-			required: ['query'],
-		},
-	},
-	{
-		type: 'function',
-		name: 'get_chat_thread',
-		description: 'Get messages from a previous chat thread by id.',
-		parameters: {
-			type: 'object',
-			properties: {
-				thread_id: { type: 'string' },
-				limit: { type: 'number', minimum: 1, maximum: 200 },
-			},
-			required: ['thread_id'],
-		},
-	},
+  {
+    type: 'function',
+    name: 'list_notes',
+    description:
+      'List compact summaries (default 15). Fetch specific notes with get_note only when full text is needed.',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+        include_archived: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    type: 'function',
+    name: 'search_notes',
+    description:
+      'Search notes by lexical substring across content, tags, and project names. Use this when the user provides exact keywords or phrases.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'search_notes_by_tag',
+    description:
+      'Search notes that have a specific tag. Use this when the user mentions a tag name (e.g., "review", "dev", "security") to find all notes with that tag.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tag: {
+          type: 'string',
+          description: 'The exact tag name to search for (e.g., "review", "dev", "bug")',
+        },
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+      },
+      required: ['tag'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'list_projects',
+    description: 'List all projects for organization and categorization.',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_project',
+    description: 'Get a project by id or by exact project name.',
+    parameters: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+        project_name: { type: 'string' },
+      },
+    },
+  },
+  {
+    type: 'function',
+    name: 'search_notes_by_project',
+    description: 'List notes that belong to a specific project or category.',
+    parameters: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+        project_name: { type: 'string' },
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+      },
+    },
+  },
+  {
+    type: 'function',
+    name: 'create_project',
+    description: 'Create a new project/category.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'update_project',
+    description: 'Rename an existing project.',
+    parameters: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+        project_name: { type: 'string' },
+        name: { type: 'string' },
+      },
+    },
+  },
+  {
+    type: 'function',
+    name: 'delete_project',
+    description: 'Delete a project and unassign its notes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+      },
+      required: ['project_id'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'reorder_projects',
+    description: 'Reorder projects by supplying the desired project id sequence.',
+    parameters: {
+      type: 'object',
+      properties: {
+        project_ids: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['project_ids'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_note',
+    description: 'Get one note by note id for deep analysis.',
+    parameters: {
+      type: 'object',
+      properties: {
+        note_id: { type: 'string' },
+        include_deleted: { type: 'boolean' },
+      },
+      required: ['note_id'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_note_by_title',
+    description:
+      'Get one note by title (case-insensitive). Useful when the user names a note but does not provide an id.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'create_note',
+    description: 'Create a new note and optionally set content/tags/star/archive flags.',
+    parameters: {
+      type: 'object',
+      properties: {
+        content: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        starred: { type: 'boolean' },
+        archived: { type: 'boolean' },
+        project_id: { type: 'string' },
+        project_name: { type: 'string' },
+      },
+    },
+  },
+  {
+    type: 'function',
+    name: 'update_note',
+    description:
+      'Edit an existing note by id. Can replace content, append content, and update tags/star/archive.',
+    parameters: {
+      type: 'object',
+      properties: {
+        note_id: { type: 'string' },
+        content: { type: 'string' },
+        append_content: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        starred: { type: 'boolean' },
+        archived: { type: 'boolean' },
+        project_id: { type: 'string' },
+        project_name: { type: 'string' },
+      },
+      required: ['note_id'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'update_note_by_title',
+    description:
+      'Edit an existing note by title when note_id is not known. Can replace content, append content, and update tags/star/archive.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        append_content: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        starred: { type: 'boolean' },
+        archived: { type: 'boolean' },
+        project_id: { type: 'string' },
+        project_name: { type: 'string' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'search_chats',
+    description: 'Search previous chat messages.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_chat_thread',
+    description: 'Get messages from a previous chat thread by id.',
+    parameters: {
+      type: 'object',
+      properties: {
+        thread_id: { type: 'string' },
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+      },
+      required: ['thread_id'],
+    },
+  },
 ] as const
 
-// ---- Tool execution context ----
-
 export interface ToolExecutionContext {
-	threadId?: string
-	messageId?: string
-	model?: string
+  threadId?: string
+  messageId?: string
+  model?: string
 }
-
 export interface ToolExecutionResult {
-	output: string
-	notesChanged: boolean
+  output: string
+  notesChanged: boolean
+  changed?: ChangedDomains
+  proposalId?: string
 }
-
-// ---- Helpers ----
-
-const parse_tool_args = (raw: string): Record<string, unknown> => {
-	if (!raw) return {}
-	try {
-		const parsed = JSON.parse(raw) as unknown
-		if (parsed && 'object' === typeof parsed && !Array.isArray(parsed)) {
-			return parsed as Record<string, unknown>
-		}
-		return {}
-	} catch {
-		return {}
-	}
+const mutations = new Set([
+  'create_note',
+  'update_note',
+  'update_note_by_title',
+  'create_project',
+  'update_project',
+  'delete_project',
+  'reorder_projects',
+])
+for (const tool of AI_TOOLS) {
+  if (tool.name === 'update_note' || tool.name === 'update_note_by_title') {
+    tool.parameters.properties.expected_revision = {
+      type: 'integer',
+      minimum: 1,
+      description: 'Revision returned by get_note; required to prevent overwriting newer edits.',
+    }
+    tool.parameters.required = [...(tool.parameters.required ?? []), 'expected_revision']
+  }
 }
-
-const normalize_tags = (value: unknown): string[] => {
-	if (!Array.isArray(value)) return []
-	const tags = value
-		.filter((item): item is string => 'string' === typeof item)
-		.map((item) => item.trim())
-		.filter(Boolean)
-	return [...new Set(tags)]
+const fieldSchema = (name: string, definition: unknown): z.ZodType => {
+  const field = definition as { type: string }
+  if (name === 'expected_revision') return z.number().int().positive()
+  if (name === 'limit') return z.number().int().min(1).max(100)
+  if (name.endsWith('_ids')) return z.array(z.string().uuid()).min(1).max(1000)
+  if (name.endsWith('_id')) return z.string().uuid()
+  if (name === 'tags') return z.array(z.string().trim().min(1).max(120)).max(100)
+  if (field.type === 'boolean') return z.boolean()
+  if (field.type === 'string')
+    return z.string().max(['content', 'append_content'].includes(name) ? 800000 : 500)
+  throw new Error(`Missing runtime schema for ${name}`)
 }
-
-const derive_note_title = (content: string): string => {
-	const lines = content.split(/\r?\n/)
-	for (const line of lines) {
-		const trimmed = line.trim()
-		if (!trimmed) continue
-		const unprefixed = trimmed.replace(/^#+\s*/, '').trim()
-		if (unprefixed) return unprefixed.length <= 80 ? unprefixed : `${unprefixed.slice(0, 77)}...`
-	}
-	return 'Untitled'
+const schemas = new Map(
+  AI_TOOLS.map((tool) => [
+    tool.name,
+    z
+      .object(
+        Object.fromEntries(
+          Object.entries(tool.parameters.properties).map(([name, field]) => {
+            const schema = fieldSchema(name, field)
+            return [name, tool.parameters.required?.includes(name) ? schema : schema.optional()]
+          }),
+        ),
+      )
+      .strict(),
+  ]),
+)
+export const summarize_notes = (notes: Note[]) =>
+  notes.map((note) => ({
+    id: note.id,
+    title: note.title ?? deriveNoteTitle(note.content),
+    revision: note.revision,
+    updatedAt: note.updatedAt,
+    projectId: note.projectId,
+    tags: note.tags,
+    starred: note.starred,
+    archived: note.archived,
+    snippet: note.content.slice(0, 200),
+  }))
+const byTitle = (db: StrataDatabase, title: string): Note => {
+  const matches = db.findNotesByTitle(title)
+  if (matches.length !== 1)
+    throw new DomainError(
+      matches.length ? 'AMBIGUOUS_TITLE' : 'NOT_FOUND',
+      matches.length ? 'Multiple notes have this title' : 'Note not found',
+      { matches: matches.map((note) => ({ id: note.id, title: note.title, revision: note.revision })) },
+    )
+  return matches[0]
 }
-
-const normalize_note_title = (title: string): string => title.replace(/\s+/g, ' ').trim().toLowerCase()
-
-const normalize_project_name = (name: string): string => name.replace(/\s+/g, ' ').trim().toLowerCase()
-
-const resolve_project = (
-	db: StrataDatabase,
-	project_id?: string,
-	project_name?: string,
-): { project: ReturnType<StrataDatabase['getProject']> } => {
-	if (project_id) {
-		return { project: db.getProject(project_id) }
-	}
-	if (project_name && project_name.trim()) {
-		const target = normalize_project_name(project_name)
-		const project = db.listProjects().find((item) => normalize_project_name(item.name) === target) ?? null
-		return { project }
-	}
-	return { project: null }
-}
-
-const resolve_project_for_write = (
-	db: StrataDatabase,
-	project_id?: string,
-	project_name?: string,
-): { project: ReturnType<StrataDatabase['getProject']>; error: string | null } => {
-	if (project_id) {
-		const project = db.getProject(project_id)
-		return project ? { project, error: null } : { project: null, error: 'project not found' }
-	}
-	if (project_name && project_name.trim()) {
-		return { project: db.createProject(project_name), error: null }
-	}
-	return { project: null, error: null }
-}
-
-const format_title_matches = (items: Array<{ note: Note; title: string }>): Array<{ id: string; title: string; updatedAt: string }> => {
-	return items
-		.slice(0, 10)
-		.map((item) => ({
-			id: item.note.id,
-			title: item.title,
-			updatedAt: item.note.updatedAt,
-		}))
-}
-
-const resolve_note_by_title = (
-	db: StrataDatabase,
-	raw_title: string,
-): { note: Note | null; matches: Array<{ id: string; title: string; updatedAt: string }> } => {
-	const title_query = normalize_note_title(raw_title)
-	if (!title_query) {
-		return { note: null, matches: [] }
-	}
-
-	const notes = db.listNotes({ includeDeleted: false })
-	const titled_notes = notes.map((note) => ({ note, title: derive_note_title(note.content) }))
-
-	const exact_matches = titled_notes.filter((item) => normalize_note_title(item.title) === title_query)
-	if (1 === exact_matches.length) {
-		return { note: exact_matches[0].note, matches: [] }
-	}
-	if (exact_matches.length > 1) {
-		return { note: null, matches: format_title_matches(exact_matches) }
-	}
-
-	const contains_matches = titled_notes.filter((item) => normalize_note_title(item.title).includes(title_query))
-	if (1 === contains_matches.length) {
-		return { note: contains_matches[0].note, matches: [] }
-	}
-	if (contains_matches.length > 1) {
-		return { note: null, matches: format_title_matches(contains_matches) }
-	}
-
-	return { note: null, matches: [] }
-}
-
-const summarize_notes = (notes: ReturnType<StrataDatabase['aiListNotes']>) => {
-	return notes.map((note: { id: string; content: string; updatedAt: string; starred: boolean; archived: boolean; tags: string[]; projectId: string | null }) => ({
-		id: note.id,
-		title: derive_note_title(note.content),
-		updatedAt: note.updatedAt,
-		starred: note.starred,
-		archived: note.archived,
-		tags: note.tags,
-		projectId: note.projectId,
-		excerpt: note.content.slice(0, 500),
-	}))
-}
-
-// ---- Tool Execution ----
-
 export const execute_tool_call = (
-	db: StrataDatabase,
-	tool_call: NormalizedToolCall,
-	ctx?: ToolExecutionContext,
+  db: StrataDatabase,
+  call: NormalizedToolCall,
+  ctx?: ToolExecutionContext,
 ): ToolExecutionResult => {
-	const args = parse_tool_args(tool_call.argumentsJson)
-	const tool_name = tool_call.name
-
-	if ('list_notes' === tool_name) {
-		const limit = 'number' === typeof args.limit ? args.limit : 60
-		const include_archived = 'boolean' === typeof args.include_archived ? args.include_archived : true
-		return {
-			output: JSON.stringify({ notes: summarize_notes(db.aiListNotes(limit, include_archived)) }),
-			notesChanged: false,
-		}
-	}
-
-	if ('search_notes' === tool_name) {
-		const query = 'string' === typeof args.query ? args.query.trim() : ''
-		const limit = 'number' === typeof args.limit ? args.limit : 25
-		if (!query) return { output: JSON.stringify({ notes: [] }), notesChanged: false }
-		return {
-			output: JSON.stringify({ notes: summarize_notes(db.aiSearchNotes(query, limit)) }),
-			notesChanged: false,
-		}
-	}
-
-	if ('search_notes_by_tag' === tool_name) {
-		const tag = 'string' === typeof args.tag ? args.tag.trim() : ''
-		const limit = 'number' === typeof args.limit ? args.limit : 50
-		if (!tag) return { output: JSON.stringify({ notes: [] }), notesChanged: false }
-		const matched = db.listNotes({ tag, includeDeleted: false }).slice(0, Math.max(1, Math.min(200, limit)))
-		return {
-			output: JSON.stringify({ notes: summarize_notes(matched) }),
-			notesChanged: false,
-		}
-	}
-
-	if ('list_projects' === tool_name) {
-		return {
-			output: JSON.stringify({ projects: db.listProjects() }),
-			notesChanged: false,
-		}
-	}
-
-	if ('get_project' === tool_name) {
-		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
-		const project_name = 'string' === typeof args.project_name ? args.project_name : ''
-		const resolved = resolve_project(db, project_id, project_name)
-		if (!resolved.project) {
-			return { output: JSON.stringify({ project: null }), notesChanged: false }
-		}
-		return {
-			output: JSON.stringify({
-				project: resolved.project,
-				notes: summarize_notes(db.listNotes({ projectId: resolved.project.id, includeDeleted: false })),
-			}),
-			notesChanged: false,
-		}
-	}
-
-	if ('search_notes_by_project' === tool_name) {
-		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
-		const project_name = 'string' === typeof args.project_name ? args.project_name : ''
-		const limit = 'number' === typeof args.limit ? args.limit : 50
-		const resolved = resolve_project(db, project_id, project_name)
-		if (!resolved.project) {
-			return { output: JSON.stringify({ project: null, notes: [] }), notesChanged: false }
-		}
-		const matched = db.listNotes({ projectId: resolved.project.id, includeDeleted: false }).slice(0, Math.max(1, Math.min(200, limit)))
-		return {
-			output: JSON.stringify({ project: resolved.project, notes: summarize_notes(matched) }),
-			notesChanged: false,
-		}
-	}
-
-	if ('create_project' === tool_name) {
-		const name = 'string' === typeof args.name ? args.name.trim() : ''
-		if (!name) return { output: JSON.stringify({ error: 'name is required', project: null }), notesChanged: false }
-		const project = db.createProject(name)
-		return {
-			output: JSON.stringify({ project }),
-			notesChanged: false,
-		}
-	}
-
-	if ('update_project' === tool_name) {
-		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
-		const project_name = 'string' === typeof args.project_name ? args.project_name : ''
-		const name = 'string' === typeof args.name ? args.name.trim() : ''
-		const project = resolve_project(db, project_id, project_name).project
-		if (!project) return { output: JSON.stringify({ error: 'project not found', project: null }), notesChanged: false }
-		if (!name) return { output: JSON.stringify({ error: 'name is required', project: null }), notesChanged: false }
-		const updated = db.renameProject(project.id, name)
-		return {
-			output: JSON.stringify({ project: updated }),
-			notesChanged: Boolean(updated),
-		}
-	}
-
-	if ('delete_project' === tool_name) {
-		const project_id = 'string' === typeof args.project_id ? args.project_id : ''
-		if (!project_id) return { output: JSON.stringify({ error: 'project_id is required' }), notesChanged: false }
-		const deleted = db.deleteProject(project_id)
-		return {
-			output: JSON.stringify({ deleted }),
-			notesChanged: deleted,
-		}
-	}
-
-	if ('reorder_projects' === tool_name) {
-		const project_ids = Array.isArray(args.project_ids) ? args.project_ids.filter((id): id is string => 'string' === typeof id) : []
-		if (0 === project_ids.length) return { output: JSON.stringify({ error: 'project_ids is required', projects: [] }), notesChanged: false }
-		const projects = db.reorderProjects(project_ids)
-		return {
-			output: JSON.stringify({ projects }),
-			notesChanged: false,
-		}
-	}
-
-	if ('get_note' === tool_name) {
-		const note_id = 'string' === typeof args.note_id ? args.note_id : ''
-		const include_deleted = true === args.include_deleted
-		if (!note_id) return { output: JSON.stringify({ note: null }), notesChanged: false }
-		return {
-			output: JSON.stringify({ note: db.aiGetNoteById(note_id, include_deleted) }),
-			notesChanged: false,
-		}
-	}
-
-	if ('get_note_by_title' === tool_name) {
-		const title = 'string' === typeof args.title ? args.title : ''
-		if (!title.trim()) return { output: JSON.stringify({ error: 'title is required', note: null }), notesChanged: false }
-
-		const resolved = resolve_note_by_title(db, title)
-		if (!resolved.note) {
-			if (resolved.matches.length) {
-				return {
-					output: JSON.stringify({
-						error: 'multiple notes matched title',
-						note: null,
-						matches: resolved.matches,
-					}),
-					notesChanged: false,
-				}
-			}
-			return { output: JSON.stringify({ error: 'note not found by title', note: null }), notesChanged: false }
-		}
-
-		return {
-			output: JSON.stringify({ note: resolved.note }),
-			notesChanged: false,
-		}
-	}
-
-	if ('create_note' === tool_name) {
-		const settings = db.getSettings()
-		if ('read_only' === settings.aiEditMode) {
-			return { output: JSON.stringify({ error: 'AI note editing is disabled (aiEditMode: read_only)' }), notesChanged: false }
-		}
-		const project_resolution = resolve_project_for_write(
-			db,
-			'string' === typeof args.project_id ? args.project_id : '',
-			'string' === typeof args.project_name ? args.project_name : '',
-		)
-		if (project_resolution.error) {
-			return { output: JSON.stringify({ error: project_resolution.error, note: null }), notesChanged: false }
-		}
-		const project = project_resolution.project
-		const created = db.createNote({
-			projectId: project?.id ?? null,
-		})
-		const patch: Record<string, unknown> = {}
-		if ('string' === typeof args.content) patch.content = args.content
-		if ('boolean' === typeof args.starred) patch.starred = args.starred
-		if ('boolean' === typeof args.archived) patch.archived = args.archived
-		const tags = normalize_tags(args.tags)
-		if (tags.length) patch.tags = tags
-		if (project?.id) patch.projectId = project.id
-		const updated = Object.keys(patch).length ? db.updateNote(created.id, patch) : created
-		const final_note = updated ?? created
-
-		// Record AI edit
-		db.recordAiEdit({
-			noteId: final_note.id,
-			threadId: ctx?.threadId ?? null,
-			messageId: ctx?.messageId ?? null,
-			action: 'create',
-			afterContent: final_note.content,
-			afterTags: final_note.tags,
-			afterProjectId: final_note.projectId,
-			model: ctx?.model ?? null,
-			promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
-		})
-
-		return {
-			output: JSON.stringify({ note: final_note }),
-			notesChanged: true,
-		}
-	}
-
-	if ('update_note' === tool_name) {
-		const settings = db.getSettings()
-		if ('read_only' === settings.aiEditMode) {
-			return { output: JSON.stringify({ error: 'AI note editing is disabled (aiEditMode: read_only)' }), notesChanged: false }
-		}
-		const note_id = 'string' === typeof args.note_id ? args.note_id : ''
-		if (!note_id) return { output: JSON.stringify({ error: 'note_id is required' }), notesChanged: false }
-		const current = db.aiGetNoteById(note_id)
-		if (!current) return { output: JSON.stringify({ error: 'note not found', note: null }), notesChanged: false }
-
-		const patch: Record<string, unknown> = {}
-		if ('string' === typeof args.content) {
-			patch.content = args.content
-		}
-		if ('string' === typeof args.append_content) {
-			patch.content = `${current.content}${args.append_content}`
-		}
-		if ('boolean' === typeof args.starred) patch.starred = args.starred
-		if ('boolean' === typeof args.archived) patch.archived = args.archived
-		if (Array.isArray(args.tags)) patch.tags = normalize_tags(args.tags)
-		const project_resolution = resolve_project_for_write(
-			db,
-			'string' === typeof args.project_id ? args.project_id : '',
-			'string' === typeof args.project_name ? args.project_name : '',
-		)
-		if (project_resolution.error) {
-			return { output: JSON.stringify({ error: project_resolution.error, note: null }), notesChanged: false }
-		}
-		if (project_resolution.project) {
-			patch.projectId = project_resolution.project.id
-		}
-
-		if (0 === Object.keys(patch).length) {
-			return { output: JSON.stringify({ note: current, unchanged: true }), notesChanged: false }
-		}
-
-		const before_content = current.content
-		const before_tags = current.tags
-		const before_project_id = current.projectId
-
-		const updated = db.updateNote(note_id, patch)
-
-		// Record AI edit
-		if (updated) {
-			db.recordAiEdit({
-				noteId: note_id,
-				threadId: ctx?.threadId ?? null,
-				messageId: ctx?.messageId ?? null,
-				action: 'update',
-				beforeContent: before_content,
-				afterContent: updated.content,
-				beforeTags: before_tags,
-				afterTags: updated.tags,
-				beforeProjectId: before_project_id,
-				afterProjectId: updated.projectId,
-				model: ctx?.model ?? null,
-				promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
-			})
-		}
-
-		return {
-			output: JSON.stringify({ note: updated }),
-			notesChanged: Boolean(updated),
-		}
-	}
-
-	if ('update_note_by_title' === tool_name) {
-		const settings = db.getSettings()
-		if ('read_only' === settings.aiEditMode) {
-			return { output: JSON.stringify({ error: 'AI note editing is disabled (aiEditMode: read_only)' }), notesChanged: false }
-		}
-
-		const title = 'string' === typeof args.title ? args.title : ''
-		if (!title.trim()) return { output: JSON.stringify({ error: 'title is required' }), notesChanged: false }
-
-		const resolved = resolve_note_by_title(db, title)
-		if (!resolved.note) {
-			if (resolved.matches.length) {
-				return {
-					output: JSON.stringify({
-						error: 'multiple notes matched title',
-						note: null,
-						matches: resolved.matches,
-					}),
-					notesChanged: false,
-				}
-			}
-			return { output: JSON.stringify({ error: 'note not found by title', note: null }), notesChanged: false }
-		}
-
-		const current = resolved.note
-		const note_id = current.id
-		const patch: Record<string, unknown> = {}
-		if ('string' === typeof args.content) {
-			patch.content = args.content
-		}
-		if ('string' === typeof args.append_content) {
-			patch.content = `${current.content}${args.append_content}`
-		}
-		if ('boolean' === typeof args.starred) patch.starred = args.starred
-		if ('boolean' === typeof args.archived) patch.archived = args.archived
-		if (Array.isArray(args.tags)) patch.tags = normalize_tags(args.tags)
-		const project_resolution = resolve_project_for_write(
-			db,
-			'string' === typeof args.project_id ? args.project_id : '',
-			'string' === typeof args.project_name ? args.project_name : '',
-		)
-		if (project_resolution.error) {
-			return { output: JSON.stringify({ error: project_resolution.error, note: null }), notesChanged: false }
-		}
-		if (project_resolution.project) {
-			patch.projectId = project_resolution.project.id
-		}
-
-		if (0 === Object.keys(patch).length) {
-			return { output: JSON.stringify({ note: current, unchanged: true }), notesChanged: false }
-		}
-
-		const before_content = current.content
-		const before_tags = current.tags
-		const before_project_id = current.projectId
-		const updated = db.updateNote(note_id, patch)
-
-		if (updated) {
-			db.recordAiEdit({
-				noteId: note_id,
-				threadId: ctx?.threadId ?? null,
-				messageId: ctx?.messageId ?? null,
-				action: 'update',
-				beforeContent: before_content,
-				afterContent: updated.content,
-				beforeTags: before_tags,
-				afterTags: updated.tags,
-				beforeProjectId: before_project_id,
-				afterProjectId: updated.projectId,
-				model: ctx?.model ?? null,
-				promptExcerpt: typeof args.content === 'string' ? args.content.slice(0, 200) : null,
-			})
-		}
-
-		return {
-			output: JSON.stringify({ note: updated }),
-			notesChanged: Boolean(updated),
-		}
-	}
-
-	if ('search_chats' === tool_name) {
-		const query = 'string' === typeof args.query ? args.query.trim() : ''
-		const limit = 'number' === typeof args.limit ? args.limit : 30
-		if (!query) return { output: JSON.stringify({ results: [] }), notesChanged: false }
-		return {
-			output: JSON.stringify({ results: db.searchAiMessages(query, limit) }),
-			notesChanged: false,
-		}
-	}
-
-	if ('get_chat_thread' === tool_name) {
-		const thread_id = 'string' === typeof args.thread_id ? args.thread_id : ''
-		const limit = 'number' === typeof args.limit ? args.limit : 120
-		if (!thread_id) return { output: JSON.stringify({ thread: null, messages: [] }), notesChanged: false }
-		const thread = db.getAiThread(thread_id)
-		if (!thread) return { output: JSON.stringify({ thread: null, messages: [] }), notesChanged: false }
-		const messages = db.listAiMessages(thread_id).slice(-Math.max(1, Math.min(200, limit)))
-		return {
-			output: JSON.stringify({ thread, messages }),
-			notesChanged: false,
-		}
-	}
-
-	return {
-		output: JSON.stringify({ error: `Unsupported tool: ${tool_name}` }),
-		notesChanged: false,
-	}
+  try {
+    const schema = schemas.get(call.name)
+    if (!schema) throw new DomainError('UNSUPPORTED_TOOL', 'Unsupported tool')
+    if (call.argumentsJson.length > 1024 * 1024)
+      throw new DomainError('VALIDATION_ERROR', 'Tool arguments too large')
+    const args = schema.parse(JSON.parse(call.argumentsJson)) as Record<string, unknown>
+    const limit = typeof args.limit === 'number' ? args.limit : 15
+    const project = () =>
+      args.project_id
+        ? db.getProject(String(args.project_id))
+        : db.getProjectByName(String(args.project_name ?? ''))
+    let result: unknown
+    if (mutations.has(call.name)) {
+      const mode = db.getSettings().aiEditMode
+      if (mode === 'read_only') throw new DomainError('READ_ONLY', 'AI mutations are disabled')
+      const service = new KnowledgeService(db)
+      let operation: unknown
+      if (['create_note', 'update_note', 'update_note_by_title'].includes(call.name)) {
+        const current =
+          call.name === 'update_note_by_title'
+            ? byTitle(db, String(args.title))
+            : call.name === 'update_note'
+              ? db.getNote(String(args.note_id))
+              : null
+        if (call.name !== 'create_note' && !current) throw new DomainError('NOT_FOUND', 'Note not found')
+        if (args.content !== undefined && args.append_content !== undefined)
+          throw new DomainError('VALIDATION_ERROR', 'Specify content or append_content')
+        const payload: Record<string, unknown> = {}
+        for (const field of ['content', 'tags', 'starred', 'archived'])
+          if (args[field] !== undefined) payload[field] = args[field]
+        if (args.append_content !== undefined)
+          payload.content = current!.content + String(args.append_content)
+        if (args.project_id !== undefined) payload.projectId = args.project_id
+        if (args.project_name !== undefined) payload.projectName = args.project_name
+        if (current) payload.expectedRevision = args.expected_revision
+        operation = current ? { op: 'update_note', id: current.id, payload } : { op: 'create_note', payload }
+      } else if (call.name === 'create_project') operation = { op: 'create_project', name: args.name }
+      else if (call.name === 'update_project')
+        operation = { op: 'rename_project', id: project()?.id, name: args.name }
+      else if (call.name === 'delete_project') operation = { op: 'delete_project', id: args.project_id }
+      else operation = { op: 'reorder_projects', projectIds: args.project_ids }
+      const parsed = operationSchema.parse(operation)
+      if (mode === 'confirm') {
+        const proposal = service.propose(parsed, ctx)
+        return {
+          output: JSON.stringify({
+            status: 'awaiting_approval',
+            proposalId: proposal.id,
+            operation: parsed.op,
+          }),
+          notesChanged: false,
+          proposalId: proposal.id,
+        }
+      }
+      result = service.mutate(parsed, { source: 'ai' })
+      return {
+        output: JSON.stringify({ status: 'applied', result }),
+        notesChanged: true,
+        changed: ALL_CHANGED,
+      }
+    }
+    switch (call.name) {
+      case 'list_notes':
+        result = { notes: summarize_notes(db.aiListNotes(limit, args.include_archived !== false)) }
+        break
+      case 'search_notes':
+        result = { notes: summarize_notes(db.aiSearchNotes(String(args.query), limit)) }
+        break
+      case 'search_notes_by_tag':
+        result = { notes: summarize_notes(db.listNoteSummaries({ tag: String(args.tag), limit })) }
+        break
+      case 'list_projects':
+        result = { projects: db.listProjects().slice(0, 100) }
+        break
+      case 'get_project':
+        result = { project: project() }
+        break
+      case 'search_notes_by_project': {
+        const found = project()
+        result = {
+          project: found,
+          notes: found ? summarize_notes(db.listNoteSummaries({ projectId: found.id, limit })) : [],
+        }
+        break
+      }
+      case 'get_note':
+        result = { note: db.aiGetNoteById(String(args.note_id), args.include_deleted === true) }
+        break
+      case 'get_note_by_title':
+        result = { note: byTitle(db, String(args.title)) }
+        break
+      case 'search_chats':
+        result = {
+          results: db
+            .searchAiMessages(String(args.query), limit)
+            .map((row) => ({
+              ...row,
+              message: { ...row.message, content: row.message.content.slice(0, 240) },
+            })),
+        }
+        break
+      case 'get_chat_thread':
+        result = {
+          thread: db.getAiThread(String(args.thread_id)),
+          messages: db
+            .listAiMessages(String(args.thread_id))
+            .slice(-limit)
+            .map((message) => ({ ...message, content: message.content.slice(0, 2000) })),
+        }
+        break
+      default:
+        throw new DomainError('UNSUPPORTED_TOOL', 'Unsupported tool')
+    }
+    return { output: JSON.stringify(result), notesChanged: false }
+  } catch (error) {
+    const code = error instanceof DomainError ? error.code : 'VALIDATION_ERROR'
+    const message = error instanceof DomainError ? error.message : 'Malformed tool arguments'
+    return {
+      output: JSON.stringify({
+        ok: false,
+        error: { code, message, details: error instanceof DomainError ? error.details : {} },
+      }),
+      notesChanged: false,
+    }
+  }
 }
-
-export { derive_note_title, summarize_notes }
+export { deriveNoteTitle as derive_note_title }

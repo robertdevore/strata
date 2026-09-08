@@ -66,7 +66,7 @@ interface EditorPaneProps {
   openAiModel: string
   content: string
   tags: Array<{ name: string; count: number }>
-  saveState: 'idle' | 'saving' | 'saved' | 'failed'
+  saveState: 'idle' | 'saving' | 'saved' | 'failed' | 'conflict' | 'unsaved'
   lastSavedAt: string | null
   onChangeDraft: (id: string, content: string) => void
   onFlush: (id: string) => Promise<void>
@@ -217,6 +217,8 @@ const build_chat_usage_summary = (logs: AiRouteLog[]): ChatUsageSummary => {
 }
 
 const saveLabel = (state: string, last: string | null): string => {
+  if ('conflict' === state) return 'Conflict — your draft is preserved'
+  if ('unsaved' === state) return 'Unsaved'
   if ('saving' === state) return 'Saving…'
   if ('failed' === state) return 'Save failed'
   if (last) return `Saved ${formatLastEdited(last)}`
@@ -629,7 +631,7 @@ export function EditorPane(props: EditorPaneProps) {
   }, [])
 
   useEffect(() => {
-    if ('saving' === saveState || 'failed' === saveState) {
+    if (['saving','failed','conflict','unsaved'].includes(saveState)) {
       if (saveStatusRef.current) window.clearTimeout(saveStatusRef.current)
       window.setTimeout(() => setShowSaveStatus(true), 0)
       return

@@ -1,3 +1,4 @@
+import { AiProposals } from './AiProposals'
 import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -776,6 +777,7 @@ export function ChatPanel(props: ChatPanelProps) {
 
 	return (
 		<aside className="preview-panel chat-panel">
+			<AiProposals sending={sending} />
 			<div className="chat-panel-top">
 				<div className="chat-thread-row">
 					{editingThreadTitle && active_thread ? (
