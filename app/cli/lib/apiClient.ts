@@ -91,7 +91,7 @@ export class StrataApiClient {
 		return url.toString()
 	}
 
-	private async request<TResponse>(
+	async request<TResponse>(
 		method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
 		path: string,
 		options: RequestOptions = {},
@@ -118,8 +118,8 @@ export class StrataApiClient {
 					headers,
 					body: undefined === options.body ? undefined : JSON.stringify(options.body),
 					signal: controller.signal,
+					redirect: 'error',
 				})
-				clearTimeout(timeout)
 
 				if (!response.ok) {
 					const error_body = await safe_get_json(response)
@@ -131,7 +131,7 @@ export class StrataApiClient {
 					throw new CliError({
 						message: `Strata API request failed (${response.status})`,
 						exitCode: map_http_status_to_exit_code(response.status),
-						code: 'STRATA_API_ERROR',
+						code: typeof (error_body as {error?:{code?:unknown}})?.error?.code === 'string' ? (error_body as {error:{code:string}}).error.code : 'STRATA_API_ERROR',
 						hint: 401 === response.status
 							? 'Set STRATA_API_TOKEN or pass --token.'
 							: 404 === response.status
@@ -142,6 +142,7 @@ export class StrataApiClient {
 				}
 
 				const raw = await safe_get_json(response)
+				clearTimeout(timeout)
 				if (!options.validate) return raw as TResponse
 				return options.validate.parse(raw) as TResponse
 			} catch (error) {
@@ -188,6 +189,8 @@ export class StrataApiClient {
 	}
 
 	async listNotes(filters: {
+		limit?: number
+		cursor?: string
 		query?: string
 		tag?: string
 		projectId?: string
@@ -239,6 +242,7 @@ export class StrataApiClient {
 	}
 
 	async updateNote(note_id: string, payload: {
+		expectedRevision?: number
 		content?: string
 		tags?: string[]
 		starred?: boolean
@@ -247,7 +251,7 @@ export class StrataApiClient {
 		projectName?: string
 	}): Promise<z.infer<typeof note_schema>> {
 		const response = await this.request<z.infer<typeof note_response_schema>>('PATCH', `/notes/${note_id}`, {
-			body: payload,
+			body: { ...payload, expectedRevision: payload.expectedRevision ?? (await this.getNote(note_id)).revision },
 			validate: note_response_schema,
 		})
 		return response.note
@@ -255,6 +259,7 @@ export class StrataApiClient {
 
 	async deleteNote(note_id: string): Promise<{ deleted: boolean }> {
 		return await this.request<{ deleted: boolean }>('DELETE', `/notes/${note_id}`, {
+			query: { expectedRevision: (await this.getNote(note_id)).revision },
 			validate: delete_response_schema,
 		})
 	}

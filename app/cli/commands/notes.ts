@@ -84,7 +84,7 @@ export const register_notes_commands = (
 			limit: string
 		}) {
 			const { options, client } = get_context(this)
-			const limit = Math.max(1, Math.min(500, Number.parseInt(command_options.limit, 10) || 50))
+			const limit = Math.max(1, Math.min(100, Number.parseInt(command_options.limit, 10) || 50))
 			const projects = command_options.project ? await client.listProjects() : []
 			const project_id = command_options.projectId
 				? command_options.projectId
@@ -125,7 +125,7 @@ export const register_notes_commands = (
 					note.updatedAt,
 					note.projectId ? (project_names.get(note.projectId) ?? note.projectId.slice(0, 8)) : '',
 					note.tags.join(','),
-					derive_title_from_markdown(note.content),
+					note.title ?? derive_title_from_markdown(note.content || note.snippet || ''),
 				])
 				print_success(options, data, { prettyText: format_table(['ID', 'Updated', 'Project', 'Tags', 'Title'], rows) })
 				return
@@ -218,6 +218,7 @@ export const register_notes_commands = (
 		.option('--project <name>', 'Move note to an existing project by name')
 		.option('--project-id <id>', 'Move note to a project by ID')
 		.option('--clear-project', 'Remove note from its project')
+		.option('--if-revision <revision>', 'Require this revision')
 		.action(async function (note_id: string, command_options: {
 			content?: string
 			file?: string
@@ -229,6 +230,7 @@ export const register_notes_commands = (
 			project?: string
 			projectId?: string
 			clearProject?: boolean
+			ifRevision?: string
 		}) {
 			const { options, client } = get_context(this)
 			note_id_schema.parse(note_id)
@@ -252,6 +254,7 @@ export const register_notes_commands = (
 				: await resolve_project_id(client, command_options.projectId, command_options.project)
 			const has_tags = (command_options.tag || []).length > 0
 			const payload = note_update_patch_schema.parse({
+				expectedRevision: command_options.ifRevision ? Number(command_options.ifRevision) : current_note.revision,
 				content: next_content,
 				tags: has_tags ? normalize_tags(command_options.tag || []) : undefined,
 				starred: parse_optional_boolean(command_options.starred),

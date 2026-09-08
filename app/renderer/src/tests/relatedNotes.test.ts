@@ -12,6 +12,7 @@ const makeNote = (overrides: Partial<Note> = {}): Note => ({
 	tags: [],
 	projectId: null,
 	deletedAt: null,
+		revision: 1,
 	...overrides,
 })
 

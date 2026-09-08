@@ -23,6 +23,8 @@ export interface Project {
 }
 
 export interface Note {
+	revision: number
+	title?: string
 	id: string
 	content: string
 	createdAt: string
@@ -36,6 +38,8 @@ export interface Note {
 }
 
 export interface NotesFilter {
+	limit?: number
+	cursor?: string
 	query?: string
 	starred?: boolean
 	archived?: boolean
@@ -78,6 +82,7 @@ export interface Settings {
 }
 
 export interface NoteUpdatePatch {
+	expectedRevision?: number
 	content?: string
 	starred?: boolean
 	archived?: boolean
@@ -182,4 +187,26 @@ export interface BackupResult {
 	createdAt: string
 	directory: string
 	files: string[]
+}
+
+export interface NoteSummary {
+ id: string
+ title: string
+ snippet: string
+ revision: number
+ createdAt: string
+ updatedAt: string
+ starred: boolean
+ archived: boolean
+ tags: string[]
+ projectId: string | null
+ deletedAt: string | null
+}
+export interface NoteRevision {
+ noteId: string
+ revision: number
+ source: string
+ operation: string
+ createdAt: string
+ snapshot: NoteUpdatePatch & {deletedAt?: string | null}
 }

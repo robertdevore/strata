@@ -1,490 +1,282 @@
-import { ensureLocalCredential, isLoopbackHost, tokensEqual } from '../../shared/apiCredential'
 import { createServer } from 'node:http'
-import type { IncomingMessage, Server } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import type { NoteUpdatePatch } from '../../shared/types'
-import type { StrataDatabase } from '../db/index'
-import { deriveNoteTitle } from '../../shared/noteTitle'
+import type { StrataDatabase } from '../db'
+import { ensureLocalCredential, isLoopbackHost, tokensEqual } from '../../shared/apiCredential'
+import { DomainError } from '../../shared/errors'
+import { KnowledgeService, idSchema, listSchema, revisionSchema } from '../services/knowledgeService'
 
-const request_body_limit_bytes = 1024 * 1024
-const default_api_port = 3939
-const default_api_host = '127.0.0.1'
-
-const tokenize = (text: string): string[] =>
-	text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2)
-
-import type { Note } from '../../shared/types'
-
-const computeRelated = (
-	current_note: Note,
-	all_notes: Note[],
-	link_index: Array<{ sourceNoteId: string; targetNoteId: string | null; rawTarget: string }>,
-): Array<{ note: Note; reason: string; score: number }> => {
-	const scored = new Map<string, { note: Note; score: number; reasons: string[] }>()
-	const ct = deriveNoteTitle(current_note.content).toLowerCase()
-	const cw = new Set(tokenize(ct + ' ' + current_note.content))
-	const ctags = new Set(current_note.tags)
-	const lf = new Set(link_index.filter((l) => l.sourceNoteId === current_note.id && l.targetNoteId).map((l) => l.targetNoteId!))
-	const lt = new Set(link_index.filter((l) => l.targetNoteId === current_note.id).map((l) => l.sourceNoteId))
-	const upsert = (note: Note, delta: number, reason: string) => {
-		if (note.id === current_note.id || note.deletedAt) return
-		const e = scored.get(note.id)
-		if (e) { e.score += delta; if (!e.reasons.includes(reason)) e.reasons.push(reason) }
-		else scored.set(note.id, { note, score: delta, reasons: [reason] })
-	}
-	for (const c of all_notes) {
-		if (lf.has(c.id)) upsert(c, 50, 'Linked from this note')
-		if (lt.has(c.id)) upsert(c, 50, 'Links here')
-		const ct2 = new Set(c.tags); let st = 0
-		for (const t of ctags) if (ct2.has(t)) st++
-		if (st > 0) upsert(c, st * 10, `Shared tag${st > 1 ? 's' : ''}`)
-		const cw2 = new Set(tokenize(deriveNoteTitle(c.content).toLowerCase() + ' ' + c.content))
-		let ov = 0
-		for (const w of cw) { if (w.length < 3) continue; if (cw2.has(w)) ov++ }
-		const ks = Math.min(50, ov * 2)
-		if (ks > 0) upsert(c, ks, 'Similar text')
-	}
-	return [...scored.values()]
-		.filter((e) => e.score >= 6)
-		.sort((a, b) => b.score - a.score || b.note.updatedAt.localeCompare(a.note.updatedAt))
-		.slice(0, 8)
-		.map((e) => ({ note: e.note, reason: e.reasons.join(', '), score: e.score }))
+const MAX_BODY = 1024 * 1024
+interface Options {
+  onNotesChanged?: () => void
+  host?: string
+  port?: number
+  token?: string
 }
-
-const list_schema = z.object({
-	query: z.string().optional(),
-	starred: z.boolean().optional(),
-	archived: z.boolean().optional(),
-	tag: z.string().optional(),
-	projectId: z.string().uuid().optional(),
-	includeDeleted: z.boolean().optional(),
+const fail = (code: string, message: string, status = 400, details: Record<string, unknown> = {}) => ({
+  status,
+  body: { ok: false, error: { code, message, details } },
 })
-
-const id_schema = z.object({ id: z.string().uuid() })
-
-const project_id_schema = z.object({ id: z.string().uuid() })
-
-const create_schema = z
-	.object({
-		content: z.string().optional(),
-		starred: z.boolean().optional(),
-		archived: z.boolean().optional(),
-		tags: z.array(z.string()).optional(),
-		projectId: z.string().uuid().nullable().optional(),
-		projectName: z.string().trim().min(1).max(120).optional(),
-	})
-	.optional()
-
-const update_patch_schema = z.object({
-	content: z.string().optional(),
-	starred: z.boolean().optional(),
-	archived: z.boolean().optional(),
-	tags: z.array(z.string()).optional(),
-	projectId: z.string().uuid().nullable().optional(),
-	projectName: z.string().trim().min(1).max(120).optional(),
-})
-
-const project_create_schema = z.object({
-	name: z.string().trim().min(1).max(120),
-})
-
-const project_update_schema = z.object({
-	name: z.string().trim().min(1).max(120),
-})
-
-const project_reorder_schema = z.object({
-	projectIds: z.array(z.string().uuid()).min(1),
-})
-
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS'
-
-interface ApiServerInstance {
-	close: () => Promise<void>
-	port: number
+const body = async (request: IncomingMessage): Promise<unknown> => {
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of request) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    size += bytes.length
+    if (size > MAX_BODY) throw new DomainError('PAYLOAD_TOO_LARGE', 'Request exceeds 1MB')
+    chunks.push(bytes)
+  }
+  const raw = Buffer.concat(chunks).toString('utf8').trim()
+  return raw ? JSON.parse(raw) : {}
+}
+const boolean = (value: string | null): boolean | undefined => {
+  if (value === null) return undefined
+  if (value === 'true') return true
+  if (value === 'false') return false
+  throw new DomainError('VALIDATION_ERROR', 'Expected true or false')
+}
+const write = (response: ServerResponse, status: number, payload: unknown) => {
+  let text = JSON.stringify(payload)
+  if (Buffer.byteLength(text) > 4 * 1024 * 1024) {
+    status = 413
+    text = JSON.stringify(fail('RESPONSE_TOO_LARGE', 'Use a smaller limit', 413).body)
+  }
+  response.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Strata-API-Version': '1',
+  })
+  response.end(text)
 }
 
-interface NotesApiServerOptions {
-	token?: string
-	onNotesChanged?: () => void
-	host?: string
-	port?: number
-}
-
-interface JsonResponse {
-	status: number
-	body?: unknown
-}
-
-const parse_boolean = (value: string | null): boolean | undefined => {
-	if (null === value) return undefined
-	if ('true' === value) return true
-	if ('false' === value) return false
-	throw new z.ZodError([{
-		code: 'invalid_value',
-		values: ['true', 'false'],
-		path: [],
-		message: 'Expected "true" or "false"',
-	}])
-}
-
-const get_request_body = async (request: IncomingMessage): Promise<unknown> => {
-	const chunks: Buffer[] = []
-	let received = 0
-
-	for await (const chunk of request) {
-		const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-		received += data.length
-		if (received > request_body_limit_bytes) {
-			throw new Error('Request body exceeds 1MB limit')
-		}
-		chunks.push(data)
-	}
-
-	if (0 === chunks.length) return undefined
-	const raw = Buffer.concat(chunks).toString('utf8').trim()
-	if (!raw) return undefined
-	return JSON.parse(raw) as unknown
-}
-
-const write_json = (response: import('node:http').ServerResponse, status: number, payload?: unknown): void => {
-	const body = undefined === payload ? '' : JSON.stringify(payload)
-	response.statusCode = status
-	response.setHeader('Content-Type', 'application/json; charset=utf-8')
-	response.setHeader('X-Content-Type-Options', 'nosniff')
-	response.setHeader('Cache-Control', 'no-store')
-	response.end(body)
-}
-
-const parse_method = (method: string | undefined): HttpMethod | null => {
-	if (!method) return null
-	if ('GET' === method || 'POST' === method || 'PUT' === method || 'PATCH' === method || 'DELETE' === method || 'OPTIONS' === method) {
-		return method
-	}
-	return null
-}
-
-const parse_update_patch = (body: unknown): NoteUpdatePatch => {
-	return update_patch_schema.parse(body)
-}
-
-const resolve_project_id = (
-	db: StrataDatabase,
-	payload: { projectId?: string | null; projectName?: string | null | undefined },
-): { hasProjectId: boolean; projectId: string | null; valid: boolean } => {
-	if (Object.prototype.hasOwnProperty.call(payload, 'projectId')) {
-		if (null === payload.projectId) return { hasProjectId: true, projectId: null, valid: true }
-		if ('string' === typeof payload.projectId) {
-			const project = db.getProject(payload.projectId)
-			return { hasProjectId: true, projectId: project?.id ?? null, valid: Boolean(project) }
-		}
-	}
-	if ('string' === typeof payload.projectName && payload.projectName.trim()) {
-		return { hasProjectId: true, projectId: db.createProject(payload.projectName).id, valid: true }
-	}
-	return { hasProjectId: false, projectId: null, valid: true }
-}
-
-const get_request_token = (request: IncomingMessage): string | null => {
-	const direct_token = request.headers['x-strata-token']
-	if ('string' === typeof direct_token && direct_token.trim()) {
-		return direct_token.trim()
-	}
-
-	const authorization = request.headers.authorization
-	if ('string' === typeof authorization && authorization.startsWith('Bearer ')) {
-		const token = authorization.slice('Bearer '.length).trim()
-		if (token) return token
-	}
-
-	return null
-}
-
-const create_handler = (db: StrataDatabase, api_token: string | null, options: NotesApiServerOptions) => {
-	return async (request: IncomingMessage): Promise<JsonResponse> => {
-		const method = parse_method(request.method)
-		if (!method) {
-			return { status: 405, body: { error: 'Method not allowed' } }
-		}
-		if (request.headers.origin || request.headers['sec-fetch-site']) return { status: 403, body: { error: 'Browser requests are not allowed' } }
-		if ((request.url?.length ?? 0) > 8192) return { status: 414, body: { error: 'URL too long' } }
-		if (Number(request.headers['content-length'] ?? 0) > request_body_limit_bytes) return { status: 413, body: { error: 'Request body exceeds 1MB limit' } }
-		if (['POST', 'PUT', 'PATCH'].includes(method) && !/^application\/json(?:;|$)/i.test(request.headers['content-type'] ?? '')) return { status: 415, body: { error: 'Expected application/json' } }
-
-		if (api_token) {
-			const request_token = get_request_token(request)
-			if (!tokensEqual(request_token, api_token)) {
-				return { status: 401, body: { error: 'Unauthorized' } }
-			}
-		}
-
-		const request_url = new URL(request.url ?? '/', `http://${default_api_host}`)
-		const parts = request_url.pathname.split('/').filter(Boolean)
-
-		if ('GET' === method && 1 === parts.length && 'health' === parts[0]) {
-			return { status: 200, body: { ok: true } }
-		}
-
-		if ('GET' === method && 1 === parts.length && 'notes' === parts[0]) {
-			const filters = list_schema.parse({
-				query: request_url.searchParams.get('query') ?? undefined,
-				starred: parse_boolean(request_url.searchParams.get('starred')),
-				archived: parse_boolean(request_url.searchParams.get('archived')),
-				tag: request_url.searchParams.get('tag') ?? undefined,
-				projectId: request_url.searchParams.get('projectId') ?? undefined,
-				includeDeleted: parse_boolean(request_url.searchParams.get('includeDeleted')),
-			})
-			return { status: 200, body: { notes: db.listNotes(filters) } }
-		}
-
-		if ('GET' === method && 2 === parts.length && 'notes' === parts[0]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			const note = db.getNote(id)
-			if (!note) {
-				return { status: 404, body: { error: 'Note not found' } }
-			}
-			return { status: 200, body: { note } }
-		}
-
-		if ('POST' === method && 1 === parts.length && 'notes' === parts[0]) {
-			const body = await get_request_body(request)
-			const parsed = create_schema.parse(body)
-			const project_resolution = parsed ? resolve_project_id(db, parsed) : { hasProjectId: false, projectId: null, valid: true }
-			if (project_resolution.hasProjectId && !project_resolution.valid) {
-				return { status: 404, body: { error: 'Project not found' } }
-			}
-			const created = db.createNote({
-				content: parsed?.content,
-				starred: parsed?.starred,
-				archived: parsed?.archived,
-				tags: parsed?.tags,
-				projectId: project_resolution.hasProjectId ? project_resolution.projectId : null,
-			})
-			options.onNotesChanged?.()
-			return { status: 201, body: { note: created } }
-		}
-
-		if (('PUT' === method || 'PATCH' === method) && 2 === parts.length && 'notes' === parts[0]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			const body = await get_request_body(request)
-			const patch = parse_update_patch(body)
-			const project_resolution = resolve_project_id(db, patch)
-			if (project_resolution.hasProjectId && !project_resolution.valid) {
-				return { status: 404, body: { error: 'Project not found' } }
-			}
-			const update_patch: NoteUpdatePatch = { ...patch }
-			if (project_resolution.hasProjectId) {
-				update_patch.projectId = project_resolution.projectId
-			}
-			const updated = db.updateNote(id, update_patch)
-			if (!updated) {
-				return { status: 404, body: { error: 'Note not found' } }
-			}
-			options.onNotesChanged?.()
-			return { status: 200, body: { note: updated } }
-		}
-
-		if ('DELETE' === method && 2 === parts.length && 'notes' === parts[0]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			const deleted = db.deleteNote(id)
-			if (!deleted) {
-				return { status: 404, body: { error: 'Note not found' } }
-			}
-			options.onNotesChanged?.()
-			return { status: 200, body: { deleted: true } }
-		}
-
-		// ---- Tags ----
-		if ('GET' === method && 1 === parts.length && 'tags' === parts[0]) {
-			return { status: 200, body: { tags: db.listTags() } }
-		}
-
-		// ---- Projects ----
-		if ('GET' === method && 1 === parts.length && 'projects' === parts[0]) {
-			return { status: 200, body: { projects: db.listProjects() } }
-		}
-
-		if ('POST' === method && 1 === parts.length && 'projects' === parts[0]) {
-			const body = await get_request_body(request)
-			const parsed = project_create_schema.parse(body)
-			const project = db.createProject(parsed.name)
-			options.onNotesChanged?.()
-			return { status: 201, body: { project } }
-		}
-
-		if ('POST' === method && 2 === parts.length && 'projects' === parts[0] && 'reorder' === parts[1]) {
-			const body = await get_request_body(request)
-			const parsed = project_reorder_schema.parse(body)
-			const projects = db.reorderProjects(parsed.projectIds)
-			options.onNotesChanged?.()
-			return { status: 200, body: { projects } }
-		}
-
-		if (('PUT' === method || 'PATCH' === method) && 2 === parts.length && 'projects' === parts[0]) {
-			const { id } = project_id_schema.parse({ id: parts[1] })
-			const body = await get_request_body(request)
-			const parsed = project_update_schema.parse(body)
-			const project = db.renameProject(id, parsed.name)
-			if (!project) {
-				return { status: 404, body: { error: 'Project not found' } }
-			}
-			options.onNotesChanged?.()
-			return { status: 200, body: { project } }
-		}
-
-		if ('DELETE' === method && 2 === parts.length && 'projects' === parts[0]) {
-			const { id } = project_id_schema.parse({ id: parts[1] })
-			const deleted = db.deleteProject(id)
-			if (!deleted) {
-				return { status: 404, body: { error: 'Project not found' } }
-			}
-			options.onNotesChanged?.()
-			return { status: 200, body: { deleted: true } }
-		}
-
-		if ('GET' === method && 3 === parts.length && 'projects' === parts[0] && 'notes' === parts[2]) {
-			const { id } = project_id_schema.parse({ id: parts[1] })
-			const project = db.getProject(id)
-			if (!project) return { status: 404, body: { error: 'Project not found' } }
-			return { status: 200, body: { project, notes: db.listNotes({ projectId: id, includeDeleted: false }) } }
-		}
-
-		// ---- Search ----
-		if ('GET' === method && 1 === parts.length && 'search' === parts[0]) {
-			const query = request_url.searchParams.get('q') ?? ''
-			const limit_str = request_url.searchParams.get('limit')
-			const limit = limit_str ? Math.min(100, Math.max(1, Number(limit_str) || 25)) : 25
-			if (!query.trim()) return { status: 200, body: { notes: [] } }
-			return { status: 200, body: { notes: db.aiSearchNotes(query, limit) } }
-		}
-
-		// ---- Backlinks ----
-		if ('GET' === method && 3 === parts.length && 'notes' === parts[0] && 'backlinks' === parts[2]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			const note = db.getNote(id)
-			if (!note) return { status: 404, body: { error: 'Note not found' } }
-			return { status: 200, body: { backlinks: db.getBacklinks(id) } }
-		}
-
-		// ---- Related Notes ----
-		if ('GET' === method && 3 === parts.length && 'notes' === parts[0] && 'related' === parts[2]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			const note = db.getNote(id)
-			if (!note) return { status: 404, body: { error: 'Note not found' } }
-			const all_notes = db.listNotes({ includeDeleted: false })
-			const link_index = db.getAllLinks()
-			// Use the same algorithm as the IPC handler
-			const related = computeRelated(note, all_notes, link_index)
-			return { status: 200, body: { related } }
-		}
-
-		// ---- AI Edit History ----
-		if ('GET' === method && 3 === parts.length && 'notes' === parts[0] && 'ai-edits' === parts[2]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			if (!db.getNote(id)) return { status: 404, body: { error: 'Note not found' } }
-			return { status: 200, body: { edits: db.listAiEdits(id) } }
-		}
-
-		// ---- AI Edit Revert ----
-		if ('POST' === method && 3 === parts.length && 'ai-edits' === parts[0] && 'revert' === parts[2]) {
-			const { id } = id_schema.parse({ id: parts[1] })
-			const reverted = db.revertAiEdit(id)
-			if (!reverted) return { status: 404, body: { error: 'Edit not found or already reverted' } }
-			options.onNotesChanged?.()
-			return { status: 200, body: { reverted: true } }
-		}
-
-		return { status: 404, body: { error: 'Not found' } }
-	}
-}
-
-const resolve_api_port = (): number => {
-	const raw_port = process.env.STRATA_API_PORT
-	if (!raw_port) return default_api_port
-	const parsed = Number.parseInt(raw_port, 10)
-	if (!Number.isFinite(parsed) || parsed < 1 || parsed > 65535) {
-		return default_api_port
-	}
-	return parsed
-}
-
-const resolve_api_host = (): string => {
-	const host = process.env.STRATA_API_HOST
-	if (!host) return default_api_host
-	return host
-}
-
-const start_http_server = async (server: Server, port: number, host: string): Promise<void> => {
-	await new Promise<void>((resolve, reject) => {
-		server.once('error', reject)
-		server.listen(port, host, () => {
-			server.off('error', reject)
-			resolve()
-		})
-	})
-}
-
-export const startNotesApiServer = async (db: StrataDatabase, options: NotesApiServerOptions = {}): Promise<ApiServerInstance> => {
-	const host = options.host ?? resolve_api_host()
-	const requested_port = options.port ?? resolve_api_port()
-	if (!isLoopbackHost(host)) throw new Error('Non-loopback API binding is disabled; use an authenticated tunnel for remote automation')
-	const api_token = options.token ?? ensureLocalCredential()
-	if (api_token.length < 32) throw new Error('API token must contain at least 32 characters')
-	const handler = create_handler(db, api_token, options)
-
-	const server = createServer(async (request, response) => {
-		try {
-			const result = await handler(request)
-			write_json(response, result.status, result.body)
-		} catch (error) {
-			if (error instanceof z.ZodError) {
-				write_json(response, 400, {
-					error: 'Validation failed',
-					details: error.issues,
-				})
-				return
-			}
-
-			if (error instanceof SyntaxError) {
-				write_json(response, 400, { error: 'Invalid JSON body' })
-				return
-			}
-
-			if (error instanceof Error && 'Request body exceeds 1MB limit' === error.message) {
-				write_json(response, 413, { error: error.message })
-				return
-			}
-
-			console.error('[strata-api] Request failed')
-			write_json(response, 500, { error: 'Internal server error' })
-		}
-	})
-
-	server.requestTimeout = 15000
-	server.headersTimeout = 10000
-	server.keepAliveTimeout = 5000
-	server.setTimeout(15000, socket => socket.destroy())
-	server.maxHeadersCount = 50
-	await start_http_server(server, requested_port, host)
-	const address = server.address()
-	const port = address && 'object' === typeof address ? address.port : requested_port
-	if (api_token) {
-		console.info(`[strata-api] Notes API listening at http://${host}:${port} (token auth enabled)`)
-	} else {
-		console.info(`[strata-api] Notes API listening at http://${host}:${port}`)
-	}
-
-	return {
-		port,
-		close: () => {
-			return new Promise<void>((resolve, reject) => {
-				server.close((error) => {
-					if (error) {
-						reject(error)
-						return
-					}
-					resolve()
-				})
-			})
-		},
-	}
+export const startNotesApiServer = async (db: StrataDatabase, options: Options = {}) => {
+  const host = options.host ?? process.env.STRATA_API_HOST ?? '127.0.0.1'
+  if (!isLoopbackHost(host))
+    throw new Error('Non-loopback API binding is disabled; use an authenticated tunnel for remote automation')
+  const port = options.port ?? Number(process.env.STRATA_API_PORT ?? 3939)
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid API port')
+  const token = options.token ?? ensureLocalCredential()
+  if (token.length < 32) throw new Error('API token must contain at least 32 characters')
+  const service = new KnowledgeService(db, () => options.onNotesChanged?.())
+  const handle = async (request: IncomingMessage) => {
+    if (request.headers.origin || request.headers['sec-fetch-site'])
+      return fail('ORIGIN_FORBIDDEN', 'Browser requests are not allowed', 403)
+    const authorization = request.headers.authorization
+    const supplied = authorization?.startsWith('Bearer ')
+      ? authorization.slice(7)
+      : request.headers['x-strata-token']
+    if (!tokensEqual(typeof supplied === 'string' ? supplied : null, token))
+      return fail('UNAUTHORIZED', 'Unauthorized', 401)
+    if ((request.url?.length ?? 0) > 8192) return fail('URL_TOO_LONG', 'URL too long', 414)
+    if (Number(request.headers['content-length'] ?? 0) > MAX_BODY)
+      return fail('PAYLOAD_TOO_LARGE', 'Request exceeds 1MB', 413)
+    const method = request.method ?? 'GET'
+    if (
+      ['POST', 'PUT', 'PATCH'].includes(method) &&
+      !/^application\/json(?:;|$)/i.test(request.headers['content-type'] ?? '')
+    )
+      return fail('UNSUPPORTED_MEDIA_TYPE', 'Expected application/json', 415)
+    const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (parts[0] === 'v1') parts.shift()
+    const route = parts.join('/')
+    const mutationOptions = {
+      source: 'api',
+      key:
+        typeof request.headers['idempotency-key'] === 'string'
+          ? request.headers['idempotency-key']
+          : undefined,
+    }
+    const filters = () =>
+      listSchema.parse({
+        query: url.searchParams.get('query') ?? url.searchParams.get('q') ?? undefined,
+        starred: boolean(url.searchParams.get('starred')),
+        archived: boolean(url.searchParams.get('archived')),
+        tag: url.searchParams.get('tag') ?? undefined,
+        projectId: url.searchParams.get('projectId') ?? undefined,
+        includeDeleted: boolean(url.searchParams.get('includeDeleted')),
+        limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined,
+        cursor: url.searchParams.get('cursor') ?? undefined,
+      })
+    const ok = (payload: unknown, status = 200) => ({ status, body: payload })
+    if (method === 'GET' && route === 'health') return ok({ ok: true })
+    if (method === 'GET' && route === 'capabilities')
+      return ok({
+        version: '0.8.0',
+        apiVersion: 1,
+        schemaVersion: 10,
+        auth: 'local-token',
+        search: 'fts5-with-substring-fallback',
+        capabilities: [
+          'summaries',
+          'pagination',
+          'revisions',
+          'optimistic-concurrency',
+          'history',
+          'batch',
+          'idempotency',
+        ],
+        limits: { list: 100, batch: 50, bodyBytes: MAX_BODY },
+        mutation: { expectedRevision: 'required', dryRun: true, aiConfirmation: 'approval-required' },
+        aiEnabled: Boolean(db.getSettings().openAiApiKey),
+      })
+    if (method === 'GET' && (route === 'notes' || route === 'search'))
+      return ok(db.listSummaryPage(filters()))
+    if (method === 'POST' && route === 'batch') return ok(service.batch(await body(request), mutationOptions))
+    if (method === 'POST' && route === 'notes')
+      return ok(
+        { note: service.mutate({ op: 'create_note', payload: await body(request) }, mutationOptions) },
+        201,
+      )
+    if (parts[0] === 'notes' && parts.length >= 2) {
+      const id = idSchema.parse(parts[1])
+      if (method === 'GET' && parts.length === 2) {
+        const note = db.getNote(id)
+        return note ? ok({ note }) : fail('NOT_FOUND', 'Note not found', 404)
+      }
+      if (['PATCH', 'PUT'].includes(method) && parts.length === 2) {
+        const payload = z.record(z.string(), z.unknown()).parse(await body(request))
+        if (request.headers['if-match'])
+          payload.expectedRevision = Number(String(request.headers['if-match']).replace(/^"|"$/g, ''))
+        return ok({ note: service.mutate({ op: 'update_note', id, payload }, mutationOptions) })
+      }
+      if (method === 'DELETE' && parts.length === 2)
+        return ok(
+          service.mutate(
+            {
+              op: 'delete_note',
+              id,
+              expectedRevision: Number(
+                request.headers['if-match'] ?? url.searchParams.get('expectedRevision'),
+              ),
+            },
+            mutationOptions,
+          ),
+        )
+      if (method === 'GET' && parts[2] === 'history') return ok({ revisions: db.listRevisions(id) })
+      if (method === 'POST' && parts[2] === 'restore') {
+        const parsed = z
+          .object({ revision: revisionSchema, expectedRevision: revisionSchema })
+          .strict()
+          .parse(await body(request))
+        const note = db.restoreRevision(id, parsed.revision, parsed.expectedRevision)
+        if (!note) return fail('NOT_FOUND', 'Note not found', 404)
+        options.onNotesChanged?.()
+        return ok({ note })
+      }
+      if (!db.getNote(id)) return fail('NOT_FOUND', 'Note not found', 404)
+      if (method === 'GET' && parts[2] === 'backlinks')
+        return ok({
+          backlinks: db.getBacklinks(id).map((entry) => ({ ...entry, source: db.summarize(entry.source) })),
+        })
+      if (method === 'GET' && parts[2] === 'related')
+        return ok({
+          related: db.getRelatedNotes(id).map((entry) => ({ ...entry, note: db.summarize(entry.note) })),
+        })
+      if (method === 'GET' && parts[2] === 'ai-edits') return ok({ edits: db.listAiEdits(id) })
+    }
+    if (method === 'GET' && route === 'tags') return ok({ tags: db.listTags() })
+    if (method === 'GET' && route === 'projects') return ok({ projects: db.listProjects() })
+    if (method === 'POST' && route === 'projects') {
+      const parsed = z
+        .object({ name: z.string() })
+        .strict()
+        .parse(await body(request))
+      return ok(
+        { project: service.mutate({ op: 'create_project', name: parsed.name }, mutationOptions) },
+        201,
+      )
+    }
+    if (method === 'POST' && route === 'projects/reorder') {
+      const parsed = z
+        .object({ projectIds: z.array(idSchema).max(1000) })
+        .strict()
+        .parse(await body(request))
+      const projects = db.reorderProjects(parsed.projectIds)
+      options.onNotesChanged?.()
+      return ok({ projects })
+    }
+    if (parts[0] === 'projects' && parts.length >= 2) {
+      const id = idSchema.parse(parts[1])
+      if (method === 'GET' && parts[2] === 'notes') {
+        const project = db.getProject(id)
+        return project
+          ? ok({ project, ...db.listSummaryPage({ ...filters(), projectId: id }) })
+          : fail('NOT_FOUND', 'Project not found', 404)
+      }
+      if (['PATCH', 'PUT'].includes(method) && parts.length === 2) {
+        const parsed = z
+          .object({ name: z.string() })
+          .strict()
+          .parse(await body(request))
+        return ok({
+          project: service.mutate({ op: 'rename_project', id, name: parsed.name }, mutationOptions),
+        })
+      }
+      if (method === 'DELETE' && parts.length === 2)
+        return ok(service.mutate({ op: 'delete_project', id }, mutationOptions))
+    }
+    if (method === 'POST' && parts[0] === 'ai-edits' && parts[2] === 'revert') {
+      const reverted = db.revertAiEdit(idSchema.parse(parts[1]))
+      if (reverted) options.onNotesChanged?.()
+      return reverted ? ok({ reverted }) : fail('NOT_FOUND', 'Edit not found or already reverted', 404)
+    }
+    return fail('NOT_FOUND', 'Not found', 404)
+  }
+  const server = createServer(async (request, response) => {
+    try {
+      const result = await handle(request)
+      write(response, result.status, result.body)
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const result = fail('VALIDATION_ERROR', 'Validation failed', 400, {
+          issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })),
+        })
+        write(response, result.status, result.body)
+        return
+      }
+      if (error instanceof SyntaxError) {
+        const result = fail('INVALID_JSON', 'Invalid JSON body')
+        write(response, result.status, result.body)
+        return
+      }
+      if (error instanceof DomainError) {
+        const status =
+          error.code.includes('CONFLICT') || error.code === 'ALREADY_EXISTS'
+            ? 409
+            : error.code === 'NOT_FOUND'
+              ? 404
+              : error.code === 'PAYLOAD_TOO_LARGE'
+                ? 413
+                : 400
+        write(response, status, fail(error.code, error.message, status, error.details).body)
+        return
+      }
+      console.error('[strata-api] Request failed')
+      write(response, 500, fail('INTERNAL_ERROR', 'Internal server error', 500).body)
+    }
+  })
+  server.requestTimeout = 15000
+  server.headersTimeout = 10000
+  server.keepAliveTimeout = 5000
+  server.maxHeadersCount = 50
+  server.setTimeout(15000, (socket) => socket.destroy())
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(port, host, () => {
+      server.off('error', reject)
+      resolve()
+    })
+  })
+  const address = server.address()
+  const actualPort = address && typeof address === 'object' ? address.port : port
+  return {
+    port: actualPort,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+        server.closeIdleConnections()
+      }),
+  }
 }

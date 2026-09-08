@@ -13,7 +13,10 @@ export const project_schema = z.object({
 
 export const note_schema = z.object({
 	id: note_id_schema,
-	content: z.string(),
+	content: z.string().default(''),
+	title: z.string().optional(),
+	snippet: z.string().optional(),
+	revision: z.number().int().positive().default(1),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 	starred: z.boolean(),
@@ -25,6 +28,7 @@ export const note_schema = z.object({
 
 export const note_list_response_schema = z.object({
 	notes: z.array(note_schema),
+	nextCursor: z.string().nullable().optional(),
 })
 
 export const note_response_schema = z.object({
@@ -55,13 +59,14 @@ export const health_response_schema = z.object({
 })
 
 export const notes_filter_schema = z.object({
+	cursor: z.string().optional(),
 	query: z.string().trim().optional(),
 	tag: z.string().trim().optional(),
 	projectId: project_id_schema.optional(),
 	starred: z.boolean().optional(),
 	archived: z.boolean().optional(),
 	includeDeleted: z.boolean().optional(),
-	limit: z.number().int().min(1).max(500).optional(),
+	limit: z.number().int().min(1).max(100).optional(),
 })
 
 export const note_create_patch_schema = z.object({
@@ -74,6 +79,7 @@ export const note_create_patch_schema = z.object({
 })
 
 export const note_update_patch_schema = z.object({
+	expectedRevision: z.number().int().positive().optional(),
 	content: z.string().trim().min(1).max(500000).optional(),
 	tags: z.array(z.string().trim().min(1).max(64)).max(100).optional(),
 	starred: z.boolean().optional(),

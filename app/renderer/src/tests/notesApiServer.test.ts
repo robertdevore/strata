@@ -36,7 +36,7 @@ describe('notes API validation', () => {
 		const response = await authenticatedFetch(`${baseUrl}/notes?starred=definitely`)
 
 		expect(response.status).toBe(400)
-		expect(await response.json()).toMatchObject({ error: 'Validation failed' })
+		expect(await response.json()).toMatchObject({ error: {code: 'VALIDATION_ERROR'} })
 	})
 
 	it('returns 404 when AI edit history is requested for a missing note', async () => {
@@ -44,7 +44,7 @@ describe('notes API validation', () => {
 		const response = await authenticatedFetch(`${baseUrl}/notes/00000000-0000-4000-8000-000000000000/ai-edits`)
 
 		expect(response.status).toBe(404)
-		expect(await response.json()).toEqual({ error: 'Note not found' })
+		expect(await response.json()).toMatchObject({ error: {code: 'NOT_FOUND'} })
 	})
 
 	it('keeps create-to-retrieval synchronous across API, agent context, and restart', async () => {

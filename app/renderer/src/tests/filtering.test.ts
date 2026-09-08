@@ -13,6 +13,7 @@ const notes: Note[] = [
 		tags: ['work'],
 		projectId: null,
 		deletedAt: null,
+		revision: 1,
 	},
 	{
 		id: '22222222-2222-4222-8222-222222222222',
@@ -24,6 +25,7 @@ const notes: Note[] = [
 		tags: ['ideas'],
 		projectId: null,
 		deletedAt: null,
+		revision: 1,
 	},
 	{
 		id: '33333333-3333-4333-8333-333333333333',
@@ -35,6 +37,7 @@ const notes: Note[] = [
 		tags: [],
 		projectId: null,
 		deletedAt: null,
+		revision: 1,
 	},
 ]
 
