@@ -23,6 +23,11 @@ export interface BackupListing {
 }
 
 export interface StrataApi {
+  history: {
+    storage: () => Promise<{ revisions: number; bytes: number }>
+    previewPrune: (keep: number) => Promise<{ count: number; bytes: number; fingerprint: string }>
+    prune: (keep: number, fingerprint: string) => Promise<number>
+  }
   notes: {
     history: (
       id: string,

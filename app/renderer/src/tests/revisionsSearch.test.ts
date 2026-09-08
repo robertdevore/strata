@@ -22,6 +22,33 @@ const open = () => {
   return { db, dir, service: new KnowledgeService(db) }
 }
 describe('transactional knowledge contracts', () => {
+  it('previews history cleanup and rejects changed plans while preserving recovery', () => {
+    const { db } = open()
+    const a = db.createNote({ content: 'a0' })
+    const b = db.createNote({ content: 'b0' })
+    for (let i = 1; i <= 25; i += 1) {
+      db.updateNote(a.id, { content: `a${i}` })
+      db.updateNote(b.id, { content: `b${i}` })
+    }
+    const plan = db.historyPrunePlan(20)
+    expect(plan.count).toBe(12)
+    expect(plan.bytes).toBeGreaterThan(0)
+    expect(db.historyStats().revisions).toBe(52)
+    expect(() => db.historyPrunePlan(19)).toThrow()
+    db.deleteNote(b.id)
+    expect(() => db.pruneHistory(20, plan.fingerprint)).toThrow('History changed')
+    expect(db.historyStats().revisions).toBe(53)
+    const next = db.historyPrunePlan(20)
+    expect(db.pruneHistory(20, next.fingerprint)).toBe(13)
+    expect(db.historyStats().revisions).toBe(40)
+    expect(db.getNote(a.id)?.content).toBe('a25')
+    expect(db.getNote(b.id)).toBeNull()
+    expect(db.getRevision(a.id, 1)).toBeNull()
+    expect(db.getRevision(a.id, 7)?.snapshot.content).toBe('a6')
+    expect(db.restoreRevision(a.id, 7, 26)?.content).toBe('a6')
+    expect(db.historyPrunePlan(20).count).toBe(1)
+  })
+
   it('removes legacy routing excerpts when a library is opened', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-route-legacy-'))
     let db = new StrataDatabase(dir)

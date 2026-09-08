@@ -3,6 +3,11 @@ import type { StrataApi } from './api'
 import { IPC_CHANNELS } from '../shared/ipc'
 
 const api: StrataApi = {
+  history: {
+    storage: () => ipcRenderer.invoke('history:storage'),
+    previewPrune: (keep) => ipcRenderer.invoke('history:prune:preview', { keep }),
+    prune: (keep, fingerprint) => ipcRenderer.invoke('history:prune:apply', { keep, fingerprint }),
+  },
   notes: {
     history: (id) => ipcRenderer.invoke('notes:history', { id }),
     getRevision: (id, revision) => ipcRenderer.invoke('notes:revision', { id, revision }),

@@ -12,6 +12,21 @@ const star_schema = mutation_schema.extend({ starred: z.boolean() })
 
 export const registerNotesHandlers = (db: StrataDatabase) => {
   const service = new KnowledgeService(db)
+  ipcMain.handle('history:storage', () => db.historyStats())
+  ipcMain.handle('history:prune:preview', (_event, payload) => {
+    const { keep } = z
+      .object({ keep: z.number().int().min(20).max(10000) })
+      .strict()
+      .parse(payload)
+    return db.historyPrunePlan(keep)
+  })
+  ipcMain.handle('history:prune:apply', (_event, payload) => {
+    const { keep, fingerprint } = z
+      .object({ keep: z.number().int().min(20).max(10000), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) })
+      .strict()
+      .parse(payload)
+    return db.pruneHistory(keep, fingerprint)
+  })
   ipcMain.handle('notes:history', (_event, payload) => db.listRevisionSummaries(id_schema.parse(payload).id))
   ipcMain.handle('notes:revision', (_event, payload) => {
     const p = z.object({ id: z.string().uuid(), revision: z.number().int().positive() }).parse(payload)

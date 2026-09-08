@@ -2,6 +2,7 @@ import { DomainError } from '../../shared/errors'
 import type { NoteSummary, NoteRevision } from '../../shared/types'
 import { SECRET_KEYS, SECRET_PRESENT, type SecretStore } from '../security/secretStore'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { v4 as uuidv4 } from 'uuid'
@@ -334,17 +335,50 @@ export class StrataDatabase {
       )
       .get() as { revisions: number; bytes: number }
   }
-  pruneHistory(keep: number): number {
+  historyPrunePlan(keep: number): { count: number; bytes: number; fingerprint: string } {
     if (!Number.isSafeInteger(keep) || keep < 20 || keep > 10000)
       throw new DomainError('VALIDATION_ERROR', 'Keep between 20 and 10000 revisions per note')
-    return this.transaction(
-      () =>
-        this.db
-          .prepare(
-            'DELETE FROM note_revisions WHERE revision NOT IN (SELECT revision FROM note_revisions recent WHERE recent.note_id=note_revisions.note_id ORDER BY revision DESC LIMIT ?)',
-          )
-          .run(keep).changes,
-    )
+    const hash = createHash('sha256').update(String(keep))
+    let count = 0
+    let bytes = 0
+    const rows = this.db
+      .prepare(
+        `
+      SELECT note_id,revision,length(CAST(snapshot AS BLOB)) AS bytes FROM (
+        SELECT note_id,revision,snapshot,ROW_NUMBER() OVER(PARTITION BY note_id ORDER BY revision DESC) AS position
+        FROM note_revisions
+      ) WHERE position > ? ORDER BY note_id,revision
+    `,
+      )
+      .iterate(keep) as Iterable<{ note_id: string; revision: number; bytes: number }>
+    for (const row of rows) {
+      count += 1
+      bytes += row.bytes
+      hash.update(JSON.stringify(row))
+    }
+    return { count, bytes, fingerprint: hash.digest('hex') }
+  }
+  pruneHistory(keep: number, expectedFingerprint?: string): number {
+    return this.transaction(() => {
+      const plan = this.historyPrunePlan(keep)
+      if (expectedFingerprint !== undefined && plan.fingerprint !== expectedFingerprint)
+        throw new DomainError(
+          'REVISION_CONFLICT',
+          'History changed. Preview cleanup again before applying it.',
+        )
+      return this.db
+        .prepare(
+          `
+        DELETE FROM note_revisions WHERE (note_id,revision) IN (
+          SELECT note_id,revision FROM (
+            SELECT note_id,revision,ROW_NUMBER() OVER(PARTITION BY note_id ORDER BY revision DESC) AS position
+            FROM note_revisions
+          ) WHERE position > ?
+        )
+      `,
+        )
+        .run(keep).changes
+    })
   }
 
   restoreRevision(id: string, revision: number, expectedRevision: number): Note | null {

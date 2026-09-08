@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HistoryStorage } from './HistoryStorage'
 import type { FormEvent } from 'react'
 import type { Project, Settings } from '@shared/types'
 import { DEFAULT_HOTKEYS } from '@shared/hotkeys'
@@ -900,6 +901,7 @@ export function SettingsModal({
           {/* ---- Backups Tab ---- */}
           {'backups' === tab && (
             <>
+              <HistoryStorage />
               <label>
                 Auto Backup Frequency
                 <select
