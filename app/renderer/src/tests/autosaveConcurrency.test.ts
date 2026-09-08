@@ -31,6 +31,51 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 describe('autosave revision safety', () => {
+  it('does not let delayed hydration replace a newer loaded revision', async () => {
+    let complete: (value: Note) => void = () => {}
+    vi.stubGlobal('window', {
+      strata: {
+        notes: {
+          get: vi.fn(
+            () =>
+              new Promise((resolve) => {
+                complete = resolve
+              }),
+          ),
+        },
+      },
+    })
+    useAppStore.setState({ notes: [{ ...note, contentLoaded: false, content: 'snippet' }] })
+    const hydration = useAppStore.getState().hydrateNote(note.id)
+    useAppStore.setState({ notes: [{ ...note, revision: 6, content: 'newer' }] })
+    complete(note)
+    await hydration
+    expect(useAppStore.getState().notes[0]).toMatchObject({ revision: 6, content: 'newer' })
+  })
+  it('preserves a draft and its base revision when hydration finds an external edit', async () => {
+    let complete: (value: Note) => void = () => {}
+    vi.stubGlobal('window', {
+      strata: {
+        notes: {
+          get: vi.fn(
+            () =>
+              new Promise((resolve) => {
+                complete = resolve
+              }),
+          ),
+        },
+      },
+    })
+    useAppStore.setState({ notes: [{ ...note, contentLoaded: false, content: 'snippet' }] })
+    const hydration = useAppStore.getState().hydrateNote(note.id)
+    useAppStore.getState().setDraft(note.id, 'human draft')
+    complete({ ...note, revision: 6, content: 'external edit' })
+    await hydration
+    expect(useAppStore.getState().notes[0].revision).toBe(5)
+    expect(useAppStore.getState().drafts[note.id]).toBe('human draft')
+    expect(useAppStore.getState().saveState).toBe('conflict')
+  })
+
   it('preserves a draft when the API rejects a stale revision', async () => {
     const update = vi.fn().mockRejectedValue(new Error('REVISION_CONFLICT: stale'))
     vi.stubGlobal('window', { strata: { notes: { update } } })

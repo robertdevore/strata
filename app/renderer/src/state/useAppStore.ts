@@ -309,17 +309,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!current || current.contentLoaded) return
     const full_note = await notesService.get(id)
     if (!full_note) return
-    set((state) => ({
-      notes: upsert_note(state.notes, full_note),
-      noteSummaryCache: {
-        ...state.noteSummaryCache,
-        [id]: state.noteSummaryCache[id] ?? summarize_note_content(current.content),
-      },
-      noteLastAccessedAt: {
-        ...state.noteLastAccessedAt,
-        [id]: Date.now(),
-      },
-    }))
+    set((state) => {
+      const latest = state.notes.find((note) => note.id === id)
+      // A delayed read must not resurrect a removed note or replace a newer revision.
+      if (!latest || latest.revision > full_note.revision) return state
+      if (state.drafts[id] !== undefined && full_note.revision !== latest.revision) {
+        return { saveState: 'conflict' }
+      }
+      return {
+        notes: upsert_note(state.notes, full_note),
+        noteSummaryCache: { ...state.noteSummaryCache, [id]: summarize_note_content(full_note.content) },
+        noteLastAccessedAt: { ...state.noteLastAccessedAt, [id]: Date.now() },
+      }
+    })
   },
 
   touchNote(id) {

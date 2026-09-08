@@ -162,3 +162,9 @@ Desktop backups now use atomically allocated unique directories, verify SQLite b
 
 Added database-backed tests for concurrent manual backups, retention, metadata, restoring a chosen backup with revision history, and failed-output cleanup. Added an administrative Python-script regression using a live WAL source: verifies knowledge survives, credentials are absent from copied rows and physical bytes, the original credential remains unchanged, manifest metadata is correct and destination permissions are private. These checks use only synthetic libraries. Final source verification follows; full goal remains active.
 Verification passed formatting/lint, the full 135-test/30-file suite and production build. The additional administrative-backup test and its lint passed separately; final typecheck included it. No live user data was read or changed.
+
+### Full-scope gap reconciliation and hydration safety checkpoint
+
+Replaced placeholder-only requirements rows with a 60-step working evidence/gap ledger. It explicitly preserves outstanding standalone secret behavior, legacy transport consolidation, granular invalidation, desktop/e2e/profile work, final controlled benchmarks/budgets, remote CI and release/documentation audit. Scoped implementation evidence is not a final completion claim.
+
+Fixed delayed note hydration: removed notes are not resurrected, older responses cannot replace newer loaded revisions, and an external revision arriving during a draft preserves its original base and surfaces conflict. Added two concurrency regressions. `npm run verify` passed formatting/lint, 138 tests in 31 files, TypeScript and production build. Full hardening goal remains active.

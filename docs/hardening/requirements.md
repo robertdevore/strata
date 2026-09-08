@@ -1,66 +1,67 @@
 # Requirement-by-requirement completion audit
 
 Status is unproven until current-state evidence covers the complete requirement. The attached source specification remains authoritative. See STATUS.md for verified increments and remaining gaps.
+This is a working gap ledger, not a completion verdict. “Scoped tests passed” refers to the documented checkpoint evidence; the final release audit must revalidate requirements at the final commit. No row waives requirements from the attached specification.
 
 | Step | Requirement | Status | Evidence needed |
 |---|---|---|---|
-| 1 | Establish Current Ground Truth | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 2 | Lock Down the Local HTTP API | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 3 | Remove Arbitrary Renderer Shell Execution | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 4 | Harden Electron Navigation | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 5 | Move AI/API Secrets Out of SQLite | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 6 | Make AI "Confirm" Mode Actually Confirm | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 7 | Introduce Universal Note Revisions | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 8 | Add Optimistic Concurrency | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 9 | Make Revert Conflict-Safe | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 10 | Make Core Mutations Transactional | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 11 | Enable SQLite Foreign Keys | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 12 | Build a Proper Indexed Note Title Model | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 13 | Replace Global Wiki-Link Rebuild Behavior | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 14 | Add SQLite FTS5 Search | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 15 | Redesign Search Results Around Summary Records | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 16 | Add Server-Side Pagination | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 17 | Rewrite Tag Counting in SQL | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 18 | Fix Backlink N+1 Queries | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 19 | Redesign Related Notes for Scale | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 20 | Make AI Retrieval More Token-Efficient | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 21 | Budget AI Conversation Context | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 22 | Fix Cheap → Premium Fallback Tool Loop | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 23 | Add Provider Timeouts and Cancellation | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 24 | Harden Custom AI Endpoints | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 25 | Bound Transcription Inputs | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 26 | Improve AI Tool Validation | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 27 | Replace `notesChanged` with Proper Invalidation | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 28 | Add Idempotency | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 29 | Add Transactional Batch Operations | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 30 | Add Capability Discovery | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 31 | Make the CLI First-Class Outside Source Checkout | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 32 | Improve CLI Token Efficiency | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 33 | Add Better Agent Memory Semantics | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 34 | Add Memory Deduplication Support | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 35 | Universal History Retention | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 36 | Route Log Privacy and Retention | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 37 | Strengthen Backups | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 38 | Database Performance Audit | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 39 | Renderer Performance Audit | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 40 | Review Autosave Semantics | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 41 | Improve External Mutation Refresh | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 42 | Review Search UX | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 43 | Review Link UX | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 44 | Tighten AI System Prompt Token Usage | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 45 | Tool Selection Efficiency | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 46 | AI Routing Evaluation | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 47 | Avoid Brittle Regex Truthfulness Logic | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 48 | Review Model Selection | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 49 | Improve Custom Provider Compatibility | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 50 | Review API Error Shape | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 51 | Add API Versioning | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 52 | Consider MCP After Core Contracts Stabilize | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 53 | Formalize the Domain Service Layer | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 54 | Keep Documentation Agent-Safe | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 55 | Consolidate Verification | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 56 | Add/Improve CI | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 57 | Dependency and Supply-Chain Review | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 58 | Packaging and Release UX | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 59 | Runtime Logging | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
-| 60 | Performance Budgets | Unproven | Inspect implementation, exercise required behavior, record verification artifact |
+| 1 | Establish Current Ground Truth | Partial | Baseline and repository changes recorded in STATUS.md; final whole-repository/TODO/issues sweep outstanding. |
+| 2 | Lock Down the Local HTTP API | Implemented; final audit pending | notesApiServer.ts; apiSecurity.test.ts. Default token, loopback, origin/body/time limits covered; packaged transport checks remain. |
+| 3 | Remove Arbitrary Renderer Shell Execution | Implemented; final audit pending | Preload shell.run removed; publishHandlers.ts uses selected destinations. Final privileged-surface sweep outstanding. |
+| 4 | Harden Electron Navigation | Partial | security/navigation.ts and navigation unit checks; actual renderer navigation/permission validation outstanding. |
+| 5 | Move AI/API Secrets Out of SQLite | Partial | secretStore.ts, secrets.test.ts, sanitized backups. Standalone legacy secret migration/credential behavior still needs closure. |
+| 6 | Make AI "Confirm" Mode Actually Confirm | Partial | KnowledgeService proposals, AiProposals UI, aiMutationSafety/providerFallback tests. Full approval UI interactions outstanding. |
+| 7 | Introduce Universal Note Revisions | Implemented; final audit pending | note_revisions migration, transaction snapshots, revisionsSearch tests. Final mutation-source coverage sweep outstanding. |
+| 8 | Add Optimistic Concurrency | Partial | Expected revisions required at main write transports; autosave/history tests. Per-note/split-pane status and remaining UI race audit outstanding. |
+| 9 | Make Revert Conflict-Safe | Implemented; scoped tests passed | Legacy AI revert after_revision check; selected-history expected revision; revisionsSearch and noteHistoryNavigation tests. |
+| 10 | Make Core Mutations Transactional | Partial | Shared service note/project/batch and atomic desktop imports. CLI folder import and other legacy mutation paths still need unification. |
+| 11 | Enable SQLite Foreign Keys | Implemented; scoped tests passed | StrataDatabase foreign_keys ON; legacy migration/foreign-key tests in revisionsSearch. |
+| 12 | Build a Proper Indexed Note Title Model | Implemented; scoped tests passed | Migration 10 materializes/indexes normalized titles; duplicate-title retrieval tests. |
+| 13 | Replace Global Wiki-Link Rebuild Behavior | Partial | Incremental affected-title/link maintenance; sparse-link benchmarks recorded. Dense graph/real Markdown benchmark still needed. |
+| 14 | Add SQLite FTS5 Search | Implemented; scoped tests passed | FTS5 triggers, materialized ranking/candidate-ID union; ranking/project/tag/pagination regression. |
+| 15 | Redesign Search Results Around Summary Records | Partial | Bounded summary projections in API/CLI/tools/renderer pages. Remaining full-list IPC/caller audit outstanding. |
+| 16 | Add Server-Side Pagination | Implemented; final audit pending | Bounded server pages and validated filter-bound offsets; cursor behavior under concurrent changes must be documented/tested. |
+| 17 | Rewrite Tag Counting in SQL | Implemented; scoped tests passed | Materialized note_tags SQL counts; after-candidate-search.json measures 50k tags at 11.18 ms. |
+| 18 | Fix Backlink N+1 Queries | Implemented; scoped tests passed | Backlink summary JOIN, bounded results; DB link tests and intermediate benchmarks. |
+| 19 | Redesign Related Notes for Scale | Partial | Bounded link/tag/project candidate pools. Shared-tag candidate source still uses JSON scan; adversarial sparse-tag workload outstanding. |
+| 20 | Make AI Retrieval More Token-Efficient | Partial | Default tool lists 15/snippets 200. Complete representative tool-byte/token comparison outstanding. |
+| 21 | Budget AI Conversation Context | Partial | History/open-note/tool-context budgets implemented; complete category/accounting/cancellation UI evaluation outstanding. |
+| 22 | Fix Cheap → Premium Fallback Tool Loop | Implemented; scoped tests passed | Shared tool loop/state across fallback; providerFallback tests cover proposals, writes, budgets and double failure. |
+| 23 | Add Provider Timeouts and Cancellation | Partial | providerRequest deadlines/AbortSignal support and timeout tests; end-user cancellation across adapters/IPC remains incomplete. |
+| 24 | Harden Custom AI Endpoints | Partial | HTTPS/localhost HTTP policy, redirect and URL rejection tests. Complete custom-endpoint/DNS policy review outstanding. |
+| 25 | Bound Transcription Inputs | Implemented; scoped tests passed | transcriptionInput.ts validates encoded/decoded limits and MIME before allocation; providerSecurity tests. |
+| 26 | Improve AI Tool Validation | Implemented; final audit pending | Runtime tool Zod schemas and structured errors; malformed and permission cases tested. Full catalog contract audit outstanding. |
+| 27 | Replace `notesChanged` with Proper Invalidation | Partial | Changed domains exist internally, but broad notesChanged compatibility and full refresh remain. Complete domain invalidation contract outstanding. |
+| 28 | Add Idempotency | Implemented; scoped tests passed | Transactional operation receipts/fingerprints; replay and key-conflict API/CLI tests. |
+| 29 | Add Transactional Batch Operations | Implemented; scoped tests passed | 50-operation atomic batch, rollback/dry-run tests, installed CLI integration. |
+| 30 | Add Capability Discovery | Implemented; final audit pending | Authenticated capabilities endpoint, schema/API version and limits. Synchronize advertised capability completeness in final audit. |
+| 31 | Make the CLI First-Class Outside Source Checkout | Implemented; scoped tests passed | scripts/strata.mjs bin; real tarball production install/native server/capture/retrieval/shutdown smoke. |
+| 32 | Improve CLI Token Efficiency | Partial | Summary list/search/context and full/fields/cursor outputs. Remaining requested flags and token comparison need audit. |
+| 33 | Add Better Agent Memory Semantics | Implemented; scoped tests passed | Markdown source/session provenance, agent/type tags, provider-neutral deterministic capture. |
+| 34 | Add Memory Deduplication Support | Implemented; scoped tests passed | Schema 12 content hash/index; transactional project-scoped exact capture dedupe and opt-out/dry-run tests. |
+| 35 | Universal History Retention | Implemented; scoped tests passed | Storage stats/manual retention preview+fingerprint approval; DB and HistoryStorage UI tests. No automatic history deletion. |
+| 36 | Route Log Privacy and Retention | Implemented; scoped tests passed | Metadata-only opt-in logs, 7/30/forever retention, deletion, legacy row cleanup tests; historical backups explicitly unchanged. |
+| 37 | Strengthen Backups | Implemented; final audit pending | Verified manifests/private permissions, optional automatic retention, restore and admin secret-removal tests. Backup health UI remains to audit. |
+| 38 | Database Performance Audit | Partial | 100/1k/10k/50k intermediate DB numbers exist. Real Markdown/dense links/project/backup and isolated release benchmarks incomplete. |
+| 39 | Renderer Performance Audit | Incomplete | No complete renderer profiling/e2e artifact; list/editor/chat/preview responsiveness still requires measurement. |
+| 40 | Review Autosave Semantics | Partial | Serialized autosaves/draft preservation/history and hydration races covered. Split panes/global save status and navigation interactions remain. |
+| 41 | Improve External Mutation Refresh | Partial | External and AI writes trigger refresh; failure-after-write notifications fixed. Granular domain refresh and full desktop checks remain. |
+| 42 | Review Search UX | Partial | Main sidebar uses FTS pages. Quick Open and navigation beyond currently loaded notes need closure. |
+| 43 | Review Link UX | Partial | Indexed title resolution preserves ambiguity in DB. Full wiki-link UX/unresolved/duplicate selection/rename behavior remains to validate. |
+| 44 | Tighten AI System Prompt Token Usage | Partial | System prompt compacted; source size/representative before-after token measurement outstanding. |
+| 45 | Tool Selection Efficiency | Incomplete | Dynamic subsets deliberately not added yet; measure catalog overhead and justify decision before completion. |
+| 46 | AI Routing Evaluation | Partial | Offline routing/provider/tool-loop regressions expanded. Full routing eval report with quality/cost/token/latency metrics outstanding. |
+| 47 | Avoid Brittle Regex Truthfulness Logic | Partial | Shared execution state preserves proposals/write facts; regex truthfulness safety net still uses broad mutation boolean. Rich final outcome state incomplete. |
+| 48 | Review Model Selection | Implemented; scoped tests passed | Explicit provider-qualified catalog identity, ambiguity errors, true Auto IPC routing; providerSelection/autoModelRouting tests. |
+| 49 | Improve Custom Provider Compatibility | Implemented; scoped tests passed | Custom tools/system/temperature capability settings and request conformance/rejection tests. Broader desktop/provider coverage remains. |
+| 50 | Review API Error Shape | Partial | Domain/API structured codes and CLI preservation tested; client response-validation/timer/error audit remains. |
+| 51 | Add API Versioning | Implemented; scoped tests passed | API v1 prefix/header/capabilities with unversioned aliases. |
+| 52 | Consider MCP After Core Contracts Stabilize | Considered; optional deferred | MCP is not required to stabilize the core and is intentionally not added; future adapter must use shared services. |
+| 53 | Formalize the Domain Service Layer | Partial | Shared KnowledgeService handles principal writes/proposals/batch/import. Remaining legacy transports and invalidation need consolidation. |
+| 54 | Keep Documentation Agent-Safe | Partial | AGENTS.md/current CLI/README/checkpoints updated. Historical docs and final architecture/contract sweep still needed. |
+| 55 | Consolidate Verification | Implemented; scoped tests passed | npm run verify covers formatting/lint/offline TS+TSX tests/build; heavy CLI/Electron package commands separate. Desktop e2e command still missing. |
+| 56 | Add/Improve CI | Partial | Pinned read-only Linux/macOS Actions workflow includes audit and package smoke. Not pushed/executed remotely yet. |
+| 57 | Dependency and Supply-Chain Review | Partial | Compatible dependency patches and zero-vulnerability audit recorded. Final audit/override rationale and release dependency review outstanding. |
+| 58 | Packaging and Release UX | Partial | Tracked release icons; unsigned macOS directory/bundled native SQLite smoke passed. Installers/platform coverage/signing docs/update policy remain. |
+| 59 | Runtime Logging | Partial | Provider errors sanitized and routing excerpts removed. Full runtime log/privacy sweep and explicit debug-mode policy outstanding. |
+| 60 | Performance Budgets | Incomplete | Intermediate measurements recorded, but final controlled workloads and enforceable documented budgets still required. |
