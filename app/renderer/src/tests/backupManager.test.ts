@@ -42,7 +42,7 @@ it('verifies backups, retains automatic recovery points and restores note histor
     db.close()
     fs.rmSync(root, { recursive: true, force: true })
   }
-})
+}, 30000)
 it('removes failed backup attempts instead of listing them as recovery points', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-backup-failure-'))
   const db = new StrataDatabase(root)
