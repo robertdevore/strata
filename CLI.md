@@ -10,7 +10,7 @@ It talks to the local HTTP API, never writes directly to SQLite, and is designed
 
 ## Install and connect
 
-From a source checkout, run `npm pack` and install the resulting archive with `npm install -g ./strata-0.9.1.tgz`. The installed `strata` command works outside the repository. Open the desktop app, or run `strata server --user-data-dir /path/to/library` to start the separate knowledge server. Use the same library directory as the desktop when sharing a library.
+From a source checkout, run `npm pack` and install the resulting archive with `npm install -g ./strata-0.9.2.tgz`. The installed `strata` command works outside the repository. Open the desktop app, or run `strata server --user-data-dir /path/to/library` to start the separate knowledge server. Use the same library directory as the desktop when sharing a library.
 
 The API requires authentication. The CLI discovers the owner-only local credential automatically; `STRATA_API_TOKEN` or `--token` explicitly overrides it. `STRATA_API_CREDENTIAL_FILE` selects a different credential file. Prefer the environment or credential file over putting secrets in shell history. API base URLs must be HTTPS origins, or HTTP on loopback; embedded credentials, paths, queries and fragments are rejected. `strata config doctor` checks connectivity and authentication without requiring a source checkout.
 
