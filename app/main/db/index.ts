@@ -1,4 +1,5 @@
 import { LibraryAccess } from './libraryAccess'
+import { sanitizeBackup } from './sanitizeBackup'
 import { DomainError } from '../../shared/errors'
 import type { NoteSummary, NoteRevision } from '../../shared/types'
 import { SECRET_KEYS, SECRET_PRESENT, type SecretStore } from '../security/secretStore'
@@ -31,11 +32,12 @@ const require = createRequire(import.meta.url)
 const packaged_database_directory = process.resourcesPath
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'better-sqlite3')
   : ''
-const Database = require(
+const databaseEntry = require.resolve(
   packaged_database_directory && fs.existsSync(path.join(packaged_database_directory, 'package.json'))
     ? packaged_database_directory
     : 'better-sqlite3',
-) as typeof import('better-sqlite3')
+)
+const Database = require(databaseEntry) as typeof import('better-sqlite3')
 
 interface DbNoteRow {
   title: string
@@ -458,17 +460,7 @@ export class StrataDatabase {
 
   async backupTo(destination_path: string): Promise<void> {
     await this.db.backup(destination_path)
-    const backup = new Database(destination_path)
-    try {
-      backup.pragma('secure_delete = ON')
-      const remove = backup.prepare('DELETE FROM settings WHERE key = ?')
-      for (const key of SECRET_KEYS) remove.run(key)
-      backup.exec('VACUUM')
-      if (backup.pragma('quick_check', { simple: true }) !== 'ok')
-        throw new Error('Backup integrity check failed')
-    } finally {
-      backup.close()
-    }
+    await sanitizeBackup(destination_path, databaseEntry)
   }
 
   assertStandaloneCredentialsSafe(): void {
