@@ -1606,7 +1606,7 @@ export class StrataDatabase {
 		), tagged AS (
 			SELECT DISTINCT nt.note_id AS id,10 AS score,'Shared tag' AS reason FROM note_tags nt INDEXED BY idx_note_tags_tag WHERE nt.tag IN (SELECT value FROM json_each(?)) AND nt.note_id<>? LIMIT 100
 		), grouped AS (
-			SELECT id,5 AS score,'Shared project' AS reason FROM notes WHERE project_id=? AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50
+			SELECT id,5 AS score,'Shared project' AS reason FROM notes WHERE project_id=? AND deleted_at IS NULL ORDER BY updated_at DESC,id LIMIT 50
 		), pooled AS (SELECT * FROM candidates UNION ALL SELECT * FROM incoming UNION ALL SELECT * FROM tagged UNION ALL SELECT * FROM grouped)
 		SELECT n.id,n.title,n.revision,substr(n.content,1,280) AS content,n.created_at,n.updated_at,n.starred,n.archived,n.tags,n.project_id,n.deleted_at,SUM(p.score) AS score,GROUP_CONCAT(DISTINCT p.reason) AS reason
 		FROM pooled p JOIN notes n ON n.id=p.id WHERE n.id<>? AND n.deleted_at IS NULL GROUP BY n.id ORDER BY score DESC,n.updated_at DESC,n.id LIMIT 8`,

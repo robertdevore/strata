@@ -23,7 +23,7 @@ it('verifies backups, retains automatic recovery points and restores note histor
     const manuals = await Promise.all([manager.createBackupNow(), manager.createBackupNow()])
     expect(manuals[0].directory).not.toBe(manuals[1].directory)
     const manifest = JSON.parse(fs.readFileSync(path.join(manuals[0].directory, 'manifest.json'), 'utf8'))
-    expect(manifest).toMatchObject({ schemaVersion: 12, integrity: 'ok', reason: 'manual' })
+    expect(manifest).toMatchObject({ schemaVersion: 13, integrity: 'ok', reason: 'manual' })
     db.setSettings({ autoBackupKeepCount: 7 })
     for (let i = 0; i < 9; i++) await manager.createBackupNow('auto')
     const manifests = () =>

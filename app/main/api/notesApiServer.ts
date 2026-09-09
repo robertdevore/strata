@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import type { StrataDatabase } from '../db'
+import { CURRENT_SCHEMA_VERSION } from '../db/migrations'
 import { ensureLocalCredential, isLoopbackHost, tokensEqual } from '../../shared/apiCredential'
 import { DomainError } from '../../shared/errors'
 import {
@@ -115,7 +116,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
       return ok({
         version: '0.8.0',
         apiVersion: 1,
-        schemaVersion: 12,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         auth: 'local-token',
         search: 'fts5-with-substring-fallback',
         capabilities: [

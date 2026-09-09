@@ -241,4 +241,13 @@ export const migrations: Migration[] = [
       END;
     `,
   },
+  {
+    version: 13,
+    description: 'bounded active project recency lookup',
+    upSql: `
+      CREATE INDEX idx_notes_project_recency ON notes(project_id,updated_at DESC,id) WHERE deleted_at IS NULL;
+    `,
+  },
 ]
+
+export const CURRENT_SCHEMA_VERSION = migrations.at(-1)!.version
