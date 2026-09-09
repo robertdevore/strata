@@ -472,8 +472,7 @@ export const execute_tool_call = (
         result = {
           thread: db.getAiThread(String(args.thread_id)),
           messages: db
-            .listAiMessages(String(args.thread_id))
-            .slice(-limit)
+            .listRecentAiMessages(String(args.thread_id), limit)
             .map((message) => ({ ...message, content: message.content.slice(0, 2000) })),
         }
         break

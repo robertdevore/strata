@@ -1117,6 +1117,15 @@ export class StrataDatabase {
     return rows.map((row) => this.mapAiMessage(row))
   }
 
+  listRecentAiMessages(thread_id: string, limit = 40): AiMessage[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+      throw new DomainError('VALIDATION_ERROR', 'Recent message limit must be between 1 and 100')
+    const rows = this.db
+      .prepare('SELECT * FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC,rowid DESC LIMIT ?')
+      .all(thread_id, limit) as DbAiMessageRow[]
+    return rows.reverse().map((row) => this.mapAiMessage(row))
+  }
+
   createAiMessage(thread_id: string, role: 'user' | 'assistant' | 'system', content: string): AiMessage {
     const now = new Date().toISOString()
     const id = uuidv4()

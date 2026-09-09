@@ -247,7 +247,7 @@ export const run_ai_turn = async (
   const ai_settings = resolve_ai_settings(db)
   if (ai_settings.aiRoutingMode === 'ask_each_time' && !options?.forcedModel?.trim())
     throw new DomainError('MODEL_SELECTION_REQUIRED', 'Choose a model for this message.')
-  const history = db.listAiMessages(thread.id).slice(-40)
+  const history = db.listRecentAiMessages(thread.id, 40)
   const last_user = history.filter((m) => 'user' === m.role).pop()
   const user_message = last_user?.content || ''
   const system_prompt = build_system_prompt(options?.openNotesContext)
