@@ -24,6 +24,12 @@ it('reads only the recent thread window in chronological insertion order, includ
     expect(db.listRecentAiMessages(thread.id)).toHaveLength(40)
     expect(db.listRecentAiMessages(thread.id, 100)).toHaveLength(100)
     expect(db.listAiMessages(thread.id)).toHaveLength(120)
+    const large = db.createAiMessage(thread.id, 'assistant', 'Evidence ' + 'x'.repeat(10000))
+    expect(
+      db.listAiThreads().find((item) => item.thread.id === thread.id)?.lastMessage?.content,
+    ).toHaveLength(240)
+    expect(db.searchAiMessages('Evidence')[0].message.content).toHaveLength(240)
+    expect(db.listRecentAiMessages(thread.id, 1)[0].content).toBe(large.content)
     for (const limit of [0, 101, 1.5, NaN]) expect(() => db.listRecentAiMessages(thread.id, limit)).toThrow()
   } finally {
     vi.useRealTimers()

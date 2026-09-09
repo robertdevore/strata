@@ -130,6 +130,7 @@ export interface AiMessage {
 
 export interface AiThreadSummary {
   thread: AiThread
+  /** Bounded preview; load the thread for the full message body. */
   lastMessage: AiMessage | null
 }
 

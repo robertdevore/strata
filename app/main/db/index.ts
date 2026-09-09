@@ -1058,7 +1058,7 @@ export class StrataDatabase {
   listAiThreads(): AiThreadSummary[] {
     const rows = this.db.prepare('SELECT * FROM ai_threads ORDER BY updated_at DESC').all() as DbAiThreadRow[]
     const last_message_stmt = this.db.prepare(
-      'SELECT * FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT id,thread_id,role,substr(content,1,240) AS content,created_at FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC,rowid DESC LIMIT 1',
     )
     return rows.map((thread_row) => {
       const last_message_row = last_message_stmt.get(thread_row.id) as DbAiMessageRow | undefined
@@ -1157,7 +1157,7 @@ export class StrataDatabase {
   searchAiMessages(query: string, limit = 20): Array<{ thread: AiThread; message: AiMessage }> {
     const rows = this.db
       .prepare(
-        `SELECT m.id as message_id, m.thread_id, m.role, m.content, m.created_at,
+        `SELECT m.id as message_id, m.thread_id, m.role, substr(m.content,1,240) AS content, m.created_at,
 					t.id as thread_id_2, t.title, t.model as thread_model, t.created_at as thread_created_at, t.updated_at as thread_updated_at
 				 FROM ai_messages m
 				 JOIN ai_threads t ON t.id = m.thread_id
