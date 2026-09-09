@@ -42,6 +42,13 @@ try {
     assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
     console.log(JSON.stringify({electron:process.versions.electron,sqlite:db.prepare('select sqlite_version() AS version').get().version,platform:process.platform,arch:process.arch}));
     db.close();
+    const { Worker } = require('node:worker_threads');
+    const worker = new Worker(
+      "const {parentPort,workerData}=require('node:worker_threads'); const D=require(workerData); const db=new D(':memory:'); db.exec('CREATE VIRTUAL TABLE docs USING fts5(content)'); const ok=db.pragma('quick_check',{simple:true}); db.close(); parentPort.postMessage(ok);",
+      {eval:true,workerData:path.join(process.argv[1],'app.asar.unpacked/node_modules/better-sqlite3/lib/index.js')}
+    );
+    worker.once('message', value => { assert.equal(value,'ok'); console.log('Packaged SQLite worker verified'); });
+    worker.once('error', error => { throw error; });
   `
   const result = await exec(executable, ['-e', smoke, resources], {
     timeout: 20000,

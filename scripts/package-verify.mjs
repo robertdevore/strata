@@ -97,10 +97,14 @@ try {
       setTimeout(() => reject(new Error('Installed server did not shut down')), 5000).unref(),
     ),
   ])
-  assert.equal(server.exitCode, 0)
+  // Windows child.kill uses TerminateProcess, not a catchable POSIX SIGTERM.
+  // Graceful desktop close is covered separately by desktop:verify.
+  if (process.platform !== 'win32') assert.equal(server.exitCode, 0)
   console.log(
     'Installed CLI package verified: native database, authenticated server, installed documentation/doctor, capture deduplication, retrieval and shutdown.',
   )
+  if (process.platform === 'win32')
+    console.log('Windows server termination is forced; this does not verify a graceful signal shutdown.')
 } finally {
   if (server && server.exitCode === null) server.kill('SIGTERM')
   await fs.rm(temporary, { recursive: true, force: true })
