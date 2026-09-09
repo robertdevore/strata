@@ -1025,15 +1025,24 @@ export class StrataDatabase {
 
   deleteProject(id: string): boolean {
     const transaction = this.db.transaction((project_id: string) => {
-      const affected = this.db.prepare('SELECT id FROM notes WHERE project_id = ?').all(project_id) as Array<{
-        id: string
-      }>
+      const stamp = new Date().toISOString()
+      // Record the resulting state in SQL before changing membership. Both
+      // statements share this transaction, including failure/rollback behavior.
+      this.db
+        .prepare(
+          `INSERT INTO note_revisions (note_id,revision,source,operation,created_at,snapshot)
+        SELECT id,revision+1,?,'project_deleted',?,json_object(
+          'content',content,'tags',json(tags),'projectId',NULL,
+          'starred',json(CASE WHEN starred THEN 'true' ELSE 'false' END),
+          'archived',json(CASE WHEN archived THEN 'true' ELSE 'false' END),'deletedAt',deleted_at)
+        FROM notes WHERE project_id=?`,
+        )
+        .run(this.mutationSource, stamp, project_id)
       this.db
         .prepare(
           'UPDATE notes SET project_id = NULL, revision = revision + 1, updated_at = ? WHERE project_id = ?',
         )
-        .run(new Date().toISOString(), project_id)
-      for (const note of affected) this.recordRevision(note.id, 'project_deleted')
+        .run(stamp, project_id)
       const deleted = this.db.prepare('DELETE FROM projects WHERE id = ?').run(project_id)
       return deleted.changes > 0
     })
