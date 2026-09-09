@@ -775,10 +775,8 @@ export function App() {
           pinnedTags={store.settings.pinnedTags ?? []}
           pinnedNotes={sidebarPinnedNotes}
           onSearchChange={store.setSearchQuery}
-          onSelect={async (id) => {
-            if (store.selectedNoteId && store.selectedNoteId !== id)
-              await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
-            store.openNoteInTab(id)
+          onSelect={(id) => {
+            void store.navigateToNote(id, true)
           }}
           onNewNote={() => void store.createNote()}
           onOpenSettings={() => store.setShowSettings(true)}

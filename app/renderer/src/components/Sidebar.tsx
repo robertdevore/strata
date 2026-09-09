@@ -1,3 +1,5 @@
+import { useProjectListings } from '../hooks/useProjectListings'
+import { useAppStore } from '../state/useAppStore'
 import { MoreNotes, NoteHistory } from './KnowledgeStatus'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -84,7 +86,6 @@ export function Sidebar(props: SidebarProps) {
   const [draggedTag, setDraggedTag] = useState<string | null>(null)
   const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null)
   const [visibleCountsByKey, setVisibleCountsByKey] = useState<Record<string, number>>({})
-  const [projectVisibleCountsById, setProjectVisibleCountsById] = useState<Record<string, number>>({})
   const [menuSubmenu, setMenuSubmenu] = useState<MenuSubmenu>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -125,16 +126,31 @@ export function Sidebar(props: SidebarProps) {
         : props.pinnedNotes,
     [hasSidebarSearch, props.pinnedNotes, sidebarSearch],
   )
-  const visibleNotesByProject = useMemo(() => {
-    const grouped = new Map<string, Note[]>()
-    for (const note of props.notes) {
-      if (!note.projectId) continue
-      const current = grouped.get(note.projectId) ?? []
-      current.push(note)
-      grouped.set(note.projectId, current)
-    }
-    return grouped
-  }, [props.notes])
+  const historyVersion = useAppStore((state) => state.historyVersion)
+  const sortMode = useAppStore((state) => state.settings.sortMode)
+  const openedProjects = projectsCollapsed
+    ? []
+    : props.projects
+        .filter(
+          (project) =>
+            props.selectedProjectId === project.id ||
+            hasSidebarSearch ||
+            projectsCollapsedById[project.id] === false,
+        )
+        .map((project) => project.id)
+  const { pages: projectPages, more: loadMoreProjectNotes } = useProjectListings(
+    openedProjects,
+    {
+      query: props.searchQuery || undefined,
+      tag: props.selectedTag ?? undefined,
+      archived:
+        props.activeFilter === 'archived' ? true : props.activeFilter === 'starred' ? undefined : false,
+      starred: props.activeFilter === 'starred' ? true : undefined,
+      untagged: props.activeFilter === 'untagged' ? true : undefined,
+      sort: sortMode,
+    },
+    historyVersion,
+  )
   const sectionOrderIndex = useMemo(() => {
     return Object.fromEntries(
       props.sidebarLayout.sectionOrder.map((section_id, index) => [section_id, index]),
@@ -222,16 +238,6 @@ export function Sidebar(props: SidebarProps) {
 
   const visibleNotes = listedNotes.slice(0, visibleCount)
   const hasMore = visibleCount < listedNotes.length
-
-  const loadMoreProjectNotes = (projectId: string) => {
-    setProjectVisibleCountsById((current) => {
-      const current_count = current[projectId] ?? 6
-      return {
-        ...current,
-        [projectId]: Math.min(current_count + 6, Number.MAX_SAFE_INTEGER),
-      }
-    })
-  }
 
   useEffect(() => {
     if (!menu) return
@@ -433,7 +439,7 @@ export function Sidebar(props: SidebarProps) {
           )}
           {props.sidebarLayout.sectionVisibility.projects && (
             <div className="projects-section" style={{ order: sectionOrderIndex.projects }}>
-              <div className="tags-header-row project-header-row">
+              <div className="tags-header-row project-header-row projects-section-header">
                 <button
                   type="button"
                   className="tags-header-toggle projects-section-toggle"
@@ -460,19 +466,24 @@ export function Sidebar(props: SidebarProps) {
               </div>
               {!projectsCollapsed &&
                 props.projects.map((project) => {
-                  const project_notes = visibleNotesByProject.get(project.id) ?? []
+                  const projectPage = projectPages[project.id]
+                  const project_notes = projectPage?.notes ?? []
                   const visible_project_notes = [
                     ...project_notes.filter((note) => pinnedNoteIdSet.has(note.id)),
                     ...project_notes.filter((note) => !pinnedNoteIdSet.has(note.id)),
                   ]
-                  const visible_project_count = projectVisibleCountsById[project.id] ?? 6
-                  const paged_project_notes = visible_project_notes.slice(0, visible_project_count)
-                  const has_more_project_notes = visible_project_count < visible_project_notes.length
+                  const paged_project_notes = visible_project_notes
+                  const has_more_project_notes = Boolean(projectPage?.nextCursor)
                   const project_collapsed =
                     undefined === projectsCollapsedById[project.id] ? true : projectsCollapsedById[project.id]
                   const project_expanded =
                     props.selectedProjectId === project.id || hasSidebarSearch || !project_collapsed
-                  const show_project = visible_project_notes.length > 0 || !hasSidebarSearch
+                  const show_project =
+                    visible_project_notes.length > 0 ||
+                    !hasSidebarSearch ||
+                    !projectPage ||
+                    projectPage.loading ||
+                    projectPage.error
                   if (!show_project) return null
 
                   return (
@@ -536,14 +547,11 @@ export function Sidebar(props: SidebarProps) {
                         >
                           {0 === visible_project_notes.length ? (
                             <div className="sidebar-section-empty project-empty-state">
-                              No notes from this project in the current results.
-                              <button
-                                type="button"
-                                className="project-view-more"
-                                onClick={() => props.onProjectFilter(project.id)}
-                              >
-                                Filter to this project
-                              </button>
+                              {!projectPage || projectPage.loading
+                                ? 'Loading notes…'
+                                : projectPage.error
+                                  ? 'Could not load project notes.'
+                                  : 'No notes match the current filters.'}
                             </div>
                           ) : (
                             paged_project_notes.map((note) => (
@@ -597,13 +605,14 @@ export function Sidebar(props: SidebarProps) {
                               </div>
                             ))
                           )}
-                          {has_more_project_notes && (
+                          {(has_more_project_notes || projectPage?.error) && (
                             <button
                               type="button"
                               className="project-view-more"
-                              onClick={() => loadMoreProjectNotes(project.id)}
+                              disabled={projectPage?.loading}
+                              onClick={() => void loadMoreProjectNotes(project.id)}
                             >
-                              View more
+                              {projectPage?.loading ? 'Loading…' : projectPage?.error ? 'Retry' : 'View more'}
                             </button>
                           )}
                         </div>

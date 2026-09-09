@@ -334,12 +334,15 @@ try {
   await expect(page.getByLabel('Filter by project')).toHaveCount(0)
   await expect(page.locator('.notes-list > .note-row')).toHaveCount(50)
   await page.getByTitle('Show Paged project fixture', { exact: true }).click()
-  await page.getByRole('button', { name: 'Filter to this project', exact: true }).last().click()
   const projectBlock = page
     .locator('.project-block')
     .filter({ has: page.locator('.project-label').getByText('Paged project fixture', { exact: true }) })
   await expect(projectBlock.locator('.project-count')).toHaveText('130')
   await expect(projectBlock.locator('.project-note-row')).toHaveCount(6)
+  await projectBlock.getByRole('button', { name: 'View more', exact: true }).click()
+  await expect(projectBlock.locator('.project-note-row')).toHaveCount(12)
+  await projectBlock.locator('.project-note-row').first().click()
+  await expect(activePane).toContainText('pagedmarker', { timeout: 20000 })
   await expect(page.getByRole('button', { name: 'Load more notes', exact: true })).toHaveCount(0)
   await page.locator('.sidebar-scroll').evaluate((element) => {
     element.scrollTop = element.scrollHeight
@@ -350,7 +353,6 @@ try {
   await expect(projectBlock.locator('.project-note-row')).toHaveCount(1)
   await expect(projectBlock.locator('.note-row-title')).toHaveText('Paged note 0')
   await sidebarSearch.fill('')
-  await page.getByRole('button', { name: 'Show all notes', exact: true }).click()
   await page.getByTitle('Hide projects', { exact: true }).click()
   await expect(page.locator('.project-block')).toHaveCount(0)
   await page.getByTitle('Show projects', { exact: true }).click()

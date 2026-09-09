@@ -4812,3 +4812,44 @@ body.theme-light .cm-gutters {
   grid-column: 1;
   grid-row: 2;
 }
+
+/* Keep the section chevron in the same trailing column as the other headings. */
+.projects-section-header {
+  position: relative;
+}
+.projects-section-header .projects-section-toggle {
+  width: 100%;
+}
+.projects-section-header > .project-header-actions {
+  position: absolute;
+  right: 28px;
+}
+.projects-section-header .projects-chevron {
+  width: 16px;
+  justify-content: center;
+}
+.project-grid-card,
+.project-grid-card > *,
+.project-grid-card-head > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.project-grid-card-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.project-grid-card-count {
+  flex-shrink: 0;
+}
+.project-grid-note-pill {
+  display: block;
+  min-width: 0;
+  text-align: left;
+}
+.project-grid-card-actions {
+  min-width: 0;
+}
+.project-grid-card-button {
+  min-width: 0;
+  white-space: normal;
+}
