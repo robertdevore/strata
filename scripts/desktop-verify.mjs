@@ -209,6 +209,10 @@ try {
   const wikiEditor = page.locator('.cm-content[contenteditable="true"]').first()
   await wikiEditor.focus()
   await wikiEditor.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a')
+  await wikiEditor.pressSequentially('[[Desktop ver')
+  await page.getByRole('option', { name: /Desktop verification/ }).click()
+  await expect(wikiEditor).toContainText('[[Desktop verification]]')
+  await wikiEditor.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a')
   await wikiEditor.pressSequentially('[[Ambiguous target]]')
   await expect
     .poll(async () => (await page.evaluate((id) => window.strata.notes.get(id), distantId)).content, {

@@ -3,7 +3,8 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView, keymap } from '@codemirror/view'
 import { EditorSelection, Prec } from '@codemirror/state'
-import { autocompletion, type CompletionContext } from '@codemirror/autocomplete'
+import { autocompletion } from '@codemirror/autocomplete'
+import { completeWikiLinks } from '../domain/wikiCompletion'
 import { oneDark } from '@codemirror/theme-one-dark'
 import ReactMarkdown from 'react-markdown'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -534,8 +535,8 @@ export function EditorPane(props: EditorPaneProps) {
       )
       return {
         project,
-        noteCount: project_notes.length,
-        latestUpdatedAt: sorted_notes[0]?.updatedAt ?? project.updatedAt,
+        noteCount: project.noteCount ?? project_notes.length,
+        latestUpdatedAt: project.latestNoteUpdatedAt ?? project.updatedAt,
         recentNotes: sorted_notes.slice(0, 3),
       }
     })
@@ -1194,44 +1195,6 @@ export function EditorPane(props: EditorPaneProps) {
     window.addEventListener('mouseup', onMouseUp)
   }
 
-  // Wiki link autocomplete source for CodeMirror — must be before any early return
-  const wikiLinkCompletions = useCallback(
-    (context: CompletionContext) => {
-      const pos = context.pos
-      const line = context.state.doc.lineAt(pos)
-      const text_before = line.text.slice(0, pos - line.from)
-      // Find the start of [[... pattern
-      const bracket_idx = text_before.lastIndexOf('[[')
-      if (-1 === bracket_idx) return null
-      const after_brackets = text_before.slice(bracket_idx + 2)
-      // Only activate if no closing ]] between [[ and cursor
-      if (after_brackets.includes(']]')) return null
-      const partial = after_brackets.trim().toLowerCase()
-      // from = position of [[ in document
-      const from = line.from + bracket_idx
-
-      const matching = notes
-        .filter((n) => {
-          const title = deriveNoteTitle(n.content)
-          return title.toLowerCase().includes(partial)
-        })
-        .slice(0, 8)
-        .map((n) => {
-          const title = deriveNoteTitle(n.content)
-          return {
-            label: title,
-            type: 'text' as const,
-            apply: `[[${title}]]`,
-            detail: 'note',
-          }
-        })
-
-      if (matching.length === 0) return null
-      return { from, options: matching, filter: false }
-    },
-    [notes],
-  )
-
   const selectionMarkdownWrapExtension = useMemo(() => {
     return EditorView.inputHandler.of((view, from, to, text, insert) => {
       void insert
@@ -1297,6 +1260,18 @@ export function EditorPane(props: EditorPaneProps) {
       return true
     })
   }, [])
+
+  const editorExtensions = useMemo(
+    () => [
+      markdown(),
+      EditorView.lineWrapping,
+      listNewlineKeymap,
+      richTextPasteExtension,
+      selectionMarkdownWrapExtension,
+      autocompletion({ override: [completeWikiLinks] }),
+    ],
+    [selectionMarkdownWrapExtension],
+  )
 
   if (!note) {
     return (
@@ -1395,7 +1370,9 @@ export function EditorPane(props: EditorPaneProps) {
                       <div className="project-grid-card-notes">
                         {0 === recentNotes.length ? (
                           <span className="project-grid-card-empty-note">
-                            Create the first note to start the project.
+                            {noteCount === 0
+                              ? 'Create the first note to start the project.'
+                              : 'Open Latest to retrieve a note from this project.'}
                           </span>
                         ) : (
                           recentNotes.map((project_note) => (
@@ -1892,14 +1869,7 @@ export function EditorPane(props: EditorPaneProps) {
           <CodeMirror
             value={editorContent}
             height="100%"
-            extensions={[
-              markdown(),
-              EditorView.lineWrapping,
-              listNewlineKeymap,
-              richTextPasteExtension,
-              selectionMarkdownWrapExtension,
-              autocompletion({ override: [wikiLinkCompletions] }),
-            ]}
+            extensions={editorExtensions}
             onCreateEditor={(view) => {
               editorViewRef.current = view
             }}
