@@ -16,7 +16,7 @@ Legacy scripts remain available for compatibility:
 
 ```bash
 npm run strata -- health
-npm run strata:ai:legacy -- health
+npm run strata -- capabilities --json
 ```
 
 ### Durable memory capture

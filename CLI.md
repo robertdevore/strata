@@ -42,11 +42,11 @@ Command format:
 npm run strata -- <command> [options]
 ```
 
-Legacy helpers are still available:
+Legacy helpers are retired; see [migration guidance](docs/legacy-interfaces.md). Use the supported CLI:
 
 ```bash
 npm run strata -- health
-npm run strata:ai:legacy -- health
+npm run strata -- capabilities --json
 ```
 
 ## Global Flags
