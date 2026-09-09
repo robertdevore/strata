@@ -911,11 +911,16 @@ export class StrataDatabase {
   listProjectSummaries(): ProjectSummary[] {
     const rows = this.db
       .prepare(
-        `SELECT p.*, (SELECT COUNT(*) FROM notes n WHERE n.project_id=p.id AND n.deleted_at IS NULL) AS note_count
+        `SELECT p.*, (SELECT COUNT(*) FROM notes n WHERE n.project_id=p.id AND n.deleted_at IS NULL) AS note_count,
+         (SELECT MAX(updated_at) FROM notes n WHERE n.project_id=p.id AND n.deleted_at IS NULL) AS latest_note_updated_at
          FROM projects p ORDER BY p.sort_order ASC, p.name COLLATE NOCASE ASC`,
       )
-      .all() as Array<DbProjectRow & { note_count: number }>
-    return rows.map((row) => ({ ...this.mapProject(row), noteCount: row.note_count }))
+      .all() as Array<DbProjectRow & { note_count: number; latest_note_updated_at: string | null }>
+    return rows.map((row) => ({
+      ...this.mapProject(row),
+      noteCount: row.note_count,
+      latestNoteUpdatedAt: row.latest_note_updated_at,
+    }))
   }
 
   getProject(id: string): Project | null {

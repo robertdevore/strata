@@ -61,6 +61,8 @@ interface AppState {
   tags: Array<{ name: string; count: number }>
   activeFilter: ActiveFilter
   selectedTag: string | null
+  selectedProjectId: string | null
+  setSelectedProjectId: (id: string | null) => void
   searchQuery: string
   settings: Settings
   showSettings: boolean
@@ -178,6 +180,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   tags: [],
   activeFilter: 'all',
   selectedTag: null,
+  selectedProjectId: null,
+  setSelectedProjectId(id) {
+    set({ selectedProjectId: id })
+    void get().refreshListing()
+  },
   searchQuery: '',
   settings: defaultSettings,
   showSettings: false,
@@ -237,6 +244,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const page = await notesService.page({
         query: state.searchQuery || undefined,
         tag: state.selectedTag ?? undefined,
+        projectId: state.selectedProjectId ?? undefined,
         starred: state.activeFilter === 'starred' ? true : undefined,
         archived:
           state.activeFilter === 'archived' ? true : state.activeFilter === 'starred' ? undefined : false,
@@ -303,7 +311,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       historyVersion: state.historyVersion + Number(changed.history),
     }))
     await Promise.all([
-      changed.projects ? projectsService.list().then((projects) => set({ projects })) : undefined,
+      changed.projects || changed.notes
+        ? projectsService.list().then((projects) =>
+            set((state) => ({
+              projects,
+              selectedProjectId: projects.some((project) => project.id === state.selectedProjectId)
+                ? state.selectedProjectId
+                : null,
+            })),
+          )
+        : undefined,
       changed.tags ? notesService.listTags().then((tags) => set({ tags })) : undefined,
     ])
     if (!changed.notes) return

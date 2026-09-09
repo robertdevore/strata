@@ -310,6 +310,34 @@ try {
       ),
     )
     .toBe(true)
+  const pagedProject = await page.evaluate(async () => {
+    const project = await window.strata.projects.create({ name: 'Paged project fixture' })
+    for (let i = 0; i < 130; i++)
+      await window.strata.notes.create({
+        projectId: project.id,
+        content: `# Paged note ${i}\n\npagedmarker${i}zebra`,
+      })
+    for (let i = 0; i < 110; i++)
+      await window.strata.notes.create({ content: `# Newer unprojected fixture ${i}` })
+    return project.id
+  })
+  const openSidebar = page.getByRole('button', { name: 'Open Sidebar', exact: true })
+  if (await openSidebar.isVisible()) await openSidebar.click()
+  const sidebarSearch = page.getByPlaceholder('Search...', { exact: true })
+  await sidebarSearch.fill('')
+  await page.getByLabel('Filter by project').selectOption(pagedProject)
+  const projectBlock = page
+    .locator('.project-block')
+    .filter({ has: page.locator('.project-label').getByText('Paged project fixture', { exact: true }) })
+  await expect(projectBlock.locator('.project-count')).toHaveText('130')
+  await expect(projectBlock.locator('.project-note-row')).toHaveCount(6)
+  await page.getByRole('button', { name: 'Load more notes', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Load more notes', exact: true })).toHaveCount(0)
+  await sidebarSearch.fill('pagedmarker0zebra')
+  await expect(projectBlock.locator('.project-note-row')).toHaveCount(1)
+  await expect(projectBlock.locator('.note-row-title')).toHaveText('Paged note 0')
+  await sidebarSearch.fill('')
+  await page.getByLabel('Filter by project').selectOption('')
   // Synthetic provider transport only: no requests reach a real AI service.
   await application.evaluate(() => {
     process.env.STRATA_OPENAI_API_KEY = 'synthetic-desktop-fixture-key'

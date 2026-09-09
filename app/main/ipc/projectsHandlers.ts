@@ -10,7 +10,7 @@ export const registerProjectsHandlers = (
   onDataChanged?: (changed: ChangedDomains) => void,
 ) => {
   const service = new KnowledgeService(db, onDataChanged)
-  handleTrustedIpc(IPC_CHANNELS.projectsList, () => db.listProjects())
+  handleTrustedIpc(IPC_CHANNELS.projectsList, () => db.listProjectSummaries())
   handleTrustedIpc(IPC_CHANNELS.projectsCreate, (_event, payload) => {
     const { name } = z.object({ name: z.string() }).strict().parse(payload)
     return service.mutate({ op: 'create_project', name }, { source: 'human' })

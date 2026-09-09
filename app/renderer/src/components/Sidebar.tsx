@@ -28,6 +28,8 @@ interface SidebarProps {
   selectedId: string | null
   activeFilter: ActiveFilter
   selectedTag: string | null
+  selectedProjectId: string | null
+  onProjectFilter: (id: string | null) => void
   searchQuery: string
   tags: Array<{ name: string; count: number }>
   showFiltersPanel: boolean
@@ -361,6 +363,23 @@ export function Sidebar(props: SidebarProps) {
               />
             </div>
           )}
+          {props.projects.length > 0 && (
+            <div className="sidebar-search-row">
+              <select
+                className="search-input sidebar-search-input"
+                aria-label="Filter by project"
+                value={props.selectedProjectId ?? ''}
+                onChange={(event) => props.onProjectFilter(event.target.value || null)}
+              >
+                <option value="">All projects</option>
+                {props.projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {/* Tags — collapsible, pinned-only shortlist */}
           {props.sidebarLayout.sectionVisibility.tags && (
             <div className="tags-section" style={{ order: sectionOrderIndex.tags }}>
@@ -445,7 +464,8 @@ export function Sidebar(props: SidebarProps) {
                 const has_more_project_notes = visible_project_count < visible_project_notes.length
                 const project_collapsed =
                   undefined === projectsCollapsedById[project.id] ? true : projectsCollapsedById[project.id]
-                const project_expanded = hasSidebarSearch || !project_collapsed
+                const project_expanded =
+                  props.selectedProjectId === project.id || hasSidebarSearch || !project_collapsed
                 const show_project = visible_project_notes.length > 0 || !hasSidebarSearch
                 if (!show_project) return null
 
@@ -481,7 +501,12 @@ export function Sidebar(props: SidebarProps) {
                       >
                         <span className="project-label-wrap">
                           <span className="tags-label project-label">{project.name}</span>
-                          <span className="project-count">{visible_project_notes.length}</span>
+                          <span
+                            className="project-count"
+                            title="All notes in this project, including archived"
+                          >
+                            {project.noteCount ?? '—'}
+                          </span>
                         </span>
                         <span className="tags-collapse-btn" aria-hidden="true">
                           {project_expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
@@ -505,8 +530,14 @@ export function Sidebar(props: SidebarProps) {
                       >
                         {0 === visible_project_notes.length ? (
                           <div className="sidebar-section-empty project-empty-state">
-                            No notes yet in this project. Drag a note here or import a folder of markdown
-                            files.
+                            No notes from this project in the current results.
+                            <button
+                              type="button"
+                              className="project-view-more"
+                              onClick={() => props.onProjectFilter(project.id)}
+                            >
+                              Filter to this project
+                            </button>
                           </div>
                         ) : (
                           paged_project_notes.map((note) => (
@@ -717,9 +748,7 @@ export function Sidebar(props: SidebarProps) {
               {!notesCollapsed && (
                 <div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
                   {0 === visibleNotes.length ? (
-                    <div className="sidebar-section-empty">
-                      {hasSidebarSearch ? 'No notes match this search.' : 'No notes yet.'}
-                    </div>
+                    <div className="sidebar-section-empty">No unprojected notes in the current results.</div>
                   ) : (
                     <>
                       {visibleNotes.map((note) => (
@@ -772,7 +801,6 @@ export function Sidebar(props: SidebarProps) {
                           </div>
                         </div>
                       ))}
-                      <MoreNotes />
                       <NoteHistory />
                       {hasMore && (
                         <div className="sidebar-load-more">
@@ -785,6 +813,9 @@ export function Sidebar(props: SidebarProps) {
               )}
             </div>
           )}
+          <div style={{ order: 99 }}>
+            <MoreNotes />
+          </div>
         </div>
       )}
       {!props.sidebarCollapsed && props.undoDeleteTitle && (

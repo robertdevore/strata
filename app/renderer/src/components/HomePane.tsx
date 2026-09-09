@@ -57,8 +57,8 @@ export function HomePane(props: HomePaneProps) {
     )
     return {
       project,
-      noteCount: projectNotes.length,
-      latestUpdatedAt: sortedNotes[0]?.updatedAt ?? project.updatedAt,
+      noteCount: project.noteCount ?? projectNotes.length,
+      latestUpdatedAt: project.latestNoteUpdatedAt ?? project.updatedAt,
       recentNotes: sortedNotes.slice(0, 3),
     }
   })
@@ -157,7 +157,9 @@ export function HomePane(props: HomePaneProps) {
                     <div className="project-grid-card-notes">
                       {0 === recentNotes.length ? (
                         <span className="project-grid-card-empty-note">
-                          Create the first note to start the project.
+                          {noteCount === 0
+                            ? 'Create the first note to start the project.'
+                            : 'Open Latest to retrieve a note from this project.'}
                         </span>
                       ) : (
                         recentNotes.map((projectNote) => (

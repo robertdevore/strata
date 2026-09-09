@@ -25,6 +25,9 @@ export interface Project {
   createdAt: string
   updatedAt: string
   sortOrder: number
+  /** Present on project listings; all non-deleted notes, including archived. */
+  noteCount?: number
+  latestNoteUpdatedAt?: string | null
 }
 
 export interface ProjectSummary extends Project {

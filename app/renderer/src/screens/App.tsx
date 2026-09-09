@@ -304,13 +304,8 @@ export function App() {
     [pinnedNoteIds, store.notes, store.drafts],
   )
   const projectNoteCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const note of store.notes) {
-      if (!note.projectId) continue
-      counts[note.projectId] = (counts[note.projectId] ?? 0) + 1
-    }
-    return counts
-  }, [store.notes])
+    return Object.fromEntries(store.projects.map((project) => [project.id, project.noteCount ?? 0]))
+  }, [store.projects])
 
   const splitRatios = useMemo(() => {
     if (store.splitRatios.length === splitNoteIds.length + 1) return store.splitRatios
@@ -460,16 +455,10 @@ export function App() {
 
   const openLatestProjectNote = useCallback(
     async (projectId: string) => {
-      const project_notes = store.notes.filter((note) => note.projectId === projectId)
-      if (0 === project_notes.length) return
-      const latest_note = [...project_notes].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      )[0]
+      const page = await window.strata.notes.page({ projectId, limit: 1, sort: 'updated_desc' })
+      const latest_note = page.notes[0]
       if (!latest_note) return
-      if (store.selectedNoteId && store.selectedNoteId !== latest_note.id) {
-        await store.flushDraft(store.selectedNoteId, { allowDiscardUntouchedEmpty: true })
-      }
-      store.openNoteInTab(latest_note.id)
+      await store.navigateToNote(latest_note.id, true)
     },
     [store],
   )
@@ -776,6 +765,8 @@ export function App() {
           selectedId={store.selectedNoteId}
           activeFilter={store.activeFilter}
           selectedTag={store.selectedTag}
+          selectedProjectId={store.selectedProjectId}
+          onProjectFilter={store.setSelectedProjectId}
           searchQuery={store.searchQuery}
           tags={store.tags}
           showFiltersPanel={store.showFiltersPanel}
