@@ -92,6 +92,11 @@ try {
   await expect(page.locator('.notes-list .note-row').first()).toBeVisible({ timeout: 120000 })
   metrics.openSidebarToFirstRowMs = performance.now() - sidebarStart
   const rowsAtStartup = await page.locator('.notes-list .note-row').count()
+  const profiler = process.env.STRATA_RENDERER_PROFILE_PATH ? await page.context().newCDPSession(page) : null
+  if (profiler) {
+    await profiler.send('Profiler.enable')
+    await profiler.send('Profiler.start')
+  }
   const search = page.getByPlaceholder('Search...', { exact: true })
   const timings = { search: [], open: [], editorInput: [], saveIncludingDebounce: [], preview: [] }
   // Three distinct notes avoid measuring only the already-open editor/cache.
@@ -129,6 +134,11 @@ try {
   for (const [name, values] of Object.entries(timings)) {
     values.sort((a, b) => a - b)
     metrics[name] = { medianMs: values[1], maxMs: values[2], samples: values.length }
+  }
+  if (profiler) {
+    const { profile } = await profiler.send('Profiler.stop')
+    fs.writeFileSync(process.env.STRATA_RENDERER_PROFILE_PATH, JSON.stringify(profile))
+    await profiler.detach()
   }
   const processMemory = await application.evaluate(({ app }) =>
     app.getAppMetrics().map(({ type, memory }) => ({ type, memory })),
