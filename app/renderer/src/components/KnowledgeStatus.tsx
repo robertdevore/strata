@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDownIcon } from './icons'
+import { HistoryIcon } from './icons'
 import type { Note } from '@shared/types'
 import { useAppStore } from '../state/useAppStore'
 export const MoreNotes = () => {
@@ -67,11 +67,10 @@ export const DraftConflict = ({ noteId: id }: { noteId: string }) => {
   )
 }
 
-export const NoteHistory = () => {
-  const note = useAppStore((state) => state.notes.find((note) => note.id === state.selectedNoteId))
-  const dirty = useAppStore((state) =>
-    state.selectedNoteId ? state.drafts[state.selectedNoteId] !== undefined : false,
-  )
+export const NoteHistory = ({ noteId }: { noteId?: string }) => {
+  const id = useAppStore((state) => noteId ?? state.selectedNoteId)
+  const note = useAppStore((state) => state.notes.find((note) => note.id === id))
+  const dirty = useAppStore((state) => (id ? state.drafts[id] !== undefined : false))
   return note ? <NoteHistoryDetails key={note.id} note={note} dirty={dirty} /> : null
 }
 
@@ -137,9 +136,8 @@ const NoteHistoryDetails = ({ note, dirty }: { note: Note; dirty: boolean }) => 
         if (event.currentTarget.open) void load()
       }}
     >
-      <summary>
-        <span>Note revision history</span>
-        <ChevronDownIcon size={14} />
+      <summary className="icon-button" aria-label="Note revision history" title="Note revision history">
+        <HistoryIcon />
       </summary>
       <div className="note-history-panel">
         {error && <p role="alert">{error}</p>}

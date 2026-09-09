@@ -619,7 +619,7 @@ button:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0;
+  padding: 0 0 0 10px;
   border: none;
   background: transparent;
   color: var(--accent-hover);
@@ -4739,8 +4739,11 @@ body.theme-light .cm-gutters {
 .sidebar-bottom {
   position: relative;
 }
+.editor-footer {
+  position: relative;
+}
 .note-history {
-  margin-bottom: 10px;
+  margin: 0;
 }
 .note-history summary {
   display: flex;
@@ -4760,14 +4763,11 @@ body.theme-light .cm-gutters {
 .note-history summary:hover {
   background: var(--hover);
 }
-.note-history[open] summary svg {
-  transform: rotate(180deg);
-}
 .note-history-panel {
   position: absolute;
-  bottom: 100%;
-  left: 8px;
-  width: min(420px, calc(100vw - 32px));
+  bottom: calc(100% + 4px);
+  right: 8px;
+  width: min(420px, calc(100% - 16px));
   max-height: 60vh;
   overflow: auto;
   padding: 16px;
@@ -4852,4 +4852,12 @@ body.theme-light .cm-gutters {
 .project-grid-card-button {
   min-width: 0;
   white-space: normal;
+}
+
+.projects-section-header .projects-chevron {
+  opacity: 0;
+}
+.projects-section-header:hover .projects-chevron,
+.projects-section-header:focus-within .projects-chevron {
+  opacity: 1;
 }

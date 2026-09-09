@@ -1,6 +1,6 @@
 import { useProjectListings } from '../hooks/useProjectListings'
 import { useAppStore } from '../state/useAppStore'
-import { MoreNotes, NoteHistory } from './KnowledgeStatus'
+import { MoreNotes } from './KnowledgeStatus'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type React from 'react'
@@ -840,7 +840,6 @@ export function Sidebar(props: SidebarProps) {
       )}
       {!props.sidebarCollapsed && (
         <div className="sidebar-bottom">
-          <NoteHistory />
           <div className="bottom-actions">
             <button className="icon-button" onClick={props.onOpenSettings} title="Settings">
               <SettingsIcon />

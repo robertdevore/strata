@@ -1,3 +1,4 @@
+import { NoteHistory } from './KnowledgeStatus'
 import { Children, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
@@ -2288,6 +2289,7 @@ export function EditorPane(props: EditorPaneProps) {
           >
             {footerActionsCollapsed ? <ChevronLeftIcon /> : <ChevronRightIcon />}
           </button>
+          <NoteHistory noteId={note.id} />
         </div>
       </footer>
       {showFindReplace && (

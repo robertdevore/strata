@@ -135,7 +135,7 @@ try {
   await page.getByRole('button', { name: 'Open Sidebar', exact: true }).click()
   await page.getByText('Desktop verification', { exact: true }).first().click()
   await expect(page.locator('.cm-content').first()).toContainText('Second revision.', { timeout: 20000 })
-  await page.getByText('Note revision history', { exact: true }).click()
+  await page.getByLabel('Note revision history', { exact: true }).click()
   await page.getByRole('button', { name: new RegExp(`^Revision ${firstRevision} ·`) }).click()
   await page.getByRole('button', { name: `Restore revision ${firstRevision}`, exact: true }).click()
   await expect

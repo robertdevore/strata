@@ -42,7 +42,7 @@ const setup = (
   })
   useAppStore.setState({ notes: [note], selectedNoteId: note.id, drafts: {} })
   render(<NoteHistory />)
-  fireEvent.click(screen.getByText('Note revision history'))
+  fireEvent.click(screen.getByLabelText('Note revision history'))
   return restoreRevision
 }
 const snapshot = (revision: number): NoteRevision => ({
@@ -106,7 +106,7 @@ it('does not let a delayed manual history load replace a newer invalidation resu
   })
   useAppStore.setState({ notes: [note], selectedNoteId: note.id, drafts: {} })
   render(<NoteHistory />)
-  fireEvent.click(screen.getByText('Note revision history'))
+  fireEvent.click(screen.getByLabelText('Note revision history'))
   await waitFor(() => expect(pending).toHaveLength(1))
   act(() => useAppStore.setState({ historyVersion: initial.historyVersion + 1 }))
   await waitFor(() => expect(pending).toHaveLength(2))
@@ -115,4 +115,18 @@ it('does not let a delayed manual history load replace a newer invalidation resu
   await act(async () => pending[0]([{ revision: 1, source: 'human', createdAt: 'before' }]))
   expect(screen.getByText(/Revision 6 ·/)).toBeTruthy()
   expect(screen.queryByText(/Revision 1 ·/)).toBeNull()
+})
+
+it('keeps a pane history scoped to its note when another note has a dirty draft', async () => {
+  setup(vi.fn().mockResolvedValue(snapshot(1)))
+  cleanup()
+  useAppStore.setState({ selectedNoteId: 'other', drafts: { other: 'unsaved' } })
+  render(<NoteHistory noteId={note.id} />)
+  fireEvent.click(screen.getByLabelText('Note revision history'))
+  fireEvent.click(await screen.findByText(/Revision 1 ·/))
+  await screen.findByText('snapshot 1')
+  expect(window.strata.notes.history).toHaveBeenLastCalledWith(note.id)
+  expect((screen.getByText('Restore revision 1') as HTMLButtonElement).disabled).toBe(false)
+  act(() => useAppStore.setState({ drafts: { [note.id]: 'unsaved' } }))
+  expect((screen.getByText('Restore revision 1') as HTMLButtonElement).disabled).toBe(true)
 })
