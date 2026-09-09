@@ -1,0 +1,161 @@
+{
+  "fixture": "controlled-v1",
+  "count": 1000,
+  "links": 3095,
+  "fixtureSha256": "89480c5de58602def39ba83f5604976b4e570990f4c4bd01c98df9ef8d5a5bb1",
+  "sourceCommit": "e2ca89b9b38efc71cb4c1652649b5297f5f67310",
+  "harnessSha256": "6ce6c2a406866509ab667a94472d6e9459dfc6eaad95a4c0dd9a2a425350c5b5",
+  "runtime": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "x64",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  },
+  "metrics": {
+    "startup": {
+      "medianMs": 1.8671779999999671,
+      "maxMs": 3.3604389999999285,
+      "samples": 3
+    },
+    "get": {
+      "medianMs": 0.10349199999996017,
+      "maxMs": 0.5631779999999935,
+      "samples": 7
+    },
+    "titleLookup": {
+      "medianMs": 28.70883200000003,
+      "maxMs": 31.994815000000017,
+      "samples": 7
+    },
+    "list100": {
+      "medianMs": 11.671092000000044,
+      "maxMs": 13.302476999999953,
+      "samples": 7
+    },
+    "search10": {
+      "medianMs": 5.478675000000067,
+      "maxMs": 6.603673000000072,
+      "samples": 7
+    },
+    "tags": {
+      "medianMs": 12.783545999999887,
+      "maxMs": 14.967100999999957,
+      "samples": 7
+    },
+    "tagList100": {
+      "medianMs": 0.956707999999935,
+      "maxMs": 4.22831599999995,
+      "samples": 7
+    },
+    "backlinksHub": {
+      "medianMs": 97.14589299999989,
+      "maxMs": 116.65889200000015,
+      "samples": 7
+    },
+    "relatedHubHttp": {
+      "medianMs": 89.84198800000013,
+      "maxMs": 99.82955099999981,
+      "samples": 7
+    },
+    "relatedLargeProjectHttp": {
+      "medianMs": 84.05319899999995,
+      "maxMs": 120.11938700000019,
+      "samples": 7
+    },
+    "projects": {
+      "medianMs": 0.09232699999984106,
+      "maxMs": 0.5587949999999182,
+      "samples": 7
+    },
+    "projectRename": {
+      "medianMs": 0.37552400000004127,
+      "maxMs": 0.5673950000000332,
+      "samples": 7
+    },
+    "updateLinks": {
+      "medianMs": 100.73931100000027,
+      "maxMs": 118.55796699999973,
+      "samples": 7
+    },
+    "renameHub": {
+      "medianMs": 1803.7587890000013,
+      "maxMs": 1977.1118829999996,
+      "samples": 4
+    },
+    "backup": {
+      "medianMs": 36.56802500000049,
+      "maxMs": 37.913540999999896,
+      "samples": 3
+    },
+    "sqlLike10Control": {
+      "medianMs": 4.181339999999182,
+      "maxMs": 4.944218999999066,
+      "samples": 7
+    },
+    "clihealth": {
+      "medianMs": 660.800521000001,
+      "maxMs": 661.1104099999993,
+      "samples": 3
+    },
+    "clilist50": {
+      "medianMs": 841.3400799999981,
+      "maxMs": 976.0047129999984,
+      "samples": 3
+    },
+    "clisearch10": {
+      "medianMs": 692.8118270000014,
+      "maxMs": 763.3729480000002,
+      "samples": 3
+    },
+    "projectDeleteLarge": {
+      "medianMs": 58.13249999999971,
+      "samples": 1
+    }
+  },
+  "cliBytes": {
+    "health": 139,
+    "list50": 131996,
+    "search10": 23299
+  },
+  "returned": {
+    "list": 100,
+    "search": 10,
+    "backlinks": 999,
+    "relatedHub": [
+      "00000000-0000-4000-8000-000000000064",
+      "00000000-0000-4000-8000-000000000005",
+      "00000000-0000-4000-8000-00000000000a",
+      "00000000-0000-4000-8000-00000000000f",
+      "00000000-0000-4000-8000-000000000014",
+      "00000000-0000-4000-8000-000000000019",
+      "00000000-0000-4000-8000-00000000001e",
+      "00000000-0000-4000-8000-000000000023"
+    ],
+    "relatedProject": [
+      "00000000-0000-4000-8000-000000000000",
+      "00000000-0000-4000-8000-000000000022",
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000034",
+      "00000000-0000-4000-8000-000000000044",
+      "00000000-0000-4000-8000-000000000097",
+      "00000000-0000-4000-8000-0000000000fb",
+      "00000000-0000-4000-8000-00000000015f"
+    ]
+  },
+  "projectPlan": [
+    {
+      "id": 5,
+      "parent": 0,
+      "notused": 90,
+      "detail": "SEARCH notes USING INDEX idx_notes_project_id (project_id=?)"
+    },
+    {
+      "id": 24,
+      "parent": 0,
+      "notused": 0,
+      "detail": "USE TEMP B-TREE FOR ORDER BY"
+    }
+  ],
+  "rssBeforeProjectDelete": 279150592,
+  "rssBytes": 279191552
+}
