@@ -1,5 +1,7 @@
 # Enterprise Readiness Checklist
 
+Historical checklist from before the full hardening upgrade. Its optional-auth and prior release assertions are not current policy. Use [AGENTS.md](../AGENTS.md), [SECURITY.md](../SECURITY.md), the [hardening evidence](hardening/requirements.md) and [release procedure](RELEASING.md) for the current contract.
+
 Use this checklist before a production or managed rollout.
 
 ## Documentation

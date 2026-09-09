@@ -2,6 +2,8 @@
 
 Strata supports multiple AI providers through a clean abstraction layer. The system is provider-agnostic by design.
 
+Model names below are repository preset defaults, not claims of current provider availability or pricing. Configure explicit provider-qualified model identities in Settings. The same shared tool loop, mutation permissions and context budgets apply to normal execution and eligible premium fallback.
+
 ## Supported Providers
 
 ### OpenAI (Responses API)
@@ -47,7 +49,7 @@ DeepSeek V4 Flash is the first cheap provider. It uses the standard Chat Complet
 - **Role**: Configurable (cheap or premium)
 - **API key**: Set in Settings → `OpenRouter API Key`
 
-OpenRouter provides access to hundreds of models. Configure the model slug in Settings.
+Configure the model slug offered by your OpenRouter account in Settings.
 
 ### Custom OpenAI-compatible
 - **Preset ID**: `custom`
@@ -57,7 +59,7 @@ OpenRouter provides access to hundreds of models. Configure the model slug in Se
 - **Role**: Configurable
 - **API key**: Set in Settings → `Custom Provider API Key`
 
-Use this for any service that exposes an OpenAI-compatible `/chat/completions` endpoint.
+Use this for services implementing the supported `/chat/completions` contract. Configure whether tools, system messages and temperature are supported; unsupported fields are omitted, and incompatible tool transcripts fail explicitly. The current custom preset requires a nonblank credential. Endpoint transport and DNS policy are documented in [provider endpoint security](provider-endpoint-security.md).
 
 ### Local llama.cpp (Future)
 - **Preset ID**: `local-llama-cpp`
@@ -100,7 +102,7 @@ The AI runner never knows which provider it's talking to — it just calls `send
 ## API Keys
 
 API keys can be set:
-1. In Settings (encrypted with OS-backed Electron safeStorage; SQLite stores only credential-presence markers)
+1. In Settings (encrypted with OS-backed Electron safeStorage; the renderer receives only credential-presence markers and provider keys are removed from SQLite)
 2. Via environment variable `STRATA_OPENAI_API_KEY` (OpenAI only, takes precedence)
 
 Keys for other providers must be set in Settings.

@@ -1,5 +1,7 @@
 # CLI Changelog
 
+Historical implementation record. Current commands, authentication and revision requirements are defined in [CLI.md](../CLI.md); past completion labels do not describe the current release audit.
+
 ## 2026-05-27
 
 ### Item 1: Core CLI runtime and command surface

@@ -28,7 +28,7 @@ npm run strata -- health
 npm run strata -- notes list --json
 npm run strata -- notes create --content "# Note\n\nCreated from CLI"
 npm run strata -- --confirm projects import ./my-notes-folder
-curl http://127.0.0.1:3939/health
+npm run strata -- capabilities --json
 ```
 
 See [CLI.md](CLI.md) and [API.md](API.md) for complete contracts.
@@ -59,7 +59,7 @@ The application uses Electron, React, TypeScript, CodeMirror, and SQLite. Import
 
 Notes and settings remain in local SQLite unless you explicitly configure an external AI provider or integration. WAL mode, scheduled backups, database recovery, Electron sandboxing, context isolation, and AI edit controls protect local work.
 
-See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [docs/enterprise-readiness-checklist.md](docs/enterprise-readiness-checklist.md).
+See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), the [hardening report](docs/hardening/FINAL-REPORT.md), and [release gates](docs/RELEASING.md).
 
 ## Troubleshooting
 
@@ -90,3 +90,9 @@ Restoring a backup requires all editor drafts to save successfully. Strata pause
 Runtime logs use fixed messages and allowlisted error codes. Startup checkpoints are quiet by default; set `STRATA_DEBUG=1` to enable them. Debug mode does not include raw exceptions, note/chat text, keys, request URLs, or library paths. CLI `--verbose` reports request methods and attempts without search queries or credentials. Command results and explicitly requested exports still contain the data you requested.
 
 In split view, each note has its own save status and conflict recovery controls. A conflict in one pane stays visible while other notes save; use that pane’s recovery controls to preserve or discard its draft. In the Markdown editor, Ctrl/Cmd-click opens a wiki link; ordinary clicks place the caret. Preview links open with a normal click.
+
+The hardening upgrade adds mandatory local API authentication, OS-encrypted provider secrets, universal revisions, conflict-safe writes, indexed retrieval and bounded agent context. The [60-step evidence ledger](docs/hardening/requirements.md) records coverage and explicit limits. Current native-package CI covers Linux, macOS and Windows; signed installer acceptance remains a release gate.
+
+Use `npm run benchmark:controlled`, `npm run benchmark:renderer`, `npm run benchmark:check -- ARTIFACT.json` and `npm run eval:routing` for the documented isolated performance/evaluation workflows. See [performance budgets](docs/hardening/performance-budgets.md). Use `npm run release -- --help` and the release guide for native signing configuration.
+
+Wiki-link completion searches the full library. Missing targets can be created explicitly; duplicate titles require selection. Title links retain their literal Markdown when a target is renamed and may become missing; UUID links remain stable. No automatic global Markdown rewrite occurs.

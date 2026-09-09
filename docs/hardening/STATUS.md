@@ -1,25 +1,16 @@
 # Hardening work record
 
-Source request: attached “Strata Full Hardening + Performance + Agentic UX Upgrade”, 2026-09-08. Starting commit: e2ca89b; version 0.8.0. This record is in progress, not a release-readiness claim.
+Source request: attached “Strata Full Hardening + Performance + Agentic UX Upgrade”, 2026-09-08. Starting commit: e2ca89b; version 0.8.0. This is the historical implementation record. The final assessment and current evidence are in [FINAL-REPORT.md](FINAL-REPORT.md) and [requirements.md](requirements.md); earlier pending statements below describe their dated checkpoints.
 
 Baseline: 77 tests / 16 files passed. Production TypeScript/Vite build passed. Existing untracked `work/` contains local knowledge exports; preserve locally and exclude from commits. Historical `.loop-engineering` success describes the prior retrieval contract only.
 
-## Work remaining
+## Final implementation state
 
-- [ ] Complete repository inspection and verify all 60 requested areas
-- [ ] HTTP boundaries, credential discovery, bounded structured protocol
-- [ ] Renderer shell removal, publishing, navigation and IPC boundaries
-- [ ] OS-backed provider secrets and migration/backup sanitization
-- [ ] Transactional domain operations, universal revisions and conflicts
-- [ ] Indexed titles, incremental links, FTS, summaries and pagination
-- [ ] SQL tags, joined backlinks, bounded related candidates
-- [ ] AI confirmation, context budget, shared fallback loop and schemas
-- [ ] Provider/transcription constraints and capability compatibility
-- [ ] Invalidation, autosave conflicts and history UI
-- [ ] Idempotency, batch, capability discovery and installed CLI
-- [ ] Memory conventions/deduplication, retention and backup integrity
-- [ ] Benchmarks, regression tests, desktop/package checks and CI
-- [ ] Current docs, final assessment, commits/push and memory consolidation
+The 60-step audit is closed with explicit offline-evaluation and signed-release limits. Runtime 7bb45dc passed 332 tests and all four CI jobs, including native packages on Linux/macOS/Windows and real macOS desktop interactions. A final sweep subsequently retired the permissive legacy bridge and redundant clients; final verification is recorded in FINAL-REPORT.md. Controlled 10k/50k budgets pass, routing is50/50 and immutable renderer/CPU/payload evidence is committed. Release signing/notarization and installer acceptance follow docs/RELEASING.md. Strata consolidation records the handoff separately from this repository evidence.
+
+## Historical checkpoints
+
+All unchecked or “remaining” language below is preserved historical evidence, superseded by the final ledger.
 
 ## Decisions
 

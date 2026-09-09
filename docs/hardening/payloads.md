@@ -25,7 +25,7 @@ Defaults return fewer summaries, so these numbers do not claim equivalent recall
 
 The combined figure excludes provider transport envelopes. The history fixture deliberately exceeds the new 24,000-character budget; it illustrates a long-conversation bound, not an average request. Short conversations save less. Unicode means byte counts differ from character limits.
 
-The full catalog grows from 4,925 to 5,302 bytes as write contracts gain validation/revision fields. A measured read-only subset retains all 10 read tools and uses 2,732 bytes, 48.47% less than the current full catalog. This first snapshot measures that subset as a candidate; the runtime still advertises the full catalog. A simple permission-mode subset can achieve that saving without guessing intent.
+The full catalog grows from 4,925 to 5,302 bytes as write contracts gain validation/revision fields. A measured read-only subset retains all 10 read tools and uses 2,732 bytes, 48.47% less than the current full catalog. This first snapshot measures that subset as a candidate; the runtime at that first checkpoint still advertised the full catalog. A simple permission-mode subset can achieve that saving without guessing intent.
 
 The first context snapshot also prompted a follow-up correctness check: the current open-note builder slices serialized JSON at a character limit. Long permitted titles can therefore leave a partial final entry. The follow-up should preserve complete entries and explicitly report omissions; the original result above must remain unchanged.
 

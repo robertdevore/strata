@@ -1,0 +1,922 @@
+{
+  "sourceCommit": "c9d76697efef300ef148e0dee7eadd8adfc1a77f",
+  "sourceSha256": "bd0f9b961cd0ad5cb0855accab318991c8d5280d3bb8df2c1867b8f910ce4942",
+  "fixtureSha256": "b2f4420fce8fd629006624dfa0895cda3f823c16a58b5a251358c72cb7c794ac",
+  "node": "v24.20.0",
+  "total": 50,
+  "passed": 46,
+  "accuracy": 0.92,
+  "latency": {
+    "medianMs": 0.23647299999993265,
+    "p95Ms": 0.4309889999999541,
+    "samples": 5000
+  },
+  "liveProviderCalls": 0,
+  "providerCostUsd": 0,
+  "inputTokens": null,
+  "outputTokens": null,
+  "toolCalls": 0,
+  "scope": "Offline heuristic classification only; model answer quality, provider token usage and live service latency are not measured.",
+  "cases": [
+    {
+      "id": "simple-note-001",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "simple-note-002",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "simple-note-003",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "simple-note-004",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "simple-note-005",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "tag-note-001",
+      "expected": {
+        "intent": "tag_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "tag_note",
+        "confidence": 0.92,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: tag note (confidence: 0.92)"
+      },
+      "passed": true
+    },
+    {
+      "id": "tag-note-002",
+      "expected": {
+        "intent": "tag_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "tag_note",
+        "confidence": 0.92,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: tag note (confidence: 0.92)"
+      },
+      "passed": true
+    },
+    {
+      "id": "tag-note-003",
+      "expected": {
+        "intent": "tag_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": false
+    },
+    {
+      "id": "todo-extract-001",
+      "expected": {
+        "intent": "extract_tasks",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "extract_tasks",
+        "confidence": 0.9,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: extract tasks (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "todo-extract-002",
+      "expected": {
+        "intent": "extract_tasks",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "extract_tasks",
+        "confidence": 0.9,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: extract tasks (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "todo-extract-003",
+      "expected": {
+        "intent": "extract_tasks",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "extract_tasks",
+        "confidence": 0.9,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: extract tasks (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-001",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-002",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-003",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-004",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "summary-001",
+      "expected": {
+        "intent": "summarize_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "summarize_note",
+        "confidence": 0.88,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: summarize note (confidence: 0.88)"
+      },
+      "passed": true
+    },
+    {
+      "id": "summary-002",
+      "expected": {
+        "intent": "summarize_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "summarize_note",
+        "confidence": 0.88,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: summarize note (confidence: 0.88)"
+      },
+      "passed": true
+    },
+    {
+      "id": "summary-003",
+      "expected": {
+        "intent": "summarize_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "summarize_note",
+        "confidence": 0.88,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: summarize note (confidence: 0.88)"
+      },
+      "passed": true
+    },
+    {
+      "id": "rewrite-search-001",
+      "expected": {
+        "intent": "rewrite_search",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "rewrite_search",
+        "confidence": 0.87,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: rewrite search (confidence: 0.87)"
+      },
+      "passed": true
+    },
+    {
+      "id": "rewrite-search-002",
+      "expected": {
+        "intent": "rewrite_search",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "rewrite_search",
+        "confidence": 0.87,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: rewrite search (confidence: 0.87)"
+      },
+      "passed": true
+    },
+    {
+      "id": "update-note-001",
+      "expected": {
+        "intent": "update_note",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "update_note",
+        "confidence": 0.88,
+        "risk": "medium",
+        "requiresConfirmation": true,
+        "reason": "Matched: update note (confidence: 0.88)"
+      },
+      "passed": true
+    },
+    {
+      "id": "update-note-002",
+      "expected": {
+        "intent": "update_note",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "update_note",
+        "confidence": 0.88,
+        "risk": "medium",
+        "requiresConfirmation": true,
+        "reason": "Matched: update note (confidence: 0.88)"
+      },
+      "passed": true
+    },
+    {
+      "id": "update-note-003",
+      "expected": {
+        "intent": "update_note",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": false
+    },
+    {
+      "id": "update-note-004",
+      "expected": {
+        "intent": "update_note",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "update_note",
+        "confidence": 0.88,
+        "risk": "medium",
+        "requiresConfirmation": true,
+        "reason": "Matched: update note (confidence: 0.88)"
+      },
+      "passed": true
+    },
+    {
+      "id": "code-arch-001",
+      "expected": {
+        "intent": "code_architecture",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "code-arch-002",
+      "expected": {
+        "intent": "code_architecture",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "code-arch-003",
+      "expected": {
+        "intent": "code_architecture",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "code-arch-004",
+      "expected": {
+        "intent": "code_architecture",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "code-arch-005",
+      "expected": {
+        "intent": "code_architecture",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "code-arch-006",
+      "expected": {
+        "intent": "code_architecture",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "complex-reasoning-001",
+      "expected": {
+        "intent": "complex_reasoning",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "complex_reasoning",
+        "confidence": 0.9,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: complex reasoning (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "complex-reasoning-002",
+      "expected": {
+        "intent": "complex_reasoning",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "code_architecture",
+        "confidence": 0.95,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: code architecture (confidence: 0.95)"
+      },
+      "passed": false
+    },
+    {
+      "id": "complex-reasoning-003",
+      "expected": {
+        "intent": "complex_reasoning",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "complex_reasoning",
+        "confidence": 0.9,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: complex reasoning (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "complex-reasoning-004",
+      "expected": {
+        "intent": "complex_reasoning",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "complex_reasoning",
+        "confidence": 0.9,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: complex reasoning (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "complex-reasoning-005",
+      "expected": {
+        "intent": "complex_reasoning",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "complex_reasoning",
+        "confidence": 0.9,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: complex reasoning (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "blocked-delete-001",
+      "expected": {
+        "intent": "unknown",
+        "route": "blocked",
+        "risk": "high",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "blocked",
+        "intent": "unknown",
+        "confidence": 1,
+        "risk": "high",
+        "requiresConfirmation": true,
+        "reason": "Destructive or blocked request detected"
+      },
+      "passed": true
+    },
+    {
+      "id": "blocked-delete-002",
+      "expected": {
+        "intent": "unknown",
+        "route": "blocked",
+        "risk": "high",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "unknown",
+        "confidence": 0.5,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "No intent matched — defaulting to premium for safety"
+      },
+      "passed": false
+    },
+    {
+      "id": "blocked-delete-003",
+      "expected": {
+        "intent": "unknown",
+        "route": "blocked",
+        "risk": "high",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "blocked",
+        "intent": "unknown",
+        "confidence": 1,
+        "risk": "high",
+        "requiresConfirmation": true,
+        "reason": "Destructive or blocked request detected"
+      },
+      "passed": true
+    },
+    {
+      "id": "blocked-delete-004",
+      "expected": {
+        "intent": "unknown",
+        "route": "blocked",
+        "risk": "high",
+        "requiresConfirmation": true
+      },
+      "actual": {
+        "route": "blocked",
+        "intent": "unknown",
+        "confidence": 1,
+        "risk": "high",
+        "requiresConfirmation": true,
+        "reason": "Destructive or blocked request detected"
+      },
+      "passed": true
+    },
+    {
+      "id": "ambiguous-001",
+      "expected": {
+        "intent": "unknown",
+        "route": "premium",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "unknown",
+        "confidence": 0.5,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "No intent matched — defaulting to premium for safety"
+      },
+      "passed": true
+    },
+    {
+      "id": "ambiguous-002",
+      "expected": {
+        "intent": "unknown",
+        "route": "premium",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "unknown",
+        "confidence": 0.5,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "No intent matched — defaulting to premium for safety"
+      },
+      "passed": true
+    },
+    {
+      "id": "ambiguous-003",
+      "expected": {
+        "intent": "unknown",
+        "route": "premium",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "unknown",
+        "confidence": 0.5,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "No intent matched — defaulting to premium for safety"
+      },
+      "passed": true
+    },
+    {
+      "id": "chat-search-001",
+      "expected": {
+        "intent": "unknown",
+        "route": "premium",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "unknown",
+        "confidence": 0.5,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "No intent matched — defaulting to premium for safety"
+      },
+      "passed": true
+    },
+    {
+      "id": "complex-context-001",
+      "expected": {
+        "intent": "complex_reasoning",
+        "route": "premium",
+        "risk": "medium",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "premium",
+        "intent": "complex_reasoning",
+        "confidence": 0.9,
+        "risk": "medium",
+        "requiresConfirmation": false,
+        "reason": "Matched: complex reasoning (confidence: 0.90)"
+      },
+      "passed": true
+    },
+    {
+      "id": "create-note-urgent-001",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "create-note-format-001",
+      "expected": {
+        "intent": "create_note",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "create_note",
+        "confidence": 0.95,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: create note (confidence: 0.95)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-find-001",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-find-002",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "search-find-003",
+      "expected": {
+        "intent": "search_notes",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "search_notes",
+        "confidence": 0.93,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: search notes (confidence: 0.93)"
+      },
+      "passed": true
+    },
+    {
+      "id": "todo-create-001",
+      "expected": {
+        "intent": "extract_tasks",
+        "route": "cheap",
+        "risk": "low",
+        "requiresConfirmation": false
+      },
+      "actual": {
+        "route": "cheap",
+        "intent": "extract_tasks",
+        "confidence": 0.9,
+        "risk": "low",
+        "requiresConfirmation": false,
+        "reason": "Matched: extract tasks (confidence: 0.90)"
+      },
+      "passed": true
+    }
+  ]
+}

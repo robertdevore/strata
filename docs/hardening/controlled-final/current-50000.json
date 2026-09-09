@@ -1,0 +1,155 @@
+{
+  "fixture": "controlled-v1",
+  "count": 50000,
+  "links": 150095,
+  "fixtureSha256": "b80cd8d62b4000c1dd41244c60e4d7795a359ad894f17b2e6d70e85c19ba66ba",
+  "sourceCommit": "7bb45dc61ee2a29c8cf12e4366589960fb6cf6e2",
+  "harnessSha256": "6ce6c2a406866509ab667a94472d6e9459dfc6eaad95a4c0dd9a2a425350c5b5",
+  "runtime": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "x64",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  },
+  "metrics": {
+    "startup": {
+      "medianMs": 5.716679999997723,
+      "maxMs": 6.4975350000022445,
+      "samples": 3
+    },
+    "get": {
+      "medianMs": 0.183617000002414,
+      "maxMs": 1.3933469999974477,
+      "samples": 7
+    },
+    "titleLookup": {
+      "medianMs": 0.21078500000294298,
+      "maxMs": 0.4915830000027199,
+      "samples": 7
+    },
+    "list100": {
+      "medianMs": 1.0121110000036424,
+      "maxMs": 1.788285000002361,
+      "samples": 7
+    },
+    "search10": {
+      "medianMs": 4.771891000003961,
+      "maxMs": 5.203980999998748,
+      "samples": 7
+    },
+    "tags": {
+      "medianMs": 5.998578999999154,
+      "maxMs": 7.400864999995974,
+      "samples": 7
+    },
+    "tagList100": {
+      "medianMs": 5.751830000001064,
+      "maxMs": 7.664204000000609,
+      "samples": 7
+    },
+    "backlinksHub": {
+      "medianMs": 241.03185200000007,
+      "maxMs": 244.75530699999945,
+      "samples": 7
+    },
+    "relatedHubHttp": {
+      "medianMs": 9.400260000002163,
+      "maxMs": 12.729975000002014,
+      "samples": 7
+    },
+    "relatedLargeProjectHttp": {
+      "medianMs": 6.248863999993773,
+      "maxMs": 6.994302999999491,
+      "samples": 7
+    },
+    "projects": {
+      "medianMs": 0.11626399999659043,
+      "maxMs": 0.5356169999940903,
+      "samples": 7
+    },
+    "projectRename": {
+      "medianMs": 0.47606200000154786,
+      "maxMs": 0.872733000003791,
+      "samples": 7
+    },
+    "updateLinks": {
+      "medianMs": 3.2686979999998584,
+      "maxMs": 4.64744200000132,
+      "samples": 7
+    },
+    "renameHub": {
+      "medianMs": 766.1174479999972,
+      "maxMs": 776.9162840000063,
+      "samples": 4
+    },
+    "backup": {
+      "medianMs": 8777.766672000012,
+      "maxMs": 9634.205077999999,
+      "samples": 3
+    },
+    "sqlLike10Control": {
+      "medianMs": 6.081348000006983,
+      "maxMs": 6.657656999988831,
+      "samples": 7
+    },
+    "clihealth": {
+      "medianMs": 581.0139400000044,
+      "maxMs": 590.7981810000056,
+      "samples": 3
+    },
+    "clilist50": {
+      "medianMs": 595.2958149999904,
+      "maxMs": 608.3367629999993,
+      "samples": 3
+    },
+    "clisearch10": {
+      "medianMs": 617.2544479999924,
+      "maxMs": 720.0545049999928,
+      "samples": 3
+    },
+    "projectDeleteLarge": {
+      "medianMs": 7163.860576000006,
+      "samples": 1
+    }
+  },
+  "cliBytes": {
+    "health": 103,
+    "list50": 27721,
+    "search10": 5655
+  },
+  "returned": {
+    "list": 100,
+    "search": 10,
+    "backlinks": 100,
+    "relatedHub": [
+      "00000000-0000-4000-8000-000000000064",
+      "00000000-0000-4000-8000-00000000005a",
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000004",
+      "00000000-0000-4000-8000-000000000005",
+      "00000000-0000-4000-8000-000000000006"
+    ],
+    "relatedProject": [
+      "00000000-0000-4000-8000-000000000000",
+      "00000000-0000-4000-8000-000000000022",
+      "00000000-0000-4000-8000-000000000034",
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000044",
+      "00000000-0000-4000-8000-000000000097",
+      "00000000-0000-4000-8000-0000000000fb",
+      "00000000-0000-4000-8000-00000000015f"
+    ]
+  },
+  "projectPlan": [
+    {
+      "id": 5,
+      "parent": 0,
+      "notused": 120,
+      "detail": "SEARCH notes USING INDEX idx_notes_project_recency (project_id=?)"
+    }
+  ],
+  "rssBeforeProjectDelete": 167100416,
+  "rssBytes": 201703424
+}

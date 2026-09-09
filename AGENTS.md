@@ -27,7 +27,7 @@ Strata 0.8.0 is a local-first Electron/React Markdown knowledge application. SQL
 
 ## Verification
 
-Run `npm run verify` for source formatting, lint, all offline tests (including TSX UI tests), TypeScript checking and production build. Use `npm run format:source` to normalize source/config formatting. Run `npm run benchmark` separately against synthetic libraries. GitHub Actions runs verification and dependency audit on Linux and macOS; run `npm run package:verify`, `npm run package:electron:verify`, and `npm run desktop:verify` separately for installed CLI, native Electron packaging, and isolated desktop interactions. Full release/platform coverage remains separately tracked work.
+Run `npm run verify` for source formatting, lint, all offline tests (including TSX UI tests), TypeScript checking and production build. Use `npm run format:source` to normalize source/config formatting. Run `npm run benchmark` separately against synthetic libraries. GitHub Actions runs verification and dependency audit on Linux and macOS; run `npm run package:verify`, `npm run package:electron:verify`, and `npm run desktop:verify` separately for installed CLI, native Electron packaging, and isolated desktop interactions. Native directory/worker CI covers Linux, macOS and Windows. Signing, notarization and actual installer acceptance follow docs/RELEASING.md. Final evidence is in docs/hardening/FINAL-REPORT.md.
 
 Use synthetic temporary libraries. Preserve immutable baselines and disclose workload changes. Never use the live user database as a fixture. Normal tests must not depend on live AI providers. Validate desktop behavior and packaged native SQLite separately.
 
