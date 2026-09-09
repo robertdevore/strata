@@ -206,6 +206,8 @@ try {
     await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice one' })
     return (await window.strata.notes.create({ content: '# Ambiguous target\n\nChoice two' })).id
   })
+  const completionPreview = page.getByTitle('Preview', { exact: true })
+  if ((await completionPreview.getAttribute('class')).includes('chip-active')) await completionPreview.click()
   const wikiEditor = page.locator('.cm-content[contenteditable="true"]').first()
   await wikiEditor.focus()
   await wikiEditor.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a')
