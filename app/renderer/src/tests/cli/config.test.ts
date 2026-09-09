@@ -1,5 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resolve_runtime_options } from '../../../../cli/lib/config'
+
+vi.mock('../../../../shared/apiCredential', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../shared/apiCredential')>()),
+  readLocalCredential: () => null,
+}))
 
 describe('cli config resolver', () => {
   afterEach(() => {

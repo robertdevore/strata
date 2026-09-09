@@ -316,7 +316,7 @@ try {
       ),
     )
     .toBe(true)
-  const pagedProject = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const project = await window.strata.projects.create({ name: 'Paged project fixture' })
     for (let i = 0; i < 130; i++)
       await window.strata.notes.create({
@@ -331,19 +331,29 @@ try {
   if (await openSidebar.isVisible()) await openSidebar.click()
   const sidebarSearch = page.getByPlaceholder('Search...', { exact: true })
   await sidebarSearch.fill('')
-  await page.getByLabel('Filter by project').selectOption(pagedProject)
+  await expect(page.getByLabel('Filter by project')).toHaveCount(0)
+  await expect(page.locator('.notes-list > .note-row')).toHaveCount(50)
+  await page.getByTitle('Show Paged project fixture', { exact: true }).click()
+  await page.getByRole('button', { name: 'Filter to this project', exact: true }).last().click()
   const projectBlock = page
     .locator('.project-block')
     .filter({ has: page.locator('.project-label').getByText('Paged project fixture', { exact: true }) })
   await expect(projectBlock.locator('.project-count')).toHaveText('130')
   await expect(projectBlock.locator('.project-note-row')).toHaveCount(6)
-  await page.getByRole('button', { name: 'Load more notes', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Load more notes', exact: true })).toHaveCount(0)
+  await page.locator('.sidebar-scroll').evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+    element.dispatchEvent(new Event('scroll'))
+  })
+  await expect.poll(() => page.locator('.notes-list > .note-row').count()).toBeGreaterThan(50)
   await sidebarSearch.fill('pagedmarker0zebra')
   await expect(projectBlock.locator('.project-note-row')).toHaveCount(1)
   await expect(projectBlock.locator('.note-row-title')).toHaveText('Paged note 0')
   await sidebarSearch.fill('')
-  await page.getByLabel('Filter by project').selectOption('')
+  await page.getByRole('button', { name: 'Show all notes', exact: true }).click()
+  await page.getByTitle('Hide projects', { exact: true }).click()
+  await expect(page.locator('.project-block')).toHaveCount(0)
+  await page.getByTitle('Show projects', { exact: true }).click()
   // Synthetic provider transport only: no requests reach a real AI service.
   await application.evaluate(() => {
     process.env.STRATA_OPENAI_API_KEY = 'synthetic-desktop-fixture-key'

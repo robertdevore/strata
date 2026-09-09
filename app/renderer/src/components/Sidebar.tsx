@@ -76,6 +76,7 @@ export function Sidebar(props: SidebarProps) {
   const [projectCreateName, setProjectCreateName] = useState('')
   const [projectCreateStatus, setProjectCreateStatus] = useState('')
   const [isProjectCreateBusy, setIsProjectCreateBusy] = useState(false)
+  const [projectsCollapsed, setProjectsCollapsed] = useState(false)
   const [tagsCollapsed, setTagsCollapsed] = useState(true)
   const [projectsCollapsedById, setProjectsCollapsedById] = useState<Record<string, boolean>>({})
   const [pinnedNotesCollapsed, setPinnedNotesCollapsed] = useState(false)
@@ -88,17 +89,17 @@ export function Sidebar(props: SidebarProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const visibleUnprojectedNotes = useMemo(() => props.notes.filter((note) => !note.projectId), [props.notes])
+  const listedNotes = useMemo(() => props.notes, [props.notes])
   const selectedIndex = useMemo(
-    () => visibleUnprojectedNotes.findIndex((note) => note.id === props.selectedId),
-    [visibleUnprojectedNotes, props.selectedId],
+    () => listedNotes.findIndex((note) => note.id === props.selectedId),
+    [listedNotes, props.selectedId],
   )
   const pinnedNoteIds = useMemo(() => props.pinnedNotes.map((entry) => entry.id), [props.pinnedNotes])
   const pinnedNoteIdSet = useMemo(() => new Set(pinnedNoteIds), [pinnedNoteIds])
   const active_list_key = useMemo(
     () =>
-      `${props.activeFilter}|${props.searchQuery}|${props.selectedTag ?? ''}|${visibleUnprojectedNotes.length}`,
-    [props.activeFilter, props.searchQuery, props.selectedTag, visibleUnprojectedNotes.length],
+      `${props.activeFilter}|${props.searchQuery}|${props.selectedTag ?? ''}|${props.selectedProjectId ?? ''}`,
+    [props.activeFilter, props.searchQuery, props.selectedTag, props.selectedProjectId],
   )
   const visibleCount = visibleCountsByKey[active_list_key] ?? 50
   const sidebarSearch = props.searchQuery.trim().toLowerCase()
@@ -204,7 +205,8 @@ export function Sidebar(props: SidebarProps) {
     if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
       setVisibleCountsByKey((prev) => {
         const current_count = prev[active_list_key] ?? 50
-        const next_count = Math.min(current_count + 50, visibleUnprojectedNotes.length)
+        if (current_count >= listedNotes.length) return prev
+        const next_count = Math.min(current_count + 50, listedNotes.length)
         if (next_count === current_count) return prev
         return {
           ...prev,
@@ -212,10 +214,14 @@ export function Sidebar(props: SidebarProps) {
         }
       })
     }
-  }, [active_list_key, visibleUnprojectedNotes.length])
+  }, [active_list_key, listedNotes.length])
 
-  const visibleNotes = visibleUnprojectedNotes.slice(0, visibleCount)
-  const hasMore = visibleCount < visibleUnprojectedNotes.length
+  useEffect(() => {
+    onScrollNearBottom()
+  }, [onScrollNearBottom])
+
+  const visibleNotes = listedNotes.slice(0, visibleCount)
+  const hasMore = visibleCount < listedNotes.length
 
   const loadMoreProjectNotes = (projectId: string) => {
     setProjectVisibleCountsById((current) => {
@@ -305,16 +311,16 @@ export function Sidebar(props: SidebarProps) {
   }
 
   const onListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (0 === visibleUnprojectedNotes.length) return
+    if (0 === listedNotes.length) return
     if ('ArrowDown' === event.key) {
       event.preventDefault()
-      const next = selectedIndex < visibleUnprojectedNotes.length - 1 ? selectedIndex + 1 : 0
-      props.onSelect(visibleUnprojectedNotes[next].id)
+      const next = selectedIndex < listedNotes.length - 1 ? selectedIndex + 1 : 0
+      props.onSelect(listedNotes[next].id)
     }
     if ('ArrowUp' === event.key) {
       event.preventDefault()
-      const next = selectedIndex > 0 ? selectedIndex - 1 : visibleUnprojectedNotes.length - 1
-      props.onSelect(visibleUnprojectedNotes[next].id)
+      const next = selectedIndex > 0 ? selectedIndex - 1 : listedNotes.length - 1
+      props.onSelect(listedNotes[next].id)
     }
     if ('Enter' === event.key && props.selectedId) {
       props.onSelect(props.selectedId)
@@ -363,22 +369,10 @@ export function Sidebar(props: SidebarProps) {
               />
             </div>
           )}
-          {props.projects.length > 0 && (
-            <div className="sidebar-search-row">
-              <select
-                className="search-input sidebar-search-input"
-                aria-label="Filter by project"
-                value={props.selectedProjectId ?? ''}
-                onChange={(event) => props.onProjectFilter(event.target.value || null)}
-              >
-                <option value="">All projects</option>
-                {props.projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {props.selectedProjectId && (
+            <button className="ghost-button" onClick={() => props.onProjectFilter(null)}>
+              Show all notes
+            </button>
           )}
           {/* Tags — collapsible, pinned-only shortlist */}
           {props.sidebarLayout.sectionVisibility.tags && (
@@ -440,7 +434,18 @@ export function Sidebar(props: SidebarProps) {
           {props.sidebarLayout.sectionVisibility.projects && (
             <div className="projects-section" style={{ order: sectionOrderIndex.projects }}>
               <div className="tags-header-row project-header-row">
-                <span className="tags-label">Projects</span>
+                <button
+                  type="button"
+                  className="tags-header-toggle projects-section-toggle"
+                  onClick={() => setProjectsCollapsed((value) => !value)}
+                  aria-expanded={!projectsCollapsed}
+                  title={projectsCollapsed ? 'Show projects' : 'Hide projects'}
+                >
+                  <span className="tags-label">Projects</span>
+                  <span className="projects-chevron" aria-hidden="true">
+                    {projectsCollapsed ? <ChevronDownIcon size={14} /> : <ChevronUpIcon size={14} />}
+                  </span>
+                </button>
                 <div className="project-header-actions">
                   <button
                     type="button"
@@ -453,158 +458,159 @@ export function Sidebar(props: SidebarProps) {
                   </button>
                 </div>
               </div>
-              {props.projects.map((project) => {
-                const project_notes = visibleNotesByProject.get(project.id) ?? []
-                const visible_project_notes = [
-                  ...project_notes.filter((note) => pinnedNoteIdSet.has(note.id)),
-                  ...project_notes.filter((note) => !pinnedNoteIdSet.has(note.id)),
-                ]
-                const visible_project_count = projectVisibleCountsById[project.id] ?? 6
-                const paged_project_notes = visible_project_notes.slice(0, visible_project_count)
-                const has_more_project_notes = visible_project_count < visible_project_notes.length
-                const project_collapsed =
-                  undefined === projectsCollapsedById[project.id] ? true : projectsCollapsedById[project.id]
-                const project_expanded =
-                  props.selectedProjectId === project.id || hasSidebarSearch || !project_collapsed
-                const show_project = visible_project_notes.length > 0 || !hasSidebarSearch
-                if (!show_project) return null
+              {!projectsCollapsed &&
+                props.projects.map((project) => {
+                  const project_notes = visibleNotesByProject.get(project.id) ?? []
+                  const visible_project_notes = [
+                    ...project_notes.filter((note) => pinnedNoteIdSet.has(note.id)),
+                    ...project_notes.filter((note) => !pinnedNoteIdSet.has(note.id)),
+                  ]
+                  const visible_project_count = projectVisibleCountsById[project.id] ?? 6
+                  const paged_project_notes = visible_project_notes.slice(0, visible_project_count)
+                  const has_more_project_notes = visible_project_count < visible_project_notes.length
+                  const project_collapsed =
+                    undefined === projectsCollapsedById[project.id] ? true : projectsCollapsedById[project.id]
+                  const project_expanded =
+                    props.selectedProjectId === project.id || hasSidebarSearch || !project_collapsed
+                  const show_project = visible_project_notes.length > 0 || !hasSidebarSearch
+                  if (!show_project) return null
 
-                return (
-                  <div
-                    key={project.id}
-                    className={`project-block ${draggedNoteId ? 'project-block-drop-active' : ''}`}
-                    onDragOver={(event) => {
-                      if (!draggedNoteId) return
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'move'
-                    }}
-                    onDrop={(event) => {
-                      if (!draggedNoteId) return
-                      event.preventDefault()
-                      props.onSetNoteProject(draggedNoteId, project.id)
-                      setDraggedNoteId(null)
-                    }}
-                  >
-                    <div className="project-header-row">
-                      <button
-                        type="button"
-                        className="tags-header-toggle project-header-toggle"
-                        onClick={(event) => {
-                          if (draggedNoteId) {
-                            event.preventDefault()
-                            return
-                          }
-                          toggleProjectCollapsed(project.id)
-                        }}
-                        title={project_collapsed ? `Show ${project.name}` : `Hide ${project.name}`}
-                        aria-expanded={project_expanded}
-                      >
-                        <span className="project-label-wrap">
-                          <span className="tags-label project-label">{project.name}</span>
-                          <span
-                            className="project-count"
-                            title="All notes in this project, including archived"
-                          >
-                            {project.noteCount ?? '—'}
+                  return (
+                    <div
+                      key={project.id}
+                      className={`project-block ${draggedNoteId ? 'project-block-drop-active' : ''}`}
+                      onDragOver={(event) => {
+                        if (!draggedNoteId) return
+                        event.preventDefault()
+                        event.dataTransfer.dropEffect = 'move'
+                      }}
+                      onDrop={(event) => {
+                        if (!draggedNoteId) return
+                        event.preventDefault()
+                        props.onSetNoteProject(draggedNoteId, project.id)
+                        setDraggedNoteId(null)
+                      }}
+                    >
+                      <div className="project-header-row">
+                        <button
+                          type="button"
+                          className="tags-header-toggle project-header-toggle"
+                          onClick={(event) => {
+                            if (draggedNoteId) {
+                              event.preventDefault()
+                              return
+                            }
+                            toggleProjectCollapsed(project.id)
+                          }}
+                          title={project_collapsed ? `Show ${project.name}` : `Hide ${project.name}`}
+                          aria-expanded={project_expanded}
+                        >
+                          <span className="project-label-wrap">
+                            <span className="tags-label project-label">{project.name}</span>
+                            <span
+                              className="project-count"
+                              title="All notes in this project, including archived"
+                            >
+                              {project.noteCount ?? '—'}
+                            </span>
                           </span>
-                        </span>
-                        <span className="tags-collapse-btn" aria-hidden="true">
-                          {project_expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
-                        </span>
-                      </button>
-                    </div>
-                    {project_expanded && (
-                      <div
-                        className={`project-notes ${draggedNoteId ? 'project-notes-drop-active' : ''}`}
-                        onDragOver={(event) => {
-                          if (!draggedNoteId) return
-                          event.preventDefault()
-                          event.dataTransfer.dropEffect = 'move'
-                        }}
-                        onDrop={(event) => {
-                          if (!draggedNoteId) return
-                          event.preventDefault()
-                          props.onSetNoteProject(draggedNoteId, project.id)
-                          setDraggedNoteId(null)
-                        }}
-                      >
-                        {0 === visible_project_notes.length ? (
-                          <div className="sidebar-section-empty project-empty-state">
-                            No notes from this project in the current results.
+                          <span className="tags-collapse-btn" aria-hidden="true">
+                            {project_expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+                          </span>
+                        </button>
+                      </div>
+                      {project_expanded && (
+                        <div
+                          className={`project-notes ${draggedNoteId ? 'project-notes-drop-active' : ''}`}
+                          onDragOver={(event) => {
+                            if (!draggedNoteId) return
+                            event.preventDefault()
+                            event.dataTransfer.dropEffect = 'move'
+                          }}
+                          onDrop={(event) => {
+                            if (!draggedNoteId) return
+                            event.preventDefault()
+                            props.onSetNoteProject(draggedNoteId, project.id)
+                            setDraggedNoteId(null)
+                          }}
+                        >
+                          {0 === visible_project_notes.length ? (
+                            <div className="sidebar-section-empty project-empty-state">
+                              No notes from this project in the current results.
+                              <button
+                                type="button"
+                                className="project-view-more"
+                                onClick={() => props.onProjectFilter(project.id)}
+                              >
+                                Filter to this project
+                              </button>
+                            </div>
+                          ) : (
+                            paged_project_notes.map((note) => (
+                              <div
+                                key={note.id}
+                                className={`note-row project-note-row ${props.selectedId === note.id ? 'note-row-active' : ''} ${draggedNoteId === note.id ? 'note-row-dragging' : ''}`}
+                                role="button"
+                                tabIndex={-1}
+                                draggable
+                                onClick={() => props.onSelect(note.id)}
+                                onDragStart={(event) => startNoteDrag(event, note.id)}
+                                onDragEnd={clearDragState}
+                                onContextMenu={(event) => {
+                                  event.preventDefault()
+                                  setMenu({ noteId: note.id, x: event.clientX, y: event.clientY })
+                                  setMenuSubmenu(null)
+                                }}
+                              >
+                                <div className="note-row-title-wrap">
+                                  <span className="note-row-title">{deriveNoteTitle(note.content)}</span>
+                                  <span className="note-row-time">{formatRelativeTime(note.updatedAt)}</span>
+                                  <div className="note-row-icons">
+                                    <button
+                                      type="button"
+                                      className={`note-row-pin ${pinnedNoteIdSet.has(note.id) ? 'pin-active' : ''}`}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        togglePinnedNote(note.id)
+                                      }}
+                                      title={pinnedNoteIdSet.has(note.id) ? 'Unpin Note' : 'Pin Note'}
+                                    >
+                                      {pinnedNoteIdSet.has(note.id) ? (
+                                        <PinFilledIcon size={14} />
+                                      ) : (
+                                        <PinIcon size={14} />
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="note-row-delete"
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        props.onDelete(note.id)
+                                      }}
+                                      title="Delete Note"
+                                    >
+                                      <TrashIcon size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                          {has_more_project_notes && (
                             <button
                               type="button"
                               className="project-view-more"
-                              onClick={() => props.onProjectFilter(project.id)}
+                              onClick={() => loadMoreProjectNotes(project.id)}
                             >
-                              Filter to this project
+                              View more
                             </button>
-                          </div>
-                        ) : (
-                          paged_project_notes.map((note) => (
-                            <div
-                              key={note.id}
-                              className={`note-row project-note-row ${props.selectedId === note.id ? 'note-row-active' : ''} ${draggedNoteId === note.id ? 'note-row-dragging' : ''}`}
-                              role="button"
-                              tabIndex={-1}
-                              draggable
-                              onClick={() => props.onSelect(note.id)}
-                              onDragStart={(event) => startNoteDrag(event, note.id)}
-                              onDragEnd={clearDragState}
-                              onContextMenu={(event) => {
-                                event.preventDefault()
-                                setMenu({ noteId: note.id, x: event.clientX, y: event.clientY })
-                                setMenuSubmenu(null)
-                              }}
-                            >
-                              <div className="note-row-title-wrap">
-                                <span className="note-row-title">{deriveNoteTitle(note.content)}</span>
-                                <span className="note-row-time">{formatRelativeTime(note.updatedAt)}</span>
-                                <div className="note-row-icons">
-                                  <button
-                                    type="button"
-                                    className={`note-row-pin ${pinnedNoteIdSet.has(note.id) ? 'pin-active' : ''}`}
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      togglePinnedNote(note.id)
-                                    }}
-                                    title={pinnedNoteIdSet.has(note.id) ? 'Unpin Note' : 'Pin Note'}
-                                  >
-                                    {pinnedNoteIdSet.has(note.id) ? (
-                                      <PinFilledIcon size={14} />
-                                    ) : (
-                                      <PinIcon size={14} />
-                                    )}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="note-row-delete"
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      props.onDelete(note.id)
-                                    }}
-                                    title="Delete Note"
-                                  >
-                                    <TrashIcon size={14} />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                        {has_more_project_notes && (
-                          <button
-                            type="button"
-                            className="project-view-more"
-                            onClick={() => loadMoreProjectNotes(project.id)}
-                          >
-                            View more
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
             </div>
           )}
           {props.sidebarLayout.sectionVisibility.pinned && (
@@ -748,7 +754,7 @@ export function Sidebar(props: SidebarProps) {
               {!notesCollapsed && (
                 <div className="notes-list" tabIndex={0} onKeyDown={onListKeyDown}>
                   {0 === visibleNotes.length ? (
-                    <div className="sidebar-section-empty">No unprojected notes in the current results.</div>
+                    <div className="sidebar-section-empty">No notes in the current results.</div>
                   ) : (
                     <>
                       {visibleNotes.map((note) => (
@@ -801,7 +807,6 @@ export function Sidebar(props: SidebarProps) {
                           </div>
                         </div>
                       ))}
-                      <NoteHistory />
                       {hasMore && (
                         <div className="sidebar-load-more">
                           {visibleCount} of {props.notes.length} notes · scroll for more
@@ -813,9 +818,7 @@ export function Sidebar(props: SidebarProps) {
               )}
             </div>
           )}
-          <div style={{ order: 99 }}>
-            <MoreNotes />
-          </div>
+          <div style={{ order: 99 }}>{!hasMore && !notesCollapsed && <MoreNotes />}</div>
         </div>
       )}
       {!props.sidebarCollapsed && props.undoDeleteTitle && (
@@ -828,6 +831,7 @@ export function Sidebar(props: SidebarProps) {
       )}
       {!props.sidebarCollapsed && (
         <div className="sidebar-bottom">
+          <NoteHistory />
           <div className="bottom-actions">
             <button className="icon-button" onClick={props.onOpenSettings} title="Settings">
               <SettingsIcon />

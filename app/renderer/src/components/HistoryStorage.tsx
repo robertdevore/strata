@@ -50,8 +50,8 @@ export const HistoryStorage = () => {
     }
   }
   return (
-    <section>
-      <h3>Note history storage</h3>
+    <section className="history-storage">
+      <h3 className="settings-section-title">Note history storage</h3>
       {stats && (
         <p>
           {stats.revisions} revisions · {(stats.bytes / 1048576).toFixed(2)} MiB of snapshot data
@@ -78,7 +78,7 @@ export const HistoryStorage = () => {
           ))}
         </select>
       </label>
-      <button disabled={busy} onClick={() => void preview()}>
+      <button className="ghost-button" disabled={busy} onClick={() => void preview()}>
         Preview history cleanup
       </button>
       {plan && (
@@ -88,10 +88,10 @@ export const HistoryStorage = () => {
             from this library. Current notes and existing backups are preserved. SQLite may reuse freed space
             without shrinking the file.
           </p>
-          <button disabled={busy || plan.count === 0} onClick={() => void apply()}>
+          <button className="ghost-button" disabled={busy || plan.count === 0} onClick={() => void apply()}>
             Permanently remove {plan.count} old revisions
           </button>
-          <button disabled={busy} onClick={() => setPlan(null)}>
+          <button className="ghost-button" disabled={busy} onClick={() => setPlan(null)}>
             Cancel
           </button>
         </div>

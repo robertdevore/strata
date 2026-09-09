@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDownIcon } from './icons'
 import type { Note } from '@shared/types'
 import { useAppStore } from '../state/useAppStore'
 export const MoreNotes = () => {
@@ -6,19 +7,37 @@ export const MoreNotes = () => {
   const error = useAppStore((state) => state.retrievalError)
   const refresh = useAppStore((state) => state.refreshListing)
   const [busy, setBusy] = useState(false)
-  if (!cursor && !error) return null
+  const sentinel = useRef<HTMLDivElement>(null)
+  const loading = useRef(false)
+  useEffect(() => {
+    const element = sentinel.current
+    if (!element || !cursor || error) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || loading.current) return
+        loading.current = true
+        setBusy(true)
+        void refresh(true).finally(() => {
+          loading.current = false
+          setBusy(false)
+        })
+      },
+      { root: element.closest('.sidebar-scroll'), rootMargin: '80px' },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [cursor, error, refresh])
   return (
-    <div>
-      {error && <p role="alert">{error}</p>}
-      <button
-        disabled={busy}
-        onClick={() => {
-          setBusy(true)
-          void refresh(Boolean(cursor)).finally(() => setBusy(false))
-        }}
-      >
-        {busy ? 'Loading…' : error ? 'Retry' : 'Load more notes'}
-      </button>
+    <div ref={sentinel} className="sidebar-page-sentinel" aria-live="polite">
+      {busy && <span>Loading notes…</span>}
+      {error && (
+        <>
+          <p role="alert">{error}</p>
+          <button className="ghost-button" disabled={busy} onClick={() => void refresh(Boolean(cursor))}>
+            Retry loading notes
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -112,47 +131,57 @@ const NoteHistoryDetails = ({ note, dirty }: { note: Note; dirty: boolean }) => 
   }
   return (
     <details
+      className="note-history"
       ref={details}
       onToggle={(event) => {
         if (event.currentTarget.open) void load()
       }}
     >
-      <summary>Note revision history</summary>
-      {error && <p role="alert">{error}</p>}
-      {revisions.map((revision) => (
-        <button
-          key={revision.revision}
-          onClick={() => {
-            const generation = ++request.current
-            const baseRevision = note.revision
-            setSnapshot(null)
-            setError('')
-            void window.strata.notes
-              .getRevision(note.id, revision.revision)
-              .then((value) => {
-                if (generation !== request.current) return
-                expectedRevision.current = baseRevision
-                setSnapshot(value)
-              })
-              .catch(() => {
-                if (generation === request.current) setError('Could not read revision')
-              })
-          }}
-        >
-          Revision {revision.revision} · {revision.source} · {revision.createdAt}
-        </button>
-      ))}
-      {snapshot && snapshot.noteId === note.id && (
-        <div>
-          <pre style={{ maxHeight: 250, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-            {snapshot.snapshot.content}
-          </pre>
-          <button disabled={busy || dirty} onClick={() => void restore()}>
-            Restore revision {snapshot.revision}
+      <summary>
+        <span>Note revision history</span>
+        <ChevronDownIcon size={14} />
+      </summary>
+      <div className="note-history-panel">
+        {error && <p role="alert">{error}</p>}
+        {revisions.map((revision) => (
+          <button
+            className="ghost-button note-history-revision"
+            key={revision.revision}
+            onClick={() => {
+              const generation = ++request.current
+              const baseRevision = note.revision
+              setSnapshot(null)
+              setError('')
+              void window.strata.notes
+                .getRevision(note.id, revision.revision)
+                .then((value) => {
+                  if (generation !== request.current) return
+                  expectedRevision.current = baseRevision
+                  setSnapshot(value)
+                })
+                .catch(() => {
+                  if (generation === request.current) setError('Could not read revision')
+                })
+            }}
+          >
+            Revision {revision.revision} · {revision.source} ·{' '}
+            {Number.isNaN(Date.parse(revision.createdAt))
+              ? revision.createdAt
+              : new Date(revision.createdAt).toLocaleString()}
           </button>
-          {dirty && <p>Save or recover your draft before restoring history.</p>}
-        </div>
-      )}
+        ))}
+        {snapshot && snapshot.noteId === note.id && (
+          <div>
+            <pre style={{ maxHeight: 250, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+              {snapshot.snapshot.content}
+            </pre>
+            <button className="primary-button" disabled={busy || dirty} onClick={() => void restore()}>
+              Restore revision {snapshot.revision}
+            </button>
+            {dirty && <p>Save or recover your draft before restoring history.</p>}
+          </div>
+        )}
+      </div>
     </details>
   )
 }
