@@ -33,6 +33,13 @@ npm run strata -- capabilities --json
 
 See [CLI.md](CLI.md) and [API.md](API.md) for complete contracts.
 
+## What changed in 0.9.0
+
+- Authenticated local API, hardened Electron boundaries and encrypted provider credentials.
+- Universal revisions, conflict-safe autosave, reviewable AI proposals and safer recovery.
+- Indexed search, bounded context retrieval and an installed automation CLI.
+- See the [complete hardening report](docs/hardening/FINAL-REPORT.md) for changes, verification and measured performance.
+
 ## What changed in 0.8.0
 
 - AI provider tool loops now preserve assistant tool-call context and use provider-compliant tool-result messages.

@@ -1,6 +1,6 @@
 # Strata repository guide
 
-Strata 0.8.0 is a local-first Electron/React Markdown knowledge application. SQLite is the knowledge source of truth; AI is optional. The full hardening upgrade is tracked in `docs/hardening/STATUS.md` and `docs/hardening/requirements.md`. Intermediate commits and historical audits are not release-readiness verdicts.
+Strata 0.9.0 is a local-first Electron/React Markdown knowledge application. SQLite is the knowledge source of truth; AI is optional. The full hardening upgrade is tracked in `docs/hardening/STATUS.md` and `docs/hardening/requirements.md`. Intermediate commits and historical audits are not release-readiness verdicts.
 
 ## Architecture
 
