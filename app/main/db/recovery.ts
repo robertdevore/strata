@@ -85,6 +85,7 @@ export const probeDatabase = async (db_path: string): Promise<Error | null> => {
 		try {
 			const Database = require(workerData.betterSqlite3Path)
 			const db = new Database(workerData.dbPath, { readonly: true, fileMustExist: true })
+			db.pragma('foreign_keys = ON')
 			const row = db.prepare('PRAGMA quick_check').get()
 			db.close()
 			const value = String(Object.values(row ?? {})[0] ?? '')

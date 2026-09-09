@@ -153,6 +153,7 @@ export class BackupManager {
       const copied = new Database(destination_file, { readonly: true })
       let schemaVersion: number
       try {
+        copied.pragma('foreign_keys = ON')
         schemaVersion = copied.pragma('user_version', { simple: true }) as number
       } finally {
         copied.close()
@@ -240,6 +241,7 @@ export class BackupManager {
       // SQLite's online backup captures committed WAL state consistently, regardless of filename.
       const source = new Database(source_database_path, { readonly: true, fileMustExist: true })
       try {
+        source.pragma('foreign_keys = ON')
         source
           .prepare(
             'SELECT id, content, created_at, updated_at, starred, archived, tags, deleted_at FROM notes LIMIT 0',
