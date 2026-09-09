@@ -27,7 +27,7 @@ interface KeyphraseRule {
   confidence: number
 }
 
-// Ordered rules — first match wins
+// Highest phrase score wins; ties prefer explicit operations over topic words.
 const KEYPHRASE_RULES: Array<{ keyphrases: string[]; rule: KeyphraseRule }> = [
   // BLOCKED: destructive / delete requests
   {
@@ -35,6 +35,8 @@ const KEYPHRASE_RULES: Array<{ keyphrases: string[]; rule: KeyphraseRule }> = [
       'delete note',
       'delete the note',
       'remove note',
+      'remove all my notes',
+      'remove all notes',
       'destroy note',
       'delete all notes',
       'delete my notes',
@@ -51,64 +53,13 @@ const KEYPHRASE_RULES: Array<{ keyphrases: string[]; rule: KeyphraseRule }> = [
     },
   },
 
-  // PREMIUM: code architecture / large-scale review
-  {
-    keyphrases: [
-      'code architecture',
-      'architectural review',
-      'system design',
-      'repo-wide',
-      'repository review',
-      'codebase review',
-      'review the codebase',
-      'analyze the codebase',
-      'audit the code',
-      'architecture decision',
-      'design pattern',
-      'refactor plan',
-      'product strategy',
-      'strategic',
-      'roadmap',
-    ],
-    rule: {
-      intent: 'code_architecture',
-      risk: 'medium',
-      route: 'premium',
-      requiresConfirmation: false,
-      confidence: 0.95,
-    },
-  },
-
-  // PREMIUM: complex reasoning / multi-note synthesis
-  {
-    keyphrases: [
-      'long-context',
-      'synthesize across',
-      'synthesize notes',
-      'compare all',
-      'analyze relationships',
-      'deep analysis',
-      'comprehensive review',
-      'cross-reference',
-      'reason about',
-      'complex reasoning',
-      'multi-step reasoning',
-    ],
-    rule: {
-      intent: 'complex_reasoning',
-      risk: 'medium',
-      route: 'premium',
-      requiresConfirmation: false,
-      confidence: 0.9,
-    },
-  },
-
   // PREMIUM: existing note update (requires explicit request)
   {
     keyphrases: [
       'edit the note',
       'update the note',
       'modify the note',
+      'modify the',
       'change the note',
       'revise the note',
       'rewrite the note',
@@ -228,6 +179,58 @@ const KEYPHRASE_RULES: Array<{ keyphrases: string[]; rule: KeyphraseRule }> = [
       confidence: 0.87,
     },
   },
+  // PREMIUM: complex reasoning / multi-note synthesis
+  {
+    keyphrases: [
+      'long-context',
+      'synthesize across',
+      'synthesize notes',
+      'compare all',
+      'analyze relationships',
+      'analyze the relationships',
+      'deep analysis',
+      'comprehensive review',
+      'cross-reference',
+      'reason about',
+      'complex reasoning',
+      'multi-step reasoning',
+    ],
+    rule: {
+      intent: 'complex_reasoning',
+      risk: 'medium',
+      route: 'premium',
+      requiresConfirmation: false,
+      confidence: 0.9,
+    },
+  },
+
+  // PREMIUM: code architecture / large-scale review
+  {
+    keyphrases: [
+      'code architecture',
+      'architectural review',
+      'system design',
+      'repo-wide',
+      'repository review',
+      'codebase review',
+      'review the codebase',
+      'analyze the codebase',
+      'audit the code',
+      'architecture decision',
+      'design pattern',
+      'refactor plan',
+      'product strategy',
+      'strategic',
+      'roadmap',
+    ],
+    rule: {
+      intent: 'code_architecture',
+      risk: 'medium',
+      route: 'premium',
+      requiresConfirmation: false,
+      confidence: 0.95,
+    },
+  },
 ]
 
 // ---- Fuzzy match helper ----
@@ -245,7 +248,10 @@ const fuzzy_score = (phrase: string, input: string): number => {
   const norm_input = normalize_for_matching(input)
   const norm_phrase = normalize_for_matching(phrase)
 
-  if (norm_input.includes(norm_phrase)) return 1.0
+  if (
+    norm_phrase.includes(' ') ? norm_input.includes(norm_phrase) : norm_input.split(' ').includes(norm_phrase)
+  )
+    return 1.0
 
   // Check word overlap
   const input_words = new Set(norm_input.split(' '))
