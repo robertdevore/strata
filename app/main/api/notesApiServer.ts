@@ -114,7 +114,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
     if (method === 'GET' && route === 'health') return ok({ ok: true })
     if (method === 'GET' && route === 'capabilities')
       return ok({
-        version: '0.9.2',
+        version: '0.9.3',
         apiVersion: 1,
         schemaVersion: CURRENT_SCHEMA_VERSION,
         auth: 'local-token',
