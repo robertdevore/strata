@@ -1,0 +1,74 @@
+{
+  "sourceCommit": "e2ca89b9b38efc71cb4c1652649b5297f5f67310",
+  "harnessSha256": "bbea2f7179c92d0039c4b45e32c674799eaa5d5545c1e8916bee9272cb6d2cd7",
+  "fixture": {
+    "count": 10000,
+    "sha256": "7d9334e8e02fb380f21145a07ed58ca3bbe0021020e6c82e561814dcbc1e3a69",
+    "rowsAtStartup": 50
+  },
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "x64",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  },
+  "metrics": {
+    "startupToHomeMs": 2617.7872410000004,
+    "openSidebarToFirstRowMs": 149.47480499999983,
+    "search": {
+      "medianMs": 109.40083500000037,
+      "maxMs": 126.39513500000066,
+      "samples": 3
+    },
+    "open": {
+      "medianMs": 2695.7907049999994,
+      "maxMs": 4612.275795999999,
+      "samples": 3
+    },
+    "editorInput": {
+      "medianMs": 348.10258899999826,
+      "maxMs": 710.4507790000007,
+      "samples": 3
+    },
+    "saveIncludingDebounce": {
+      "medianMs": 1027.8801459999995,
+      "maxMs": 1506.2913180000014,
+      "samples": 3
+    },
+    "preview": {
+      "medianMs": 1476.9916199999989,
+      "maxMs": 1504.817085999999,
+      "samples": 3
+    }
+  },
+  "processMemory": [
+    {
+      "type": "Browser",
+      "memory": {
+        "workingSetSize": 363396,
+        "peakWorkingSetSize": 363400
+      }
+    },
+    {
+      "type": "GPU",
+      "memory": {
+        "workingSetSize": 116672,
+        "peakWorkingSetSize": 116676
+      }
+    },
+    {
+      "type": "Utility",
+      "memory": {
+        "workingSetSize": 28796,
+        "peakWorkingSetSize": 28796
+      }
+    },
+    {
+      "type": "Tab",
+      "memory": {
+        "workingSetSize": 281160,
+        "peakWorkingSetSize": 284168
+      }
+    }
+  ]
+}
