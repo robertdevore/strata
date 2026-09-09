@@ -356,6 +356,11 @@ try {
   await page.getByTitle('Hide projects', { exact: true }).click()
   await expect(page.locator('.project-block')).toHaveCount(0)
   await page.getByTitle('Show projects', { exact: true }).click()
+  // Restore the active fixture expected by the later chat and quit-persistence checks.
+  await sidebarSearch.fill('Distant lookup target')
+  await page.locator('.notes-list .note-row').filter({ hasText: 'Distant lookup target' }).first().click()
+  await expect(activePane).toContainText('Another pane saved')
+  await sidebarSearch.fill('')
   // Synthetic provider transport only: no requests reach a real AI service.
   await application.evaluate(() => {
     process.env.STRATA_OPENAI_API_KEY = 'synthetic-desktop-fixture-key'
