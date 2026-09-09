@@ -9,10 +9,28 @@ describe('provider boundaries', () => {
       'http://example.com',
       'https://u:secret@example.com',
       'https://169.254.169.254/latest',
+      'https://0xa9fea9fe/latest',
+      'https://[::ffff:169.254.169.254]/latest',
+      'https://[::ffff:0:1]/',
+      'https://[::]/',
+      'https://[fe90::1]/',
+      'https://[febf::1]/',
+      'https://[ff02::1]/',
+      'https://224.0.0.1/',
+      'https://metadata.google.internal/',
       'https://example.com?secret=key',
     ])
       expect(() => validateProviderUrl(url)).toThrow()
     expect(validateProviderUrl('http://127.0.0.1:8080/v1')).toBe('http://127.0.0.1:8080/v1')
+    expect(validateProviderUrl('https://192.168.1.20/v1')).toBe('https://192.168.1.20/v1')
+    expect(validateProviderUrl('https://[fd00::1]/v1')).toBe('https://[fd00::1]/v1')
+    expect(validateProviderUrl('http://[::1]:8080/v1')).toBe('http://[::1]:8080/v1')
+  })
+  it('connects plain HTTP localhost to a literal loopback address', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))
+    vi.stubGlobal('fetch', fetchMock)
+    await requestProviderJson('http://localhost:8080/v1', {})
+    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:8080/v1')
   })
   it('times out stalled requests', async () => {
     vi.stubGlobal(
