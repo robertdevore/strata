@@ -112,6 +112,7 @@ body.theme-light {
 .sidebar-scroll {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4854,9 +4855,18 @@ body.theme-light .cm-gutters {
   white-space: normal;
 }
 
+.tags-section > .tags-header-row .tags-collapse-btn,
+.pinned-notes-section > .tags-header-row .tags-collapse-btn,
+.notes-section > .tags-header-row .tags-collapse-btn,
 .projects-section-header .projects-chevron {
   opacity: 0;
 }
+.tags-section > .tags-header-row:hover .tags-collapse-btn,
+.tags-section > .tags-header-row:focus-within .tags-collapse-btn,
+.pinned-notes-section > .tags-header-row:hover .tags-collapse-btn,
+.pinned-notes-section > .tags-header-row:focus-within .tags-collapse-btn,
+.notes-section > .tags-header-row:hover .tags-collapse-btn,
+.notes-section > .tags-header-row:focus-within .tags-collapse-btn,
 .projects-section-header:hover .projects-chevron,
 .projects-section-header:focus-within .projects-chevron {
   opacity: 1;
