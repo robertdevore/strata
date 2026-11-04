@@ -111,13 +111,15 @@ body.theme-light {
 
 .sidebar-scroll {
   flex: 1;
-  overflow-y: auto;
+  /* Keep a fixed scrollbar lane, including with auto-hiding system scrollbars. */
+  overflow-y: scroll;
+  padding: 3px;
   scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: 0;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
   scrollbar-color: var(--scrollbar-thumb) var(--sidebar-bg);
 }
 
@@ -454,6 +456,7 @@ button:focus-visible,
 
 .sidebar-search-input {
   width: 100%;
+  min-width: 0;
   position: relative;
   z-index: 2;
 }
