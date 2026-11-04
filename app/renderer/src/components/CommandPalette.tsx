@@ -82,6 +82,7 @@ export function CommandPalette({
   }, [mode, query])
   const loading = mode === 'quick-open' && result?.query !== query
   const noteResults = result?.query === query ? result.notes : []
+  const searchError = mode === 'quick-open' && result?.query === query ? result.error : ''
   const openNote = async (id: string) => {
     if (opening) return
     setOpening(true)
@@ -169,7 +170,13 @@ export function CommandPalette({
 
   return (
     <div className="modal-overlay palette-overlay" onClick={onClose}>
-      <div className="palette-container" onClick={(event) => event.stopPropagation()}>
+      <div
+        className={`palette-container ${mode === 'quick-open' ? 'palette-quick-open' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === 'quick-open' ? 'Search notes' : 'Run a command'}
+        onClick={(event) => event.stopPropagation()}
+      >
         <input
           ref={inputRef}
           className="palette-input"
@@ -182,51 +189,59 @@ export function CommandPalette({
           placeholder={'quick-open' === mode ? 'Search notes...' : 'Run a command...'}
           aria-label={'quick-open' === mode ? 'Quick open notes' : 'Command palette'}
         />
-        {totalItems > 0 && (
-          <div className="palette-results" ref={listRef}>
-            {'quick-open' === mode
-              ? noteResults.map((note, index) => (
-                  <div
-                    key={note.id}
-                    className={`palette-item ${index === selectedIndex ? 'palette-item-selected' : ''}`}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    onClick={() => {
-                      void openNote(note.id)
-                    }}
-                  >
-                    <div className="palette-item-title">{note.title ?? deriveNoteTitle(note.content)}</div>
-                    <div className="palette-item-meta">
-                      {note.tags.length > 0 && (
-                        <span className="palette-item-tags">{note.tags.slice(0, 3).join(' ')}</span>
-                      )}
-                      <span className="palette-item-time">{formatRelativeTime(note.updatedAt)}</span>
-                    </div>
+        <div className="palette-results" ref={listRef} aria-busy={loading}>
+          {loading && (
+            <div className="palette-loading" role="status" aria-label="Searching notes">
+              <span className="palette-spinner" aria-hidden="true" />
+            </div>
+          )}
+          {'quick-open' === mode
+            ? noteResults.map((note, index) => (
+                <div
+                  key={note.id}
+                  className={`palette-item ${index === selectedIndex ? 'palette-item-selected' : ''}`}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  onClick={() => {
+                    void openNote(note.id)
+                  }}
+                >
+                  <div className="palette-item-title">{note.title ?? deriveNoteTitle(note.content)}</div>
+                  <div className="palette-item-meta">
+                    {note.tags.length > 0 && (
+                      <span className="palette-item-tags">{note.tags.slice(0, 3).join(' ')}</span>
+                    )}
+                    <span className="palette-item-time">{formatRelativeTime(note.updatedAt)}</span>
                   </div>
-                ))
-              : commandResults.map((cmd, index) => (
-                  <div
-                    key={cmd.id}
-                    className={`palette-item ${index === selectedIndex ? 'palette-item-selected' : ''}`}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    onClick={() => {
-                      executeCommand(cmd)
-                      onClose()
-                    }}
-                  >
-                    <span className="palette-item-title">{cmd.label}</span>
-                    {cmd.shortcut && <span className="palette-item-shortcut">{cmd.shortcut}</span>}
-                  </div>
-                ))}
-          </div>
-        )}
-        {loading && <div role="status">Searching…</div>}
-        {opening && <div role="status">Opening…</div>}
-        {(openError || (result?.query === query ? result.error : '')) && (
-          <div role="alert">{openError || (result?.query === query ? result.error : '')}</div>
-        )}
-        {!loading && !result?.error && 0 === totalItems && query.trim() && (
-          <div className="palette-empty">No results</div>
-        )}
+                </div>
+              ))
+            : commandResults.map((cmd, index) => (
+                <div
+                  key={cmd.id}
+                  className={`palette-item ${index === selectedIndex ? 'palette-item-selected' : ''}`}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  onClick={() => {
+                    executeCommand(cmd)
+                    onClose()
+                  }}
+                >
+                  <span className="palette-item-title">{cmd.label}</span>
+                  {cmd.shortcut && <span className="palette-item-shortcut">{cmd.shortcut}</span>}
+                </div>
+              ))}
+          {opening && (
+            <div className="palette-message" role="status">
+              Opening…
+            </div>
+          )}
+          {(openError || searchError) && (
+            <div className="palette-message" role="alert">
+              {openError || searchError}
+            </div>
+          )}
+          {!loading && !searchError && !openError && totalItems === 0 && (
+            <div className="palette-empty">{query.trim() ? 'No results' : 'No notes yet'}</div>
+          )}
+        </div>
       </div>
     </div>
   )

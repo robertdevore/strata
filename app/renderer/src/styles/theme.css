@@ -4164,7 +4164,53 @@ body.theme-light .cm-gutters {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
+.palette-quick-open {
+  height: min(420px, calc(100dvh - 100px));
+}
+
+.palette-quick-open .palette-results {
+  flex: 1;
+  min-height: 0;
+}
+
+.palette-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 64px;
+}
+
+.palette-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-3);
+  border-radius: 50%;
+  animation: palette-spin 800ms linear infinite;
+}
+
+@keyframes palette-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palette-spinner {
+    animation: none;
+  }
+}
+
+.palette-message {
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
 .palette-input {
+  flex-shrink: 0;
   width: 100%;
   padding: 14px 18px;
   font-size: 15px;

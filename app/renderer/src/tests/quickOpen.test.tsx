@@ -75,3 +75,30 @@ it('ignores a late result from an earlier query and preserves the palette on fai
   await screen.findByRole('alert')
   expect(close).not.toHaveBeenCalled()
 })
+
+it('keeps the results region mounted while searching and prevents opening stale matches', async () => {
+  let resolveSearch!: (value: unknown) => void
+  const page = vi
+    .fn()
+    .mockResolvedValueOnce({ notes: [note] })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve
+        }),
+    )
+  const { get } = setup(page)
+  await screen.findByText('Beyond sidebar')
+  const results = screen.getByText('Beyond sidebar').closest('.palette-results')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'missing' } })
+  expect(screen.getByRole('status', { name: 'Searching notes' }).parentElement).toBe(results)
+  expect(results?.getAttribute('aria-busy')).toBe('true')
+  expect(screen.queryByText('Beyond sidebar')).toBeNull()
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+  expect(get).not.toHaveBeenCalled()
+  await waitFor(() => expect(page).toHaveBeenCalledTimes(2))
+  await act(async () => resolveSearch({ notes: [] }))
+  expect(screen.getByText('No results').parentElement).toBe(results)
+  expect(results?.getAttribute('aria-busy')).toBe('false')
+  expect(screen.queryByRole('status')).toBeNull()
+})

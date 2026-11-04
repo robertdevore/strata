@@ -177,7 +177,14 @@ try {
   }, saved.id)
   await page.reload()
   await page.getByRole('button', { name: /^Quick Open/ }).click()
+  const searchDialog = page.getByRole('dialog', { name: 'Search notes', exact: true })
+  const initialSearchBounds = await searchDialog.boundingBox()
+  await page.getByRole('textbox', { name: 'Quick open notes' }).fill('no-matching-search-fixture')
+  await expect(searchDialog.getByText('No results', { exact: true })).toBeVisible()
+  expect(await searchDialog.boundingBox()).toEqual(initialSearchBounds)
   await page.getByRole('textbox', { name: 'Quick open notes' }).fill('Distant lookup target')
+  await expect(searchDialog.getByText('Distant lookup target', { exact: true })).toBeVisible()
+  expect(await searchDialog.boundingBox()).toEqual(initialSearchBounds)
   await page.getByText('Distant lookup target', { exact: true }).click()
   await expect(page.locator('.cm-content').first()).toContainText('Retrieved beyond sidebar page.', {
     timeout: 20000,
