@@ -47,9 +47,9 @@ const fixture = () => {
     createAiMessage,
     deleteThread: () => mocks.handlers.get(IPC_CHANNELS.aiThreadDelete)!(event, { threadId: thread.id }),
     sender,
-    send: () =>
+    send: (id = requestId) =>
       mocks.handlers.get(IPC_CHANNELS.aiSendMessage)!(event, {
-        requestId,
+        requestId: id,
         threadId: thread.id,
         message: 'hello',
       }) as Promise<import('@shared/types').AiChatResponse>,
@@ -152,4 +152,26 @@ it('aborts an active chat when its conversation is deleted without writing a lat
   await rejected
   expect(f.createAiMessage).toHaveBeenCalledTimes(1)
   expect(f.cancel()).toBe(false)
+})
+
+it('rejects overlapping conversation turns before recording a second user message', async () => {
+  const f = fixture()
+  let finish!: (value: { content: string }) => void
+  mocks.run.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
+  const first = f.send()
+  await vi.waitFor(() => expect(mocks.run).toHaveBeenCalledOnce())
+  await expect(f.send('00000000-0000-4000-8000-000000000003')).rejects.toMatchObject({ code: 'AI_BUSY' })
+  expect(f.createAiMessage).toHaveBeenCalledTimes(1)
+  expect(mocks.run).toHaveBeenCalledOnce()
+  finish({ content: 'First reply' })
+  await first
+  mocks.run.mockResolvedValue({ content: 'Next reply' })
+  await f.send()
+  expect(f.createAiMessage).toHaveBeenCalledTimes(4)
+  expect(f.sender.listenerCount('destroyed')).toBe(0)
 })

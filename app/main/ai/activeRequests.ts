@@ -22,6 +22,10 @@ export class ActiveAiRequests {
     return {
       signal: entry.controller.signal,
       bindThread: (threadId) => {
+        for (const other of this.requests.values()) {
+          if (other !== entry && other.threadId === threadId)
+            throw new DomainError('AI_BUSY', 'This conversation already has an active AI request')
+        }
         entry.threadId = threadId
       },
       cancel: () => entry.controller.abort(),
