@@ -203,6 +203,21 @@ describe('AI mutation permissions', () => {
     )
   })
 })
+it('pages the project catalog without silently omitting projects after the first hundred', () => {
+  const { db, call } = open()
+  for (let index = 0; index < 105; index++) db.createProject(`Project ${index}`)
+  const first = JSON.parse(call('list_projects', {}).output)
+  const second = JSON.parse(call('list_projects', { offset: first.nextOffset }).output)
+  expect(first.projects).toHaveLength(100)
+  expect(first.nextOffset).toBe(100)
+  expect(second.projects).toHaveLength(5)
+  expect(second.nextOffset).toBeNull()
+  expect([...first.projects, ...second.projects]).toEqual(db.listProjects())
+  expect(JSON.parse(call('list_projects', { limit: 2 }).output).projects).toHaveLength(2)
+  for (const offset of [-1, 0.5, 1000001])
+    expect(JSON.parse(call('list_projects', { offset }).output).error.code).toBe('VALIDATION_ERROR')
+})
+
 describe('bounded provider loop', () => {
   it('runs retrieval tools for any provider, including a premium fallback', async () => {
     for (const providerId of ['cheap', 'premium']) {

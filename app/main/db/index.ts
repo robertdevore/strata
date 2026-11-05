@@ -902,10 +902,12 @@ export class StrataDatabase {
     return this.updateNote(id, { starred })
   }
 
-  listProjects(): Project[] {
+  listProjects(limit?: number, offset = 0): Project[] {
     const rows = this.db
-      .prepare('SELECT * FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE ASC')
-      .all() as DbProjectRow[]
+      .prepare(
+        'SELECT * FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?',
+      )
+      .all(limit ?? -1, offset) as DbProjectRow[]
     return rows.map((row) => this.mapProject(row))
   }
 
@@ -1162,11 +1164,11 @@ export class StrataDatabase {
 					t.id as thread_id_2, t.title, t.model as thread_model, t.created_at as thread_created_at, t.updated_at as thread_updated_at
 				 FROM ai_messages m
 				 JOIN ai_threads t ON t.id = m.thread_id
-				 WHERE m.content LIKE ?
+				 WHERE m.content LIKE ? ESCAPE '\\'
 				 ORDER BY m.created_at DESC
 				 LIMIT ?`,
       )
-      .all(`%${query}%`, Math.max(1, Math.min(100, limit))) as Array<{
+      .all(`%${this.escapeLikePattern(query)}%`, Math.max(1, Math.min(100, limit))) as Array<{
       message_id: string
       thread_id: string
       role: 'user' | 'assistant' | 'system'

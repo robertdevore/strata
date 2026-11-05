@@ -37,3 +37,23 @@ it('reads only the recent thread window in chronological insertion order, includ
     fs.rmSync(directory, { recursive: true, force: true })
   }
 })
+
+it('searches chat punctuation literally rather than as SQL wildcards', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-chat-search-'))
+  const db = new StrataDatabase(directory)
+  try {
+    const thread = db.createAiThread('Literal search', '')
+    for (const content of ['100% complete', 'snake_case', 'path\\file', 'ordinary words'])
+      db.createAiMessage(thread.id, 'user', content)
+    for (const [query, content] of [
+      ['%', '100% complete'],
+      ['_', 'snake_case'],
+      ['\\', 'path\\file'],
+      ['ORDINARY', 'ordinary words'],
+    ])
+      expect(db.searchAiMessages(query).map((hit) => hit.message.content)).toEqual([content])
+  } finally {
+    db.close()
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})

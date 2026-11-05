@@ -61,10 +61,13 @@ export const AI_TOOLS: AiToolDefinition[] = [
   {
     type: 'function',
     name: 'list_projects',
-    description: 'List all projects for organization and categorization.',
+    description: 'List projects in pages. Continue with nextOffset until null.',
     parameters: {
       type: 'object',
-      properties: {},
+      properties: {
+        limit: { type: 'number', minimum: 1, maximum: 100 },
+        offset: { type: 'number', minimum: 0, maximum: 1000000 },
+      },
     },
   },
   {
@@ -290,6 +293,7 @@ for (const tool of AI_TOOLS) {
 const fieldSchema = (name: string, definition: unknown): z.ZodType => {
   const field = definition as { type: string }
   if (name === 'expected_revision') return z.number().int().positive()
+  if (name === 'offset') return z.number().int().min(0).max(1000000)
   if (name === 'limit') return z.number().int().min(1).max(100)
   if (name.endsWith('_ids')) return z.array(z.string().uuid()).min(1).max(1000)
   if (name.endsWith('_id')) return z.string().uuid()
@@ -440,9 +444,16 @@ export const execute_tool_call = (
       case 'search_notes_by_tag':
         result = { notes: summarize_notes(db.listNoteSummaries({ tag: String(args.tag), limit })) }
         break
-      case 'list_projects':
-        result = { projects: db.listProjects().slice(0, 100) }
+      case 'list_projects': {
+        const pageLimit = typeof args.limit === 'number' ? args.limit : 100
+        const offset = typeof args.offset === 'number' ? args.offset : 0
+        const projects = db.listProjects(pageLimit + 1, offset)
+        result = {
+          projects: projects.slice(0, pageLimit),
+          nextOffset: projects.length > pageLimit ? offset + pageLimit : null,
+        }
         break
+      }
       case 'get_project':
         result = { project: project() }
         break

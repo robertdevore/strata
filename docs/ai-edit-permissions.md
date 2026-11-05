@@ -34,6 +34,12 @@ Legacy AI edit records remain available. Their revert operation checks whether l
 
 **Stop AI response** cancels an in-flight provider request. Already-applied writes remain saved, and pending proposals can still be reviewed. Switching conversations or unmounting the editor cancels that view's pending request; cancellation is not a transaction spanning the entire conversation.
 
+Only one request may write to a conversation at a time. A second request receives `AI_BUSY` before recording another user message. Canceling a request retains its conversation slot until the provider work settles; separate conversations can still run concurrently within the global limit.
+
+## Retrieval
+
+Chat searches treat `%`, `_` and backslashes literally. The `list_projects` tool returns at most 100 projects by default with `nextOffset`; follow that offset until it is null. Optional `limit` (1–100) and `offset` (0–1,000,000) control pages. Ordering is stable for an unchanged library; edits or reorders between pages can shift offsets. Full note bodies still require explicit retrieval.
+
 ## Deleting a conversation
 
 Deleting a chat rejects its pending proposals in the same database transaction and cancels chat requests attached to it, including work started from another view. Late tool calls cannot mutate the library or create another proposal for that deleted chat. Notes and revisions already saved remain available. A rejected proposal cannot later be approved.
