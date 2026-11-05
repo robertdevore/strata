@@ -149,6 +149,6 @@ Commands ran from the repository root. Full logs are retained in the dated artif
 | `npm run package:electron:verify` | PASS, packaged Electron native SQLite and worker; `after-electron.log` |
 | `npm run desktop:verify` | PASS, isolated Electron interactions and security boundaries; `after-desktop.log` |
 | `npm run benchmark` | PASS, all default sizes through 50,000 notes; `after-database-benchmark.log` |
-| `git diff --check` | PASS |
+| `git diff --check 7fa22a0 HEAD -- . ':!docs/audits/artifacts/**'` | PASS; archived raw Vitest logs retain their original trailing blank lines and produce three whitespace notices when included. |
 
 The report commit follows the verified implementation SHA above; it cannot include its own SHA. Strata consolidation records the final pushed report commit and the session handoff.
