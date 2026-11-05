@@ -1,13 +1,15 @@
 export const deriveNoteTitle = (content: string): string => {
-  const lines = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-  if (lines.length === 0) return 'Untitled'
-  const heading = lines.find((line) => /^#{1,6}\s+/.test(line))
-  if (heading) {
-    const normalized = heading.replace(/^#{1,6}\s+/, '').trim()
-    return normalized || 'Untitled'
+  let firstLine = ''
+  let offset = 0
+  while (offset < content.length) {
+    const newline = content.indexOf('\n', offset)
+    const end = newline === -1 ? content.length : newline
+    const line = content.slice(offset, end).trim()
+    if (line) {
+      if (!firstLine) firstLine = line.slice(0, 80)
+      if (/^#{1,6}\s+/.test(line)) return line.replace(/^#{1,6}\s+/, '').trim() || 'Untitled'
+    }
+    offset = end + 1
   }
-  return lines[0].slice(0, 80)
+  return firstLine || 'Untitled'
 }

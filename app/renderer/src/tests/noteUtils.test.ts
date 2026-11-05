@@ -20,6 +20,19 @@ describe('deriveNoteTitle', () => {
   })
 })
 
+it.each([
+  ['\r\n  intro  \r\n\t## Heading \r\n# Later', 'Heading'],
+  ['####### Not a heading\n#hashtag', '####### Not a heading'],
+  ['#   \nordinary', '#'],
+  ['\t\r\n', 'Untitled'],
+  ['x'.repeat(100) + '\nbody', 'x'.repeat(80)],
+  ['intro\n###### ' + 'x'.repeat(100), 'x'.repeat(100)],
+  ['# Early\n' + 'body\n'.repeat(150000), 'Early'],
+  ['body\n'.repeat(150000) + '# Late', 'Late'],
+])('preserves title extraction for whitespace, long lines and large bodies', (content, expected) => {
+  expect(deriveNoteTitle(content)).toBe(expected)
+})
+
 describe('normalizeTag', () => {
   it('normalizes case and spaces', () => {
     expect(normalizeTag('  Product Ideas  ')).toBe('product-ideas')

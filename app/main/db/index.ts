@@ -815,6 +815,7 @@ export class StrataDatabase {
       if (!has_real_change && next_starred === current.starred && next_archived === current.archived)
         return current
       const next_updated = has_real_change ? new Date().toISOString() : current.updatedAt
+      const next_title = deriveNoteTitle(next_content)
 
       this.db
         .prepare(
@@ -827,18 +828,18 @@ export class StrataDatabase {
           JSON.stringify(next_tags),
           next_project_id,
           next_updated,
-          deriveNoteTitle(next_content),
-          this.normalizeTitle(deriveNoteTitle(next_content)),
+          next_title,
+          this.normalizeTitle(next_title),
           id,
         )
 
       // Rebuild wiki links when content changes
       if (typeof patch.content === 'string' && patch.content !== current.content) {
         this.rebuildLinksForContent(id, next_content)
-        if (current.title !== deriveNoteTitle(next_content))
+        if (current.title !== next_title)
           this.refreshLinkTargets([
             this.normalizeTitle(current.title ?? deriveNoteTitle(current.content)),
-            this.normalizeTitle(deriveNoteTitle(next_content)),
+            this.normalizeTitle(next_title),
           ])
       }
 
