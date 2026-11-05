@@ -128,16 +128,10 @@ export function Sidebar(props: SidebarProps) {
   )
   const historyVersion = useAppStore((state) => state.historyVersion)
   const sortMode = useAppStore((state) => state.settings.sortMode)
+  const isProjectExpanded = (id: string) => !(projectsCollapsedById[id] ?? props.selectedProjectId !== id)
   const openedProjects = projectsCollapsed
     ? []
-    : props.projects
-        .filter(
-          (project) =>
-            props.selectedProjectId === project.id ||
-            hasSidebarSearch ||
-            projectsCollapsedById[project.id] === false,
-        )
-        .map((project) => project.id)
+    : props.projects.filter((project) => isProjectExpanded(project.id)).map((project) => project.id)
   const { pages: projectPages, more: loadMoreProjectNotes } = useProjectListings(
     openedProjects,
     {
@@ -312,7 +306,7 @@ export function Sidebar(props: SidebarProps) {
   const toggleProjectCollapsed = (projectId: string) => {
     setProjectsCollapsedById((current) => ({
       ...current,
-      [projectId]: undefined === current[projectId] ? false : !current[projectId],
+      [projectId]: !(current[projectId] ?? props.selectedProjectId !== projectId),
     }))
   }
 
@@ -474,17 +468,8 @@ export function Sidebar(props: SidebarProps) {
                   ]
                   const paged_project_notes = visible_project_notes
                   const has_more_project_notes = Boolean(projectPage?.nextCursor)
-                  const project_collapsed =
-                    undefined === projectsCollapsedById[project.id] ? true : projectsCollapsedById[project.id]
-                  const project_expanded =
-                    props.selectedProjectId === project.id || hasSidebarSearch || !project_collapsed
-                  const show_project =
-                    visible_project_notes.length > 0 ||
-                    !hasSidebarSearch ||
-                    !projectPage ||
-                    projectPage.loading ||
-                    projectPage.error
-                  if (!show_project) return null
+                  const project_expanded = isProjectExpanded(project.id)
+                  const project_collapsed = !project_expanded
 
                   return (
                     <div
