@@ -1,0 +1,64 @@
+npm warn Unknown user config "python". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v4.1.12 /Users/robertdevore/2026/strata
+
+ ❯ app/renderer/src/tests/apiMutationResponse.test.ts (2 tests | 2 failed) 2939ms
+   × rolls back oversized batch responses, revisions, receipts and notifications before reporting 413 1954ms
+   × rolls back a single metadata update when an existing note expands beyond the JSON response budget 981ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  app/renderer/src/tests/apiMutationResponse.test.ts > rolls back oversized batch responses, revisions, receipts and notifications before reporting 413
+AssertionError: expected { …(12) } to match object { starred: false, revision: 1 }
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "revision": 1,
+-   "starred": false,
++   "revision": 2,
++   "starred": true,
+  }
+
+ ❯ app/renderer/src/tests/apiMutationResponse.test.ts:31:33
+     29|   expect(await response.json()).toMatchObject({ error: { code: 'RESPON…
+     30|   for (const note of notes) {
+     31|     expect(db.getNote(note.id)).toMatchObject({ starred: false, revisi…
+       |                                 ^
+     32|     expect(db.listRevisions(note.id)).toHaveLength(1)
+     33|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  app/renderer/src/tests/apiMutationResponse.test.ts > rolls back a single metadata update when an existing note expands beyond the JSON response budget
+AssertionError: expected { …(12) } to match object { starred: false, revision: 1 }
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "revision": 1,
+-   "starred": false,
++   "revision": 2,
++   "starred": true,
+  }
+
+ ❯ app/renderer/src/tests/apiMutationResponse.test.ts:52:31
+     50|   expect(response.status).toBe(413)
+     51|   await response.json()
+     52|   expect(db.getNote(note.id)).toMatchObject({ starred: false, revision…
+       |                               ^
+     53|   expect(notify).not.toHaveBeenCalled()
+     54| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  22:47:14
+   Duration  4.49s (transform 463ms, setup 0ms, import 981ms, tests 2.94s, environment 0ms)
+

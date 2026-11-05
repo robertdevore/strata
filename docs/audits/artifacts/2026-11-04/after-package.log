@@ -1,0 +1,6 @@
+npm warn Unknown user config "python". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> strata@0.9.3 package:verify
+> node scripts/package-verify.mjs
+
+Installed CLI package verified: native database, authenticated server, installed documentation/doctor, capture deduplication, retrieval and shutdown.

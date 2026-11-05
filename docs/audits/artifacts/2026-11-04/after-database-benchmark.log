@@ -1,0 +1,88 @@
+npm warn Unknown user config "python". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> strata@0.9.3 benchmark
+> tsx --tsconfig tsconfig.app.json scripts/benchmark.ts
+
+{
+  "node": "v26.12.1",
+  "platform": "darwin",
+  "arch": "x64",
+  "results": [
+    {
+      "count": 100,
+      "ms": {
+        "startup": 8.500497999999993,
+        "get": 0.13639100000000326,
+        "list": 0.7683240000000069,
+        "search": 1.3911749999999756,
+        "tags": 0.1737770000000296,
+        "tagList": 0.29810599999996157,
+        "updateLinks": 2.515935000000013,
+        "backlinks": 0.2574520000000007,
+        "related": 1.069283999999982
+      },
+      "payloadBytes": {
+        "list50": 25452,
+        "search10": 576
+      },
+      "rss": 78110720
+    },
+    {
+      "count": 1000,
+      "ms": {
+        "startup": 5.91319099999987,
+        "get": 0.11143799999990733,
+        "list": 0.9102649999999812,
+        "search": 2.2844559999998637,
+        "tags": 0.5044920000000275,
+        "tagList": 0.7292730000001484,
+        "updateLinks": 3.9809790000001612,
+        "backlinks": 0.2805309999998826,
+        "related": 1.0471099999999751
+      },
+      "payloadBytes": {
+        "list50": 25507,
+        "search10": 5760
+      },
+      "rss": 86556672
+    },
+    {
+      "count": 10000,
+      "ms": {
+        "startup": 6.723721999999725,
+        "get": 0.1802350000007209,
+        "list": 1.250025000000278,
+        "search": 1.6489229999997406,
+        "tags": 2.564680999999837,
+        "tagList": 1.8062129999998433,
+        "updateLinks": 3.7749979999998686,
+        "backlinks": 0.3120579999995243,
+        "related": 1.1529299999992872
+      },
+      "payloadBytes": {
+        "list50": 25560,
+        "search10": 5769
+      },
+      "rss": 99594240
+    },
+    {
+      "count": 50000,
+      "ms": {
+        "startup": 8.631257999993977,
+        "get": 0.11029600000620121,
+        "list": 0.5893260000011651,
+        "search": 3.7628439999971306,
+        "tags": 9.895660000001953,
+        "tagList": 4.5640910000001895,
+        "updateLinks": 2.631924000001163,
+        "backlinks": 0.20641900000191526,
+        "related": 0.9937580000041635
+      },
+      "payloadBytes": {
+        "list50": 25605,
+        "search10": 5779
+      },
+      "rss": 118743040
+    }
+  ]
+}
