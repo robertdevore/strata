@@ -25,7 +25,7 @@ curl --fail-with-body -H "Authorization: Bearer $STRATA_API_TOKEN" \
 
 Use `/v1/…`; unversioned aliases remain compatible. Responses include `Strata-API-Version: 1`, JSON content type, no-store and nosniff. Capabilities report schema version, supported features, authentication and current limits. POST/PUT/PATCH require `Content-Type: application/json`.
 
-Request bodies are at most 1 MiB, responses 4 MiB, URLs 8,192 characters, list pages 100 and batches 50 operations. Queries are bounded to 500 characters. Header/request/idle deadlines prevent indefinite connections. Large exports should use smaller pages and explicit individual body retrieval.
+Request bodies are at most 1 MiB, responses 4 MiB, URLs 8,192 characters, list pages 100 and batches 50 operations. Queries are bounded to 500 characters. Header/request/idle deadlines prevent indefinite connections. Large exports should use smaller pages and explicit individual body retrieval. Mutating responses are size-checked before commit: a `RESPONSE_TOO_LARGE` rejection rolls back the entire operation, its revisions and idempotency receipt, and emits no refresh notification. Reduce the batch before retrying.
 
 Errors have the form `{"ok":false,"error":{"code":"REVISION_CONFLICT","message":"…","details":{}}}`. Authentication returns 401, browser requests 403, missing entities 404, revision/idempotency conflicts 409, oversized bodies/results 413, invalid input 400 and wrong content type 415. Unexpected failures return sanitized 500 errors. The CLI preserves structured server codes and distinguishes transport failures.
 

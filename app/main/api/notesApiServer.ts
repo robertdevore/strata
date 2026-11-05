@@ -1,5 +1,11 @@
 import { notifyCommittedChanges } from '../services/notifications'
-import { ALL_CHANGED, type ChangedDomains } from '../../shared/changedDomains'
+import {
+  ALL_CHANGED,
+  NO_CHANGED,
+  hasChanges,
+  mergeChanged,
+  type ChangedDomains,
+} from '../../shared/changedDomains'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
@@ -16,6 +22,13 @@ import {
 } from '../services/knowledgeService'
 
 const MAX_BODY = 1024 * 1024
+const MAX_RESPONSE = 4 * 1024 * 1024
+const encodeResponse = (payload: unknown): string => {
+  const text = JSON.stringify(payload)
+  if (Buffer.byteLength(text) > MAX_RESPONSE)
+    throw new DomainError('RESPONSE_TOO_LARGE', 'Use a smaller limit or batch; no changes were applied')
+  return text
+}
 interface Options {
   onDataChanged?: (changed: ChangedDomains) => void
   host?: string
@@ -46,7 +59,7 @@ const boolean = (value: string | null): boolean | undefined => {
 }
 const write = (response: ServerResponse, status: number, payload: unknown) => {
   let text = JSON.stringify(payload)
-  if (Buffer.byteLength(text) > 4 * 1024 * 1024) {
+  if (Buffer.byteLength(text) > MAX_RESPONSE) {
     status = 413
     text = JSON.stringify(fail('RESPONSE_TOO_LARGE', 'Use a smaller limit', 413).body)
   }
@@ -67,7 +80,6 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid API port')
   const token = options.token ?? ensureLocalCredential()
   if (token.length < 32) throw new Error('API token must contain at least 32 characters')
-  const service = new KnowledgeService(db, options.onDataChanged)
   const handle = async (request: IncomingMessage) => {
     if (request.headers.origin || request.headers['sec-fetch-site'])
       return fail('ORIGIN_FORBIDDEN', 'Browser requests are not allowed', 403)
@@ -111,6 +123,22 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
         cursor: url.searchParams.get('cursor') ?? undefined,
       })
     const ok = (payload: unknown, status = 200) => ({ status, body: payload })
+    // Validate the actual reply inside the transaction. A 413 must not report failure
+    // after writes/receipts committed, and refresh notifications must follow commit.
+    let changed = { ...NO_CHANGED }
+    const service = new KnowledgeService(db, (domains) => {
+      changed = mergeChanged(changed, domains)
+    })
+    const commit = (action: () => unknown, status = 200) => {
+      const payload = db.transaction(() => {
+        const value = action()
+        encodeResponse(value)
+        return value
+      })
+      if (hasChanges(changed)) notifyCommittedChanges(options.onDataChanged, changed)
+      return ok(payload, status)
+    }
+
     if (method === 'GET' && route === 'health') return ok({ ok: true })
     if (method === 'GET' && route === 'capabilities')
       return ok({
@@ -141,16 +169,26 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
         .object({ payload: importSchema, dryRun: z.boolean().default(false) })
         .strict()
         .parse(await body(request))
-      const result = service.importFolder(parsed.payload, { dryRun: parsed.dryRun, key: mutationOptions.key })
-      return ok({ ...result, notes: result.notes.map((note) => db.summarize(note)), dryRun: parsed.dryRun })
+      return commit(() => {
+        const result = service.importFolder(parsed.payload, {
+          dryRun: parsed.dryRun,
+          key: mutationOptions.key,
+        })
+        return { ...result, notes: result.notes.map((note) => db.summarize(note)), dryRun: parsed.dryRun }
+      })
     }
-    if (method === 'POST' && route === 'memory/capture') return ok(service.capture(await body(request)))
-    if (method === 'POST' && route === 'batch') return ok(service.batch(await body(request), mutationOptions))
-    if (method === 'POST' && route === 'notes')
-      return ok(
-        { note: service.mutate({ op: 'create_note', payload: await body(request) }, mutationOptions) },
-        201,
-      )
+    if (method === 'POST' && route === 'memory/capture') {
+      const payload = await body(request)
+      return commit(() => service.capture(payload))
+    }
+    if (method === 'POST' && route === 'batch') {
+      const payload = await body(request)
+      return commit(() => service.batch(payload, mutationOptions))
+    }
+    if (method === 'POST' && route === 'notes') {
+      const payload = await body(request)
+      return commit(() => ({ note: service.mutate({ op: 'create_note', payload }, mutationOptions) }), 201)
+    }
     if (parts[0] === 'notes' && parts.length >= 2) {
       const id = idSchema.parse(parts[1])
       if (method === 'GET' && parts.length === 2) {
@@ -161,10 +199,10 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
         const payload = z.record(z.string(), z.unknown()).parse(await body(request))
         if (request.headers['if-match'])
           payload.expectedRevision = Number(String(request.headers['if-match']).replace(/^"|"$/g, ''))
-        return ok({ note: service.mutate({ op: 'update_note', id, payload }, mutationOptions) })
+        return commit(() => ({ note: service.mutate({ op: 'update_note', id, payload }, mutationOptions) }))
       }
       if (method === 'DELETE' && parts.length === 2)
-        return ok(
+        return commit(() =>
           service.mutate(
             {
               op: 'delete_note',
@@ -186,10 +224,12 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
           .object({ revision: revisionSchema, expectedRevision: revisionSchema })
           .strict()
           .parse(await body(request))
-        const note = db.restoreRevision(id, parsed.revision, parsed.expectedRevision)
-        if (!note) return fail('NOT_FOUND', 'Note not found', 404)
-        notifyCommittedChanges(options.onDataChanged, ALL_CHANGED)
-        return ok({ note })
+        return commit(() => {
+          const note = db.restoreRevision(id, parsed.revision, parsed.expectedRevision)
+          if (!note) throw new DomainError('NOT_FOUND', 'Note not found')
+          changed = { ...ALL_CHANGED }
+          return { note }
+        })
       }
       if (!db.getNote(id)) return fail('NOT_FOUND', 'Note not found', 404)
       if (method === 'GET' && parts[2] === 'backlinks')
@@ -209,8 +249,8 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
         .object({ name: z.string() })
         .strict()
         .parse(await body(request))
-      return ok(
-        { project: service.mutate({ op: 'create_project', name: parsed.name }, mutationOptions) },
+      return commit(
+        () => ({ project: service.mutate({ op: 'create_project', name: parsed.name }, mutationOptions) }),
         201,
       )
     }
@@ -219,11 +259,9 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
         .object({ projectIds: z.array(idSchema).max(1000) })
         .strict()
         .parse(await body(request))
-      const projects = service.mutate(
-        { op: 'reorder_projects', projectIds: parsed.projectIds },
-        mutationOptions,
-      )
-      return ok({ projects })
+      return commit(() => ({
+        projects: service.mutate({ op: 'reorder_projects', projectIds: parsed.projectIds }, mutationOptions),
+      }))
     }
     if (parts[0] === 'projects' && parts.length >= 2) {
       const id = idSchema.parse(parts[1])
@@ -238,17 +276,20 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
           .object({ name: z.string() })
           .strict()
           .parse(await body(request))
-        return ok({
+        return commit(() => ({
           project: service.mutate({ op: 'rename_project', id, name: parsed.name }, mutationOptions),
-        })
+        }))
       }
       if (method === 'DELETE' && parts.length === 2)
-        return ok(service.mutate({ op: 'delete_project', id }, mutationOptions))
+        return commit(() => service.mutate({ op: 'delete_project', id }, mutationOptions))
     }
     if (method === 'POST' && parts[0] === 'ai-edits' && parts[2] === 'revert') {
-      const reverted = db.revertAiEdit(idSchema.parse(parts[1]))
-      if (reverted) notifyCommittedChanges(options.onDataChanged, ALL_CHANGED)
-      return reverted ? ok({ reverted }) : fail('NOT_FOUND', 'Edit not found or already reverted', 404)
+      return commit(() => {
+        const reverted = db.revertAiEdit(idSchema.parse(parts[1]))
+        if (!reverted) throw new DomainError('NOT_FOUND', 'Edit not found or already reverted')
+        changed = { ...ALL_CHANGED }
+        return { reverted }
+      })
     }
     return fail('NOT_FOUND', 'Not found', 404)
   }
@@ -275,7 +316,7 @@ export const startNotesApiServer = async (db: StrataDatabase, options: Options =
             ? 409
             : error.code === 'NOT_FOUND'
               ? 404
-              : error.code === 'PAYLOAD_TOO_LARGE'
+              : error.code === 'PAYLOAD_TOO_LARGE' || error.code === 'RESPONSE_TOO_LARGE'
                 ? 413
                 : 400
         write(response, status, fail(error.code, error.message, status, error.details).body)
